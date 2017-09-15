@@ -4,7 +4,7 @@ This project provides an example deployment for [Ontoserver](https://ontoserver.
 
 The deployment in the default docker-compose file looks like this:
 
-![Ontoserver deployment diagram](/ontoserver deployment.png)
+![Ontoserver deployment diagram](https://aehrc.github.com/repository/ontoserver-deployment/ontoserver deployment.png)
 
 To add HTTPS support:
  * Add your fullchain and private key files to ontocache/conf/certs/
