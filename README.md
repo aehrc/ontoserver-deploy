@@ -1,4 +1,4 @@
-# Ontoserver deployment example project
+# Ontoserver deployment example project (with horizontal scaling)
 
 This project provides an example deployment for [Ontoserver](https://ontoserver.csiro.au). It uses an NGINX cache in addition to the default Ontoserver deployment described at https://ontoserver.csiro.au/docs.
 
