@@ -11,23 +11,37 @@ services:
     build: ontocache
     container_name: ontocache
     depends_on:
-      - ontoserver
+      - ontoserver1
+      - ontoserver2
     ports:
       - "8080:80"
 #      - "8443:443"
     environment:
       - TZ=Australia/Brisbane
-  ontoserver:
+  ontoserver1:
     image: aehrc/ontoserver:ctsa-5.0
-    container_name: ontoserver
+    container_name: ontoserver1
     depends_on:
      - db
     environment:
       - ONTOSERVER_INSECURE=true
-      - ontoserver.fhir.base=https://your.domain.here/myfhir
-      - authentication.oauth.endpoint.client_id.0=YOUR_NCTS_CLIENT_ID
-      - authentication.oauth.endpoint.client_secret.0=YOUR_NCTS_CLIENT_SECRET
-      - JAVA_OPTS=-Xmx8G
+      - atom.syndication.publish.enabled=true
+      - JAVA_OPTS=-Xmx12G
+      - TZ=Australia/Brisbane
+    volumes:
+     - /mnt/onto:/var/onto
+    logging:
+      options:
+        max-size: 1024m
+  ontoserver2:
+    image: aehrc/ontoserver:ctsa-5.0
+    container_name: ontoserver2
+    depends_on:
+     - db
+    environment:
+      - ONTOSERVER_INSECURE=true
+      - atom.syndication.publish.enabled=true
+      - JAVA_OPTS=-Xmx12G
       - TZ=Australia/Brisbane
     volumes:
      - /mnt/onto:/var/onto
