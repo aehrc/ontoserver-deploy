@@ -1,31 +1,32 @@
-version: '2'
+version: '3'
 services:
   db:
     image: postgres:9.5
-    container_name: db
     volumes:
      - /mnt/pgdata:/var/lib/postgresql/data
     environment:
      - TZ=Australia/Brisbane
   cache:
     build: ontocache
-    container_name: ontocache
+    image: ontocache:latest
     depends_on:
-      - ontoserver1
-      - ontoserver2
+      - ontoserver_stateful
+      - ontoserver_stateless
     ports:
       - "8080:80"
 #      - "8443:443"
     environment:
       - TZ=Australia/Brisbane
-  ontoserver1:
+  ontoserver_stateful:
     image: aehrc/ontoserver:ctsa-5.0
-    container_name: ontoserver1
     depends_on:
      - db
     environment:
       - ONTOSERVER_INSECURE=true
       - atom.syndication.publish.enabled=true
+      - ontoserver.security.readOnly.api=true
+      - ontoserver.security.readOnly.fhir=true
+      - ontoserver.security.readOnly.synd=true
       - JAVA_OPTS=-Xmx12G
       - TZ=Australia/Brisbane
     volumes:
@@ -33,14 +34,16 @@ services:
     logging:
       options:
         max-size: 1024m
-  ontoserver2:
+  ontoserver_stateless:
     image: aehrc/ontoserver:ctsa-5.0
-    container_name: ontoserver2
     depends_on:
      - db
     environment:
       - ONTOSERVER_INSECURE=true
       - atom.syndication.publish.enabled=true
+      - ontoserver.security.readOnly.api=true
+      - ontoserver.security.readOnly.fhir=true
+      - ontoserver.security.readOnly.synd=true
       - JAVA_OPTS=-Xmx12G
       - TZ=Australia/Brisbane
     volumes:
