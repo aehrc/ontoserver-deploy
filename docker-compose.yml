@@ -8,43 +8,41 @@ services:
      - TZ=Australia/Brisbane
   cache:
     build: ontocache
-    image: ontocache:latest
+    image: 127.0.0.1:5000/ontocache
     depends_on:
-      - ontoserver_stateful
-      - ontoserver_stateless
+      - stateful
+      - stateless
     ports:
       - "8080:80"
-#      - "8443:443"
     environment:
       - TZ=Australia/Brisbane
-  ontoserver_stateful:
-    image: aehrc/ontoserver:ctsa-5.0
+  stateful:
+    image: aehrc/ontoserver:ctsa-5.1
     depends_on:
      - db
     environment:
       - ONTOSERVER_INSECURE=true
       - atom.syndication.publish.enabled=true
-      - ontoserver.security.readOnly.api=true
-      - ontoserver.security.readOnly.fhir=true
-      - ontoserver.security.readOnly.synd=true
-      - JAVA_OPTS=-Xmx12G
+      - JAVA_OPTS=-Xmx1G
       - TZ=Australia/Brisbane
     volumes:
      - /mnt/onto:/var/onto
     logging:
       options:
         max-size: 1024m
-  ontoserver_stateless:
-    image: aehrc/ontoserver:ctsa-5.0
+  stateless:
+    image: aehrc/ontoserver:ctsa-5.1
     depends_on:
      - db
+     - stateful
     environment:
       - ONTOSERVER_INSECURE=true
       - atom.syndication.publish.enabled=true
+      - ontoserver.security.enabled=true
       - ontoserver.security.readOnly.api=true
       - ontoserver.security.readOnly.fhir=true
       - ontoserver.security.readOnly.synd=true
-      - JAVA_OPTS=-Xmx12G
+      - JAVA_OPTS=-Xmx1G
       - TZ=Australia/Brisbane
     volumes:
      - /mnt/onto:/var/onto
