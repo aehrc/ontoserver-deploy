@@ -6,7 +6,7 @@ It uses an NGINX cache and is based on the default Ontoserver deployment describ
 It uses Docker Swarm as the scaling mechanism.
 For background see [Services](https://docs.docker.com/get-started/part3/), [Swarms](https://docs.docker.com/get-started/part4/), and [Stacks](https://docs.docker.com/get-started/part5/).
 
-The stack defined in the docker-compose file looks like this:
+The stack defined in the docker-compose file (`docker-compose.yml`) looks like this:
 
 ![Ontoserver deployment diagram](deployment.png)
 
@@ -14,6 +14,10 @@ To add HTTPS support:
  * Add your fullchain and private key files to ontocache/conf/certs/
  * Edit ontocache/conf/snippets/ssl-your.domain.here.conf (and if you rename the file, make sure you fix /ontocache/conf/nginx.conf to match)
  * Edit docker-compose to expose the cache's port 443 as 8443 instead of port 80 as 8080
+
+You will also need to edit the `docker-compose.yml` file to set appropriate values for `ontoserver.fhir.base` and `ontoserver.synd.base`.
+They are currently pointing at `localhost` which is suitable for a local test deployment, but should be updated to reference the proper endpoint for your service.
+Remember to also change the `http:` to `https:` if you are using TLS as well as specifying the correct port if other than the defaults (80 for http and 443 for https).
 
 # Deploying the stack and scaling up
 

@@ -23,6 +23,8 @@ services:
     environment:
       - ONTOSERVER_INSECURE=true
       - atom.syndication.publish.enabled=true
+      - ontoserver.fhir.base=http://localhost:8080/fhir
+      - ontoserver.synd.base=http://localhost:8080/synd
       - JAVA_OPTS=-Xmx1G
       - TZ=Australia/Brisbane
     volumes:
@@ -38,6 +40,8 @@ services:
     environment:
       - ONTOSERVER_INSECURE=true
       - atom.syndication.publish.enabled=true
+      - ontoserver.fhir.base=http://localhost:8080/fhir
+      - ontoserver.synd.base=http://localhost:8080/synd
       - ontoserver.security.enabled=true
       - ontoserver.security.readOnly.api=true
       - ontoserver.security.readOnly.fhir=true
