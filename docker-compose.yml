@@ -20,6 +20,9 @@ services:
     image: aehrc/ontoserver:ctsa-5.1
     depends_on:
      - db
+    deploy:
+      mode: replicated
+      replicas: 1
     environment:
       - ONTOSERVER_INSECURE=true
       - atom.syndication.publish.enabled=true
@@ -37,6 +40,9 @@ services:
     depends_on:
      - db
      - stateful
+    deploy:
+      mode: replicated
+      replicas: 0
     environment:
       - ONTOSERVER_INSECURE=true
       - atom.syndication.publish.enabled=true
