@@ -18,7 +18,7 @@ services:
     environment:
       - TZ=Australia/Brisbane
   ontoserver:
-    image: aehrc/ontoserver:ctsa-5.3
+    image: aehrc/ontoserver:ctsa-5.6
     container_name: ontoserver
     depends_on:
      - db
