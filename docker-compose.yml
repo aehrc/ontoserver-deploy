@@ -1,12 +1,13 @@
 version: '2'
 services:
   db:
-    image: postgres:9.5
+    image: postgres
     container_name: db
     volumes:
      - /mnt/pgdata:/var/lib/postgresql/data
     environment:
      - TZ=Australia/Brisbane
+     - POSTGRES_HOST_AUTH_METHOD=trust
   cache:
     build: ontocache
     container_name: ontocache
