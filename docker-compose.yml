@@ -1,7 +1,7 @@
 version: '2'
 services:
   db:
-    image: postgres:9.5
+    image: postgres
     container_name: db
     volumes:
      - /mnt/pgdata:/var/lib/postgresql/data
