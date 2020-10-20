@@ -12,13 +12,12 @@ services:
     image: 127.0.0.1:5000/ontocache
     depends_on:
       - stateful
-      - stateless
     ports:
       - "8080:80"
     environment:
       - TZ=Australia/Brisbane
   stateful:
-    image: aehrc/ontoserver:ctsa-5
+    image: aehrc/ontoserver:ctsa-6
     depends_on:
      - db
     deploy:
@@ -29,15 +28,17 @@ services:
       - atom.syndication.publish.enabled=true
       - ontoserver.fhir.base=http://localhost:8080/fhir
       - ontoserver.synd.base=http://localhost:8080/synd
+      - ontoserver.security.enabled=true
+      - ontoserver.security.readOnly.api=true
+      - ontoserver.security.readOnly.fhir=true
+      - ontoserver.security.readOnly.synd=true
       - JAVA_OPTS=-Xmx1G
       - TZ=Australia/Brisbane
-    volumes:
-     - /mnt/onto:/var/onto
     logging:
       options:
         max-size: 1024m
   stateless:
-    image: aehrc/ontoserver:ctsa-5
+    image: aehrc/ontoserver:ctsa-6
     depends_on:
      - db
      - stateful
@@ -55,8 +56,6 @@ services:
       - ontoserver.security.readOnly.synd=true
       - JAVA_OPTS=-Xmx1G
       - TZ=Australia/Brisbane
-    volumes:
-     - /mnt/onto:/var/onto
     logging:
       options:
         max-size: 1024m

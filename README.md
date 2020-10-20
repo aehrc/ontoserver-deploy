@@ -1,6 +1,6 @@
 # Example Ontoserver deployment with horizontal scaling
 
-This project provides an example deployment approach for horizontal scaling of [Ontoserver](https://ontoserver.csiro.au).
+This project provides an example deployment approach for readonly horizontal scaling of [Ontoserver](https://ontoserver.csiro.au).
 It uses an NGINX cache and is based on the default Ontoserver deployment described at https://ontoserver.csiro.au/docs/.
 
 It uses Docker Swarm as the scaling mechanism.
@@ -104,9 +104,8 @@ verify: Service converged
 
 # How does it work?
 
-This deployment runs one Ontoserver instance in read/write mode and zero or more instances of Ontosever in a **read only** mode.
+This deployment runs one stateful Ontoserver instance and zero or more instances of Ontoserver, all in a **read only** mode.
 
-Looking at the diagram you will see there are two types of Ontoserver instance: a single stateful instances and zero or more stateless instances.
 The stateless instances provide the horizontal scaling.  The Nginx cache is configured to route the requests to the appropriate instances, and can provide TLS if required.
 
 The stateful instance is there to support _write_ operations as well as _read only_ interactions that nevertheless intrinsically establish state in the instance.
@@ -114,7 +113,7 @@ Rather than introduce the need for _sticky routing_ so that subsequent related r
 
 The first two of the stateful operations are `_search` and `_history` -- due to the way paging is specified in FHIR, the URLs for the previous and next page of results are specific to the instance that generated the current result page.
 
-The third stateful operation is `$closure` -- this is because it creates a notion of shared or synchonrised state between the client and the server.
+The third stateful operation is `$closure` -- this is because it creates a notion of shared or synchronised state between the client and the server.
 
 For most deployments one could expect that both `_search` and `_history` have a relatively low-volume of requests, are not response-time critical, and thus can be served by a single instance.
 Things are slightly different for `$closure` -- it is not yet a commonly used operation, but it would not be surprising that if it were used, then it might get a high-volume of requests.
