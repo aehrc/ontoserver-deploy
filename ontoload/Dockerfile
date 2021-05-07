@@ -1,2 +1,2 @@
-FROM aehrc/ontoserver:ctsa-5.5
+FROM quay.io/aehrc/ontoserver:ctsa-6
 COPY data/* data/

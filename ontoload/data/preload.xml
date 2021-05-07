@@ -15,6 +15,7 @@
       <link rel="alternate" href="file:///data/myCodeSystem.json" type="application/fhir+json" />
       <ncts:contentItemIdentifier>http://example.com/CodeSystem/1</ncts:contentItemIdentifier>
       <ncts:contentItemVersion>1.0.0</ncts:contentItemVersion>
+      <ncts:fhirVersion>4.0</ncts:fhirVersion>
   </entry>
 
   <entry>
@@ -26,5 +27,6 @@
       <link rel="alternate" href="file:///data/myValueSet.json" type="application/fhir+json" />
       <ncts:contentItemIdentifier>http://example.com/ValueSet/1</ncts:contentItemIdentifier>
       <ncts:contentItemVersion>1.0.0</ncts:contentItemVersion>
+      <ncts:fhirVersion>4.0</ncts:fhirVersion>
   </entry>
 </feed>
