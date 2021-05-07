@@ -19,7 +19,7 @@ services:
     environment:
       - TZ=Australia/Brisbane
   ontoserver:
-    image: aehrc/ontoserver:ctsa-6
+    image: quay.io/aehrc/ontoserver:ctsa-6
     container_name: ontoserver
     depends_on:
      - db
