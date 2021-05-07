@@ -18,7 +18,7 @@ services:
     environment:
       - TZ=Australia/Brisbane
   stateful:
-    image: aehrc/ontoserver:ctsa-5
+    image: quay.io/aehrc/ontoserver:ctsa-6
     depends_on:
      - db
     deploy:
@@ -37,7 +37,7 @@ services:
       options:
         max-size: 1024m
   stateless:
-    image: aehrc/ontoserver:ctsa-5
+    image: quay.io/aehrc/ontoserver:ctsa-6
     depends_on:
      - db
      - stateful
