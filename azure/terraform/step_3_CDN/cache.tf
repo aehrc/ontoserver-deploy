@@ -1,7 +1,7 @@
 resource "azurerm_cdn_profile" "onto" {
   location            = "global"
-  name                = "ontoserver-test"
-  resource_group_name = data.azurerm_resource_group.onto.name
+  name                = "ontoserver-example"
+  resource_group_name = data.azurerm_resource_group.test.name
   sku                 = "Standard_Akamai"
   lifecycle {
     ignore_changes = [tags]

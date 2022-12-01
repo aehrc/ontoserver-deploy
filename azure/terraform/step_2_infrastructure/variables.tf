@@ -63,7 +63,7 @@ variable "onto_disk_capacity" {
   default     = 512
 }
 
-variables "acr_enabled" {
+variable "acr_enabled" {
   description = "Is ACR installed by terraform"
   type        = bool
   default     = true

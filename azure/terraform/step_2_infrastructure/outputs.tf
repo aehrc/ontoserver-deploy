@@ -24,7 +24,6 @@ output "aks_kubelet_identity" {
   description = "The resource group created for the AKS cluster"
 }
 
-
 output "database_host" {
   value       = var.setup_db ? azurerm_postgresql_server.onto[0].fqdn : "Not available for this deployment"
   description = "Database host name"

@@ -79,8 +79,9 @@ resource "azurerm_kubernetes_cluster_node_pool" "large_pool" {
 
 # Attach ACT To the Cluster
 resource "azurerm_role_assignment" "acr_kube_role" {
-  count                = var.acr_enabled ? 1 : 0
-  scope                = azurerm_container_registry.acr[0].id
-  role_definition_name = "AcrPull"
-  principal_id         = module.aks.system_assigned_identity[0].principal_id
+  count                            = var.acr_enabled ? 1 : 0
+  scope                            = azurerm_container_registry.acr[0].id
+  role_definition_name             = "AcrPull"
+  principal_id                     = module.aks.kubelet_identity[0].object_id
+  skip_service_principal_aad_check = true
 }
