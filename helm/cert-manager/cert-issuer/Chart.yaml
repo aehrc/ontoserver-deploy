@@ -1,0 +1,5 @@
+apiVersion: v2
+name: cert-issuer
+description: A Helm chart for installing a cluster-wide Let's Encrypt cert issuer
+type: application
+version: 2.0.0

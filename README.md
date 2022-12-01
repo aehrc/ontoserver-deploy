@@ -1,12 +1,13 @@
-# Ontoserver deployment example project
+# Ontoserver deployment examples
 
-This project provides an example deployment for [Ontoserver](https://ontoserver.csiro.au). It uses an NGINX cache in addition to the default Ontoserver deployment described at https://ontoserver.csiro.au/docs.
+This repository provides example deployment projects and infrastructure setup for [Ontoserver](https://ontoserver.csiro.au) using different technologies.
 
-The deployment in the default docker-compose file looks like this:
+* [docker](docker/) - Deployment project using docker-compose files
+* [helm](helm/) - Helm charts for Kubernetes deployments
+* [azure](azure/) - Example infrastructure on Azure using Azure Kubernetes Services to host Ontoserver containers
 
-![Ontoserver deployment diagram](https://github.com/aehrc/ontoserver-deploy/blob/master/deployment.png)
-
-To add HTTPS support:
- * Add your fullchain and private key files to ontocache/conf/certs/
- * Edit ontocache/conf/snippets/ssl-your.domain.here.conf (and if you rename the file, make sure you fix /ontocache/conf/nginx.conf to match)
- * Edit docker-compose to expose the cache's port 443 as 8443 instead of port 80 as 8080
+You will find different configuration sets in the repository branches:
+* [horizontal-scaling](https://github.com/aehrc/ontoserver-deploy/tree/horizontal-scaling) - Example docker deployment with horizontal scaling that deploys one read/write Ontoserver and multiple read only Ontoservers in a stack
+* [horizontal-scaling-readonly-onto6](https://github.com/aehrc/ontoserver-deploy/tree/horizontal-scaling-readonly-onto6) - Example docker deployment with horizontal scaling that deploys multiple read only Ontoservers in a stack
+* [preload-bundle](https://github.com/aehrc/ontoserver-deploy/tree/preload-bundle) - Example deployment including an embedded preload bundle to provide initial content for Ontoserver
+* [preload-feed](https://github.com/aehrc/ontoserver-deploy/tree/preload-feed) - Example deployment including an embedded preload feed to provide initial content for Ontoserver

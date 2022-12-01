@@ -1,0 +1,21 @@
+name: ontoserver-helm-$(Date:yyyyMMdd)$(Rev:.r)
+
+trigger:
+  branches:
+    include:
+    - '*'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+jobs:
+  - job: build
+    displayName: Build, package and publish Helm chart
+    steps:
+      - task: CmdLine@2
+        displayName: Package Helm chart
+        inputs:
+          script: helm package --dependency-update --destination $(Build.ArtifactStagingDirectory) ./ontoserver
+      - publish: $(Build.ArtifactStagingDirectory)
+        displayName: Publish Helm chart
+        artifact: ontoserver-helm-chart
