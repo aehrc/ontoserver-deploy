@@ -48,4 +48,4 @@ terraform apply
 ```
 
 ## Attach ACR
-The Azure Container Registry created by the Terraform scripts is not attached to the AKS cluster by default. Please use the [attach-acr.sh](attach-acr.sh) script to do this task.
+If the Azure Container Registry created by the Terraform scripts is not attached to the AKS cluster please use the [attach-acr.sh](attach-acr.sh) script to do this task.
