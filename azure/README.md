@@ -68,8 +68,7 @@ An [Application Gateway Ingress Controller (AGIC)](https://azure.github.io/appli
 
 AGIC can be used for the TLS termination and routing of Web traffic to the Ontoserver services and an attached Web Application Firewall can be used to secure network traffic. Please note that Spring library used in the development of Ontoserver comes with a basic security built in for malicious URLs/etc.
 
-If AGIC is used in the setup it's advised to use a custom wildcard domain or multiple domains for the exposed services.
-The Application Gateway's Public IP address only allows one Azure generated domain name.
+If AGIC is used in the setup it's advised to use a custom wildcard domain or multiple domains for the exposed services. The Application Gateway's Public IP address only allows one Azure generated domain name. Otherwise you will have to host your exposed PODs/services in different paths on the same domain.
 
 If Web Application Firewall is enabled for the setup please note that Azure only allows 128kb request body size that is way to small for Ontoserver functionality. There could be large CodeSystems/ValueSets or Maps POSTed to Ontoserver so this limitation would not allow to upload them. Request Body inspection should be turned off on the WAF profile to go around this issue.
 
