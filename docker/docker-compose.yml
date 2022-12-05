@@ -4,10 +4,10 @@ services:
     image: postgres
     container_name: db
     volumes:
-     - /mnt/pgdata:/var/lib/postgresql/data
+      - onto-pg-data:/var/lib/postgresql/data
     environment:
-     - TZ=Australia/Brisbane
-     - POSTGRES_HOST_AUTH_METHOD=trust
+      - TZ=Australia/Brisbane
+      - POSTGRES_HOST_AUTH_METHOD=trust
   cache:
     build: ontocache
     container_name: ontocache
@@ -22,16 +22,21 @@ services:
     image: quay.io/aehrc/ontoserver:ctsa-6
     container_name: ontoserver
     depends_on:
-     - db
+      - db
     environment:
       - ONTOSERVER_INSECURE=true
       - ontoserver.fhir.base=https://your.domain.here/myfhir
       - authentication.oauth.endpoint.client_id.0=YOUR_NCTS_CLIENT_ID
       - authentication.oauth.endpoint.client_secret.0=YOUR_NCTS_CLIENT_SECRET
+      - ontoserver.fhir.header.cacheControl=must-revalidate,max-age=1
       - JAVA_OPTS=-Xmx8G
       - TZ=Australia/Brisbane
     volumes:
-     - /mnt/onto:/var/onto
+      - onto-data:/var/onto
     logging:
       options:
         max-size: 1024m
+
+volumes:
+  onto-data:
+  onto-pg-data:
