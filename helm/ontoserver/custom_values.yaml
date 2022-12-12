@@ -36,7 +36,7 @@ ontoserver:
     conformance.implementation.description: Example Demo Server
     conformance.experimental: 'false'
     conformance.contact.0.name: Example Demo Server
-    ontoserver.feature.adminUI: false
+    ontoserver.feature.adminUI: true
     ontoserver.feature.feedFilters: true
     ontoserver.feature.eclFilters: true
     ontoserver.feature.msgaEnabled: true
