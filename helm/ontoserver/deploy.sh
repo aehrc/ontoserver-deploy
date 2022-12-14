@@ -17,6 +17,6 @@ if [ "${DOCKERCONFIGJSON}" == ""  -a "${REPOSECRET_ENABLED}" == "true" ]; then
 fi
 
 # Quay io
-helm upgrade --dry-run --install --namespace $ONTOSERVER_NAMESPACE --values custom_values.yaml \
+helm upgrade --install --namespace $ONTOSERVER_NAMESPACE --values custom_values.yaml \
     --set repoSecret.enabled=$REPOSECRET_ENABLED,repoSecret.name="quayioreposecret",repoSecret.dockerconfigjson="$DOCKERCONFIGJSON" \
     --wait --timeout 30m --create-namespace $ONTOSERVER_NAMESPACE ./ontoserver
