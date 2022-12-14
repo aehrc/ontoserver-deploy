@@ -1,5 +1,5 @@
 ontoserver:
-  image: ontoserver.azurecr.io/ontoserver:develop
+  image: quay.io/aehrc/ontoserver:ctsa-6
   postgresTag: 12.2
   timeZone: Australia/Brisbane
   hostName: ontoserver-example.australiaeast.cloudapp.azure.com
