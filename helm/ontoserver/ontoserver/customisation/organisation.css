@@ -1,0 +1,95 @@
+/* Background and Text colors */
+body, .navbar, .well, .split, .pretty-split-pane-component-inner {
+    background-color: #F0F4F5;
+    color: #212B32;
+}
+.navbar-default .navbar-brand,
+.navbar-brand {
+    color: #212B32;
+}
+ 
+/* Link colors */
+a:link, a:visited {
+    color: #005EB8;
+}
+ 
+/* Highlight colors */
+#main, #main .gutter {
+    background-color: #ED8B00;
+}
+.navbar-default {
+    border-bottom-color: #ED8B00;
+}
+ 
+/* Color palette for controls */
+.btn-default.active {
+    border-color: #337EC6;
+}
+.btn-primary {
+    color: #ffffff;
+    background-color: #005EB8;
+    border-color: #425563;
+}
+.btn-primary:focus,
+.btn-primary.focus {
+    color: #ffffff;
+    background-color: #337EC6;
+    border-color: #687784;
+}
+.btn-primary:hover {
+    color: #ffffff;
+    background-color: #337EC6;
+    border-color: #687784;
+}
+.btn-primary:active,
+.btn-primary.active,
+.open > .dropdown-toggle.btn-primary {
+    color: #ffffff;
+    background-color: #337EC6;
+    border-color: #687784;
+}
+.btn-primary:active:hover,
+.btn-primary.active:hover,
+.open > .dropdown-toggle.btn-primary:hover,
+.btn-primary:active:focus,
+.btn-primary.active:focus,
+.open > .dropdown-toggle.btn-primary:focus,
+.btn-primary:active.focus,
+.btn-primary.active.focus,
+.open > .dropdown-toggle.btn-primary.focus {
+    color: #ffffff;
+    background-color: #204d74;
+    border-color: #122b40;
+}
+.btn-primary:active,
+.btn-primary.active,
+.open > .dropdown-toggle.btn-primary {
+    background-image: none;
+}
+.btn-primary.disabled:hover,
+.btn-primary[disabled]:hover,
+fieldset[disabled] .btn-primary:hover,
+.btn-primary.disabled:focus,
+.btn-primary[disabled]:focus,
+fieldset[disabled] .btn-primary:focus,
+.btn-primary.disabled.focus,
+.btn-primary[disabled].focus,
+fieldset[disabled] .btn-primary.focus {
+    background-color: #005EB8;
+    border-color: #425563;
+}
+ 
+.nav-pills > li.active > a,
+.nav-pills > li.active > a:hover,
+.nav-pills > li.active > a:focus {
+  color: #ffffff;
+  background-color: #005EB8;
+}
+   
+.list-group-item.active,
+.list-group-item.active:hover,
+.list-group-item.active:focus {
+  color: #ffffff;
+  background-color: #005EB8;
+  border-color: #005EB8;
+}

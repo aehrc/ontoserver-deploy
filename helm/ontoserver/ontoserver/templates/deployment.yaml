@@ -1,0 +1,317 @@
+{{- $releaseName := .Release.Name }}
+# This service sends traffic to all Ontoserver replicas.
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ .Release.Name }}-ontoserver-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8080
+  selector:
+    app: {{ .Release.Name }}-ontoserver
+
+{{- range $i, $e := until (int .Values.ontoserver.replicas) }}
+---
+# A deployment and service are created for each Ontoserver replica, and also its corresponding database.
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ $releaseName }}-ontoserver-deployment-{{ $i }}
+spec:
+  strategy:
+    type: {{ $.Values.ontoserver.deployment.strategy }}
+  selector:
+    matchLabels:
+      replica: {{ $releaseName }}-ontoserver-{{ $i }}
+  template:
+    metadata:
+      labels:
+        app: {{ $releaseName }}-ontoserver
+        replica: {{ $releaseName }}-ontoserver-{{ $i }}
+    spec:
+      {{- if $.Values.repoSecret.enabled }}
+      imagePullSecrets:
+      - name:  {{ $.Values.repoSecret.name }}
+      {{- end }}
+      containers:
+        {{- if not $.Values.ontoserver.database.external }}
+        - name: {{ $releaseName }}-ontoserver-db-{{ $i }}
+          image: "postgres:{{ $.Values.ontoserver.postgresTag }}"
+          ports:
+            - containerPort: 5432
+          resources:
+            requests: {{ toJson $.Values.ontoserver.resources.db.requests }}
+            limits: {{ toJson $.Values.ontoserver.resources.db.limits }}
+          env:
+            - name: LANG
+              value: en_US.UTF-8
+            - name: LANGUAGE
+              value: en_US:en
+            - name: LC_ALL
+              value: en_US.UTF-8
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: trust
+            - name: TZ
+              value: {{ $.Values.ontoserver.timeZone }}
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          {{- if and $.Values.ontoserver.persistence.enabled (not $.Values.ontoserver.database.external)}}
+          volumeMounts:
+          {{- if not $.Values.ontoserver.database.external }}
+            - name: {{ $releaseName }}-ontoserver-db-cluster
+              mountPath: /var/lib/postgresql/data
+          {{- end }}
+          {{- end }}
+        {{- end }}
+        - name: {{ $releaseName }}-ontoserver-{{ $i }}
+          image: {{ required "An ontoserver.image value is required" $.Values.ontoserver.image }}
+          imagePullPolicy: {{ $.Values.ontoserver.imagePullPolicy }}
+          ports:
+            - containerPort: 8080
+          resources:
+            requests: {{ toJson $.Values.ontoserver.resources.ontoserver.requests }}
+            limits: {{ toJson $.Values.ontoserver.resources.ontoserver.limits }}
+          livenessProbe:
+            exec:
+              command:
+                - /healthcheck.sh
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 10
+          readinessProbe:
+            exec:
+              command:
+                - /healthcheck.sh
+                {{- if $.Values.ontoserver.waitForPreloadSuccess }}
+                - "-s"
+                {{- else }}
+                - "-l"
+                {{- end}}
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            failureThreshold: 3
+          env:
+            - name: ONTOSERVER_INSECURE
+              value: "true"
+            - name: JAVA_OPTS
+              value: -Xms{{ $.Values.ontoserver.resources.ontoserver.initialHeapSize }} -Xmx{{ $.Values.ontoserver.resources.ontoserver.maxHeapSize }}
+            - name: TZ
+              value: {{ $.Values.ontoserver.timeZone | quote }}
+            - name: LANG
+              value: {{ $.Values.ontoserver.lang | quote }}
+            - name: LANGUAGE
+              value: {{ $.Values.ontoserver.language | quote }}
+            - name: LC_ALL
+              value: {{ $.Values.ontoserver.lc_all | quote }}
+            - name: spring.datasource.url
+              {{- if $.Values.ontoserver.database.host }}
+              value: "jdbc:postgresql://{{ $.Values.ontoserver.database.host }}:{{ $.Values.ontoserver.database.port }}/{{ $.Values.ontoserver.database.database }}"
+              {{- else }}
+              value: "jdbc:postgresql://localhost:5432/{{ $.Values.ontoserver.database.database }}"
+              {{- end }}
+            {{- if $.Values.ontoserver.database.user }}
+            - name: spring.datasource.username
+              value: {{ $.Values.ontoserver.database.user | quote }}
+            {{- end }}
+            {{- if $.Values.ontoserver.database.password }}
+            - name: spring.datasource.password
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $releaseName }}-ontoserver-db-password
+                  key: password
+            {{- end }}
+            - name: ontoserver.synd.base
+              value: https://{{ required "An ontoserver.hostName value is required" $.Values.ontoserver.hostName }}/synd
+            - name: ontoserver.fhir.base
+              value: https://{{ $.Values.ontoserver.hostName }}/fhir
+            - name: ontoserver.formats.html.base
+              value: https://{{ $.Values.ontoserver.hostName }}/static
+            {{- range $configKey, $configValue := $.Values.ontoserver.config }}
+            - name: {{ $configKey }}
+              {{- if contains "client_secret" $configKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $releaseName }}-ontoserver-client-secrets
+                  key: {{ $configKey }}
+              {{- else }}
+              value: {{ $configValue | quote }}
+              {{- end }}
+            {{- end }}
+        {{- if or $.Values.ontoserver.persistence.enabled $.Values.ontoserver.customisation.mapname $.Values.ontoserver.preload.feed $.Values.ontoserver.preload.bundle }}
+          volumeMounts:
+        {{- end }}
+        {{- if $.Values.ontoserver.persistence.enabled }}
+            - name: {{ $releaseName }}-ontoserver-files
+              mountPath: /var/onto
+        {{- end }}
+        {{- if $.Values.ontoserver.customisation.mapname }}
+            - name: {{ $releaseName }}-config
+              mountPath: /well-known
+        {{- end }}
+        {{- if $.Values.ontoserver.preload.feed }}
+            - name: {{ $releaseName }}-preload
+              mountPath: /data/preload.xml
+              subPath: preload.xml
+            - name: {{ $releaseName }}-preload
+              mountPath: /data/myValueSet.json
+              subPath: myValueSet.json
+            - name: {{ $releaseName }}-preload
+              mountPath: /data/myCodeSystem.json
+              subPath: myCodeSystem.json
+        {{- end }}
+        {{- if $.Values.ontoserver.preload.bundle }}
+            - name: {{ $releaseName }}-preload
+              mountPath: /data/preload.json
+              subPath: preload.json
+        {{- end }}
+      {{- if or $.Values.ontoserver.persistence.enabled $.Values.ontoserver.customisation.mapname $.Values.ontoserver.preload.feed $.Values.ontoserver.preload.bundle }}
+      volumes:
+      {{- end }}
+        {{- if or $.Values.ontoserver.preload.feed $.Values.ontoserver.preload.bundle }}
+        - name: {{ $releaseName }}-preload
+          configMap:
+            name: ontoserver-preload
+            items:
+              {{- if $.Values.ontoserver.preload.bundle }}
+              - key: "preload.json"
+                path: "preload.json"
+              {{- end }}
+              {{- if $.Values.ontoserver.preload.feed }}
+              - key: "preload.xml"
+                path: "preload.xml"
+              - key: "myValueSet.json"
+                path: "myValueSet.json"
+              - key: "myCodeSystem.json"
+                path: "myCodeSystem.json"
+              {{- end }}
+        {{- end }}
+        {{- if $.Values.ontoserver.customisation.mapname }}
+        - name: {{ $releaseName }}-config
+          configMap:
+            name: {{ $.Values.ontoserver.customisation.mapname }}-config
+            items:
+              - key: "organisation.css"
+                path: "organisation.css"
+              - key: "organisation_logo.png"
+                path: "organisation_logo.png"
+              {{- if $.Values.ontoserver.customisation.ontologo }}
+              - key: "organisation_logo.png"
+                path: "logo.png"
+              {{- end }}
+        {{- end }}
+        {{/* We only allow persistence to be enabled in a single-replica configuration. */}}
+        {{- if and $.Values.ontoserver.persistence.enabled (eq (int $.Values.ontoserver.replicas) 1) }}
+        - name: {{ $releaseName }}-ontoserver-files
+          {{- if $.Values.ontoserver.persistence.fileDiskName }}
+          azureDisk:
+            kind: Managed
+            diskName: {{ required "A ontoserver.persistence.fileDiskName value is required" $.Values.ontoserver.persistence.fileDiskName }}
+            diskURI: {{ required "A ontoserver.persistence.fileDiskUri value is required" $.Values.ontoserver.persistence.fileDiskUri }}
+          {{- end }}
+          {{- if $.Values.ontoserver.persistence.fileShareName }}
+          azureFile:
+            shareName: {{ required "A ontoserver.persistence.fileShareName value is required" $.Values.ontoserver.persistence.fileShareName }}
+            secretName: {{ required "A ontoserver.persistence.fileSecretName value is required" $.Values.ontoserver.persistence.fileSecretName }}
+          {{- end }}
+        {{- if not $.Values.ontoserver.database.external }}
+        - name: {{ $releaseName }}-ontoserver-db-cluster
+          azureDisk:
+            kind: Managed
+            diskName: {{ required "A ontoserver.persistence.dbDiskName value is required" $.Values.ontoserver.persistence.dbDiskName }}
+            diskURI: {{ required "A ontoserver.persistence.dbDiskUri value is required" $.Values.ontoserver.persistence.dbDiskUri }}
+        {{- end }}
+        {{- end }}
+      {{- if $.Values.ontoserver.tolerations }}
+      tolerations:
+        {{- range $index, $element := $.Values.ontoserver.tolerations }}
+        - key: {{ $element.key }}
+          operator: {{ $element.operator }}
+          value: {{ $element.value }}
+          effect: {{ $element.effect }}
+        {{- end }}
+      {{- end }}
+
+---
+# This service sends traffic to a specific Ontoserver replica.
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ $.Release.Name }}-ontoserver-service-{{ $i }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8080
+  selector:
+    replica: {{ $.Release.Name }}-ontoserver-{{ $i }}
+{{- end }}
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $releaseName }}-ontoserver-client-secrets
+data:
+{{- range $configKey, $configValue := .Values.ontoserver.config }}
+  {{- if contains "client_secret" $configKey }}
+  {{ $configKey }}: {{ $configValue | b64enc }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.ontoserver.database.password }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $releaseName }}-ontoserver-db-password
+data:
+  password: {{ .Values.ontoserver.database.password | b64enc }}
+{{- end }}
+---
+{{- if .Values.repoSecret.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $.Values.repoSecret.name }}
+data:
+  .dockerconfigjson:  {{ $.Values.repoSecret.dockerconfigjson }}
+type: kubernetes.io/dockerconfigjson
+{{- end }}
+---
+{{- if $.Values.ontoserver.customisation.mapname }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $.Values.ontoserver.customisation.mapname }}-config
+  labels:
+    app: {{ $.Values.ontoserver.customisation.mapname }}-config
+binaryData:
+  organisation.css: |-
+    {{ .Files.Get "customisation/organisation.css" | b64enc | indent 4 }}
+  organisation_logo.png: |-
+    {{ .Files.Get "customisation/organisation_logo.png" | b64enc | indent 4 }}
+{{- end }}
+---
+{{- if or $.Values.ontoserver.preload.feed $.Values.ontoserver.preload.bundle }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ontoserver-preload
+  labels:
+    app: ontoserver-preload
+binaryData:
+  {{- if or $.Values.ontoserver.preload.feed }}
+  preload.xml: |-
+    {{ .Files.Get "preload/preload.xml" | b64enc | indent 4 }}
+  myValueSet.json: |-
+    {{ .Files.Get "preload/myValueSet.json" | b64enc | indent 4 }}
+  myCodeSystem.json: |-
+    {{ .Files.Get "preload/myCodeSystem.json" | b64enc | indent 4 }}
+  {{- end }}
+  {{- if or $.Values.ontoserver.preload.bundle }}
+  preload.json: |-
+    {{ .Files.Get "preload/preload.json" | b64enc | indent 4 }}
+  {{- end }}
+{{- end }}
