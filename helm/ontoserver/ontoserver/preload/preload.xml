@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:ncts="http://ns.electronichealth.net.au/ncts/syndication/asf/extensions/0.1.0">
+    <title type="text">Preload Feed</title>
+    <link rel="alternate" type="application/atom+xml" href="classpath:preload/preload.xml"/>
+    <updated>2019-06-29</updated>
+    <id>urn:uuid:282A810F-6DAB-40B6-8DB8-85E6624743AA</id>
+    <ncts:atomSyndicationFormatProfile version="http://ns.electronichealth.net.au/ncts/syndication/asf/profile/0.1.0"/>
+
+  <entry>
+      <title>Preload Bundle</title>
+      <category term="FHIR_Bundle" label="FHIR Bundle" scheme="http://ns.electronichealth.net.au/ncts/syndication/asf/scheme/1.0.0" />
+      <author>
+        <name>CSIRO</name>
+      </author>
+      <id>a24bbe44-04d5-457d-aebc-513cc2c296b8</id>
+      <updated>2018-01-16</updated>
+      <published>2018-01-16</published>
+      <summary type="text">This is a bundle of resources to be loaded</summary>
+      <link rel="alternate" href="file:///data/preload.json" type="application/fhir+json" />
+      <ncts:bundleInterpretation>batch</ncts:bundleInterpretation>
+      <ncts:contentItemIdentifier>preload-bundle</ncts:contentItemIdentifier>
+      <ncts:contentItemVersion>0.0.1</ncts:contentItemVersion>
+      <ncts:fhirVersion>4.0</ncts:fhirVersion>
+  </entry>
+
+</feed>

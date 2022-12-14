@@ -55,6 +55,9 @@ ontoserver:
   customisation:
     mapname: false
     ontologo: false
+  preload:
+    bundle: false
+    feed: false
   proxy:
     maxBodySize: 1m
     readTimeout: 60s

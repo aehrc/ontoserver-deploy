@@ -139,7 +139,7 @@ spec:
               value: {{ $configValue | quote }}
               {{- end }}
             {{- end }}
-        {{- if or $.Values.ontoserver.persistence.enabled $.Values.ontoserver.customisation.mapname }}
+        {{- if or $.Values.ontoserver.persistence.enabled $.Values.ontoserver.customisation.mapname $.Values.ontoserver.preload.feed $.Values.ontoserver.preload.bundle }}
           volumeMounts:
         {{- end }}
         {{- if $.Values.ontoserver.persistence.enabled }}
@@ -150,9 +150,33 @@ spec:
             - name: {{ $releaseName }}-config
               mountPath: /well-known
         {{- end }}
-      {{- if or $.Values.ontoserver.persistence.enabled $.Values.ontoserver.customisation.mapname }}
+        {{- if $.Values.ontoserver.preload.feed }}
+            - name: {{ $releaseName }}-preload
+              mountPath: /data/preload.xml
+              subPath: preload.xml
+        {{- end }}
+        {{- if $.Values.ontoserver.preload.bundle }}
+            - name: {{ $releaseName }}-preload
+              mountPath: /data/preload.json
+              subPath: preload.json
+        {{- end }}
+      {{- if or $.Values.ontoserver.persistence.enabled $.Values.ontoserver.customisation.mapname $.Values.ontoserver.preload.feed $.Values.ontoserver.preload.bundle }}
       volumes:
       {{- end }}
+        {{- if or $.Values.ontoserver.preload.feed $.Values.ontoserver.preload.bundle }}
+        - name: {{ $releaseName }}-preload
+          configMap:
+            name: ontoserver-preload
+            items:
+              {{- if $.Values.ontoserver.preload.bundle }}
+              - key: "preload.json"
+                path: "preload.json"
+              {{- end }}
+              {{- if $.Values.ontoserver.preload.feed }}
+              - key: "preload.xml"
+                path: "preload.xml"
+              {{- end }}
+        {{- end }}
         {{- if $.Values.ontoserver.customisation.mapname }}
         - name: {{ $releaseName }}-config
           configMap:
@@ -258,4 +282,22 @@ binaryData:
     {{ .Files.Get "customisation/organisation.css" | b64enc | indent 4 }}
   organisation_logo.png: |-
     {{ .Files.Get "customisation/organisation_logo.png" | b64enc | indent 4 }}
+{{- end }}
+---
+{{- if or $.Values.ontoserver.preload.feed $.Values.ontoserver.preload.bundle }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ontoserver-preload
+  labels:
+    app: ontoserver-preload
+binaryData:
+  {{- if or $.Values.ontoserver.preload.feed }}
+  preload.xml: |-
+    {{ .Files.Get "preload/preload.xml" | b64enc | indent 4 }}
+  {{- end }}
+  {{- if or $.Values.ontoserver.preload.bundle }}
+  preload.json: |-
+    {{ .Files.Get "preload/preload.json" | b64enc | indent 4 }}
+  {{- end }}
 {{- end }}
