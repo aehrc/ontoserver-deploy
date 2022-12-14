@@ -1,0 +1,25 @@
+  {
+    "resourceType": "Bundle",
+    "type": "batch",
+    "entry": [
+      {
+        "resource": {
+          "resourceType": "CodeSystem",
+          "id": "2",
+          "url": "http://sample.com/CodeSystem/2",
+          "status": "draft",
+          "content": "complete",
+          "concept": [
+            {
+              "code": "AA",
+              "display": "1st concept"
+            },
+            {
+              "code": "BB",
+              "display": "2nd concept"
+            }
+          ]
+        }
+      }
+    ]
+  }

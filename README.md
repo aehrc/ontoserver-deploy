@@ -1,12 +1,6 @@
-# Ontoserver deployment example project
+# Ontoserver deployment examples with embedded preload bundle
 
-This project provides an example deployment for [Ontoserver](https://ontoserver.csiro.au). It uses an NGINX cache in addition to the default Ontoserver deployment described at https://ontoserver.csiro.au/docs.
+This repository provides example deployment projects and infrastructure setup for [Ontoserver](https://ontoserver.csiro.au) using different technologies.
 
-The deployment in the default docker-compose file looks like this:
-
-![Ontoserver deployment diagram](https://github.com/aehrc/ontoserver-deploy/blob/master/deployment.png)
-
-To add HTTPS support:
- * Add your fullchain and private key files to ontocache/conf/certs/
- * Edit ontocache/conf/snippets/ssl-your.domain.here.conf (and if you rename the file, make sure you fix /ontocache/conf/nginx.conf to match)
- * Edit docker-compose to expose the cache's port 443 as 8443 instead of port 80 as 8080
+* [docker](docker/) - Deployment project using docker-compose files
+* [helm](helm/) - Helm charts for Kubernetes deployments

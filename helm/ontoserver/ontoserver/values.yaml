@@ -1,0 +1,107 @@
+ontoserver:
+  image: quay.io/aehrc/ontoserver:ctsa-6
+  imagePullPolicy: Always
+  imagePullSecrets: []
+  # hostName: [host name]
+  # internalHostName: [internal host name]
+  postgresTag: 12.2
+  timeZone: Australia/Brisbane
+  lang: en_AU.UTF-8
+  language: en_AU.UTF-8
+  lc_all: en_AU.UTF-8
+  replicas: 1
+  persistence:
+    enabled: false
+    fileDiskName: false
+    # fileDiskUri: [Azure Disk URI]
+    fileShareName: false
+    #fileSecretName
+    dbDiskName: false
+    # dbDiskUri: [Azure Disk URI]
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2
+        memory: 4G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2800m
+      maxHeapSize: 2800m
+    db:
+      requests:
+        cpu: 1
+        memory: 1G
+      limits:
+        cpu: 1
+        memory: 1G
+  # defaultSctEdition: [default SNOMED CT edition]
+  security:
+    enabled: false
+  tolerations: false
+    #- key: "kubernetes.azure.com/scalesetpriority"
+    #  operator: "Equal"
+    #  value: "spot"
+    #  effect: "NoSchedule"
+  deployment:
+    strategy: RollingUpdate
+  database:
+    external: false
+    host: false
+    port: 5432
+    database: postgres
+    user: false
+    password: false
+  customisation:
+    mapname: false
+    ontologo: false
+  preload:
+    bundle: false
+    feed: false
+  proxy:
+    maxBodySize: 1m
+    readTimeout: 60s
+    sendTimeout: 60s
+  waitForPreloadSuccess: true
+
+ingress:
+  #class: azure/application-gateway
+  #class: alb
+  class: ontoserver-nginx
+  nginx:
+    enabled: true # Set this to true if nginx-ingress is used
+    sslRedirect: false
+  appgw:
+    # Change this to actual values if using Application Gateway Ingress Controller
+    #sslcertificate: "name-of-appgw-installed-certificate"
+    probeInterval: 60
+    probePath: /fhir/metadata
+    requesttimeout: 1800
+    className: azure-application-gateway
+  alb:
+    #loadBalancerGroup: ontoserver
+    # Change this to actual values if using ALB Ingress controller
+    #certificateArn: arn:aws:acm:location:tenancy:certificate/id
+
+
+certmanager:
+  enabled: true
+
+nginx-ingress:
+  controller:
+    enableSnippets: true
+    enableCertManager: true
+    ingressClassResource:
+      name: ontoserver-nginx
+      controllerValue: 'k8s.io/ontoserver-nginx'
+      enabled: true
+    service:
+      annotations:
+        service.beta.kubernetes.io/azure-dns-label-name: ontoserver
+    ingressClass: 'ontoserver-nginx'
+    ingressClassByName: true
+
+repoSecret:
+  enabled: false
+  #name: [reposecret]
+  #dockerconfigjson: [base64 configjson]

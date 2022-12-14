@@ -1,0 +1,10 @@
+apiVersion: v2
+name: ontoserver
+description: A Helm chart for Ontoserver
+type: application
+version: 2.1.0
+dependencies:
+  - name: nginx-ingress
+    condition: ingress.nginx.enabled
+    version: ^0.13.2
+    repository: https://helm.nginx.com/stable

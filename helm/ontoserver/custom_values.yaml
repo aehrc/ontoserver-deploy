@@ -1,0 +1,73 @@
+ontoserver:
+  image: quay.io/aehrc/ontoserver:ctsa-6
+  postgresTag: 12.2
+  timeZone: Australia/Brisbane
+  hostName: ontoserver-example.australiaeast.cloudapp.azure.com
+  internalHostName: ontoserver-example.australiaeast.cloudapp.azure.com
+  waitForPreloadSuccess: true
+  database:
+    external: false
+  persistence:
+    enabled: false
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2000m
+        memory: 8G
+      limits:
+        cpu: 2500m
+        memory: 8G
+      initialHeapSize: 7000m
+      maxHeapSize: 7000m
+    db:
+      cpu: 100m
+      memory: 1Gi
+
+  proxy:
+    maxBodySize: 1000M
+    readTimeout: 300s
+    sendTimeout: 300s
+
+  config:
+    ontoserver.preload.on.start.fail.fast: 'true'
+    conformance.description: Example Demo Server
+    conformance.publisher: Example Publisher
+    conformance.implementation.description: Example Demo Server
+    conformance.experimental: 'false'
+    conformance.contact.0.name: Example Demo Server
+    ontoserver.feature.adminUI: true
+    ontoserver.feature.feedFilters: true
+    ontoserver.feature.eclFilters: true
+    ontoserver.feature.msgaEnabled: true
+    ontoserver.feature.generic-validation-enabled: true
+    ontoserver.feature.postcoordination: true
+    ontoserver.fhir.batch.addBundle: true
+    ontoserver.fhir.too.costly.threshold: 150000
+    ontoserver.formats.extra: html,csv,tsv
+    spring.http.multipart.maxFileSize: 1000Mb
+    spring.http.multipart.maxRequestSize: 1000Mb
+
+  tolerations:
+    - key: "kubernetes.azure.com/scalesetpriority"
+      operator: "Equal"
+      value: "spot"
+      effect: "NoSchedule"
+  preload:
+    bundle: true
+
+certmanager:
+  enabled: true
+
+nginx-ingress:
+  controller:
+    ingressClassResource:
+      name: ontoserver-ontoserver-example-nginx
+      controllerValue: 'k8s.io/ontoserver-ontoserver-example-nginx'
+    service:
+      annotations:
+        service.beta.kubernetes.io/azure-dns-label-name: ontoserver-example
+    ingressClass: 'ontoserver-ontoserver-example-nginx'
+
+ingress:
+  class: ontoserver-ontoserver-example-nginx

@@ -1,0 +1,74 @@
+kind: Ingress
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: {{ .Release.Name }}-ontoserver-ingress
+  annotations:
+    {{- if .Values.certmanager.enabled }}
+    cert-manager.io/cluster-issuer: letsencrypt
+    {{- if contains "nginx" .Values.ingress.class }}
+    cert-manager.io/issue-temporary-certificate: "true" # temporary cert required for nginx to be able to reload
+    acme.cert-manager.io/http01-edit-in-place: "true" # important to merge with existing ingress resource into a single nginx config file
+    {{- end }}
+    {{- end }}
+    {{- if contains "nginx" .Values.ingress.class }}
+    nginx.org/redirect-to-https: "{{ .Values.ingress.nginx.sslRedirect }}"
+    ingress.kubernetes.io/ssl-redirect: "{{ .Values.ingress.nginx.sslRedirect }}"
+    nginx.org/client-max-body-size: {{ .Values.ontoserver.proxy.maxBodySize | quote }}
+    nginx.org/proxy-read-timeout: {{ .Values.ontoserver.proxy.readTimeout | quote }}
+    nginx.org/proxy-send-timeout: {{ .Values.ontoserver.proxy.sendTimeout | quote }}
+    nginx.org/server-snippets: |
+      send_timeout {{ .Values.ontoserver.proxy.sendTimeout }};
+    {{- end}}
+    {{- if eq .Values.ingress.class "azure/application-gateway" }}
+    cert-manager.io/acme-challenge-type: http01
+    appgw.ingress.kubernetes.io/use-private-ip: "false"
+    appgw.ingress.kubernetes.io/health-probe-path: "{{ .Values.ingress.appgw.probePath }}"
+    appgw.ingress.kubernetes.io/health-probe-interval: "{{ .Values.ingress.appgw.probeIterval }}"
+    appgw.ingress.kubernetes.io/request-timeout: "{{ .Values.ingress.appgw.requesttimeout }}"
+    appgw.ingress.kubernetes.io/ssl-redirect: "false"
+    {{- if .Values.ingress.appgw.sslcertificate }}
+    appgw.ingress.kubernetes.io/appgw-ssl-certificate: {{ .Values.ingress.appgw.sslcertificate }}
+    {{- end }}
+    {{- end }}
+    {{- if eq .Values.ingress.class "alb" }}
+    alb.ingress.kubernetes.io/group.name: {{ .Values.ingress.alb.loadBalancerGroup | quote }}
+    alb.ingress.kubernetes.io/certificate-arn: {{ .Values.ingress.alb.certificateArn | quote }}
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds={{ .Values.ontoserver.proxy.readTimeout }}
+    alb.ingress.kubernetes.io/target-type: ip
+    {{- end }}
+
+spec:
+
+  {{- if eq .Values.ingress.class "azure/application-gateway" }}
+  ingressClassName:  {{ .Values.ingress.appgw.className }}
+  {{- else }}
+  ingressClassName:  {{ .Values.ingress.class }}
+  {{ end }}
+  {{- if not .Values.ingress.appgw.sslcertificate }}
+  tls:
+    - hosts:
+        - {{ required "An ontoserver.internalHostName value is required" .Values.ontoserver.internalHostName }}
+      secretName: ontoserver-tls-secret
+  {{- end }}
+  rules:
+    - host: {{ .Values.ontoserver.internalHostName }}
+      http:
+        paths:
+          # Requests to the closure operation endpoint are always routed to the first (stateful) Ontoserver replica.
+          - path: /fhir/$closure
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ .Release.Name }}-ontoserver-service-0
+                port:
+                  number: 80
+          # All other requests are routed to the service which sends traffic to all Ontoserver replicas.
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ .Release.Name }}-ontoserver-service
+                port:
+                  number: 80
