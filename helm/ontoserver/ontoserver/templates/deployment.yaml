@@ -209,18 +209,25 @@ spec:
             kind: Managed
             diskName: {{ required "A ontoserver.persistence.fileDiskName value is required" $.Values.ontoserver.persistence.fileDiskName }}
             diskURI: {{ required "A ontoserver.persistence.fileDiskUri value is required" $.Values.ontoserver.persistence.fileDiskUri }}
-          {{- end }}
-          {{- if $.Values.ontoserver.persistence.fileShareName }}
+          {{- else if $.Values.ontoserver.persistence.fileShareName }}
           azureFile:
             shareName: {{ required "A ontoserver.persistence.fileShareName value is required" $.Values.ontoserver.persistence.fileShareName }}
             secretName: {{ required "A ontoserver.persistence.fileSecretName value is required" $.Values.ontoserver.persistence.fileSecretName }}
+          {{- else }}
+          persistentVolumeClaim:
+            claimName: {{ $releaseName }}-ontoserver-files
           {{- end }}
         {{- if not $.Values.ontoserver.database.external }}
         - name: {{ $releaseName }}-ontoserver-db-cluster
+          {{- if $.Values.ontoserver.persistence.dbDiskName }}
           azureDisk:
             kind: Managed
             diskName: {{ required "A ontoserver.persistence.dbDiskName value is required" $.Values.ontoserver.persistence.dbDiskName }}
             diskURI: {{ required "A ontoserver.persistence.dbDiskUri value is required" $.Values.ontoserver.persistence.dbDiskUri }}
+          {{- else }}
+          persistentVolumeClaim:
+            claimName: {{ $releaseName }}-ontoserver-db-cluster
+          {{- end }}
         {{- end }}
         {{- end }}
       {{- if $.Values.ontoserver.tolerations }}
@@ -269,8 +276,8 @@ metadata:
 data:
   password: {{ .Values.ontoserver.database.password | b64enc }}
 {{- end }}
----
 {{- if .Values.repoSecret.enabled }}
+---
 apiVersion: v1
 kind: Secret
 metadata:
@@ -279,8 +286,8 @@ data:
   .dockerconfigjson:  {{ $.Values.repoSecret.dockerconfigjson }}
 type: kubernetes.io/dockerconfigjson
 {{- end }}
----
 {{- if $.Values.ontoserver.customisation.mapname }}
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -293,8 +300,8 @@ binaryData:
   organisation_logo.png: |-
     {{ .Files.Get "customisation/organisation_logo.png" | b64enc | indent 4 }}
 {{- end }}
----
 {{- if or $.Values.ontoserver.preload.feed $.Values.ontoserver.preload.bundle }}
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -314,4 +321,32 @@ binaryData:
   preload.json: |-
     {{ .Files.Get "preload/preload.json" | b64enc | indent 4 }}
   {{- end }}
+{{- end }}
+{{- if $.Values.ontoserver.persistence.enabled }}
+{{- if not (or $.Values.ontoserver.persistence.fileDiskName $.Values.ontoserver.persistence.fileShareName) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $releaseName }}-ontoserver-files
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ $.Values.ontoserver.persistence.pvFilesDiskSize }}
+{{- end }}
+{{- if not $.Values.ontoserver.persistence.dbDiskName }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $releaseName }}-ontoserver-db-cluster
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ $.Values.ontoserver.persistence.pvDbDiskSize }}
+{{- end }}
 {{- end }}

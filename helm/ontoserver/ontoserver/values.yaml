@@ -12,6 +12,10 @@ ontoserver:
   replicas: 1
   persistence:
     enabled: false
+    # PersistentVolume details - Will not be used if azure disk or fileshare provided
+    pvFilesDiskSize: 200Gi
+    pvDbDiskSize: 200Gi
+    # fileDiskUri: [Azure Disk URI]
     fileDiskName: false
     # fileDiskUri: [Azure Disk URI]
     fileShareName: false
