@@ -322,7 +322,7 @@ binaryData:
     {{ .Files.Get "preload/preload.json" | b64enc | indent 4 }}
   {{- end }}
 {{- end }}
-{{- if $.Values.ontoserver.persistence.enabled }}
+{{- if and $.Values.ontoserver.persistence.enabled (eq (int $.Values.ontoserver.replicas) 1) }}
 {{- if not (or $.Values.ontoserver.persistence.fileDiskName $.Values.ontoserver.persistence.fileShareName) }}
 ---
 apiVersion: v1
