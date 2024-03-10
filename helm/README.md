@@ -36,9 +36,13 @@ Here is a list of variables that are most likely to be customised for a new Onto
 | `ontoserver.preload.bundle` | If this is set to anything but `false` the deployment mounts a [`preload.json`](ontoserver/ontoserver/preload/preload.json) file into the `/data` directory overwriting the default file in the container. The FHIR Bundle will be preloaded into Ontoserver at startup. Please note if you have preload feed set this bundle will not preload on startup unless you include `file:///data/preload.json` in your new feed. |
 | `ontoserver.preload.feed` | If this is set to anything but `false` the deployment mounts a [`preload.xml`](ontoserver/ontoserver/preload/preload.xml) file into the `/data` directory overwriting the default file in the container. The content specified within the feed will be preloaded into Ontoserver at startup. |
 | `ontoserver.tolerations.*` | By default this setting is `false` otherwise it can be used to pass Kubernetes tolerations settings to the pod by adding `-key` configuration item(s) under it. For example it can be used to schedule the Ontoserver pod on an Azure non-spot node for high availability if the K8s Cluster has mixed spot and non-spot nodes [More here](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/) |
-| `httpProxy` | Define a HTTP proxy for internet access.
-| `httpsProxy` | Define a HTTPS proxy for internet access.
-| `noProxy` | Define a list of domains to except from being proxied. eg. ".svc.cluster.local,.svc,.foo.com"
+| `ontoserver.httpProxy` | Define a Global HTTP proxy for internet access.
+| `ontoserver.httpsProxy` | Define a Global HTTPS proxy for internet access.
+| `ontoserver.noProxy` | Define a list of domains to except from being proxied. eg. ".svc.cluster.local,.svc,.foo.com"
+| `ontoserver.env.HTTP_PROXY_HOST` | Define an HTTP proxy for Ontoserver app internet access. (Ontoserver does not use system proxy ENV variables)
+| `ontoserver.env.HTTP_PROXY_PORT` | Define an HTTP proxy port for Ontoserver app internet access. (Ontoserver does not use system proxy ENV variables)
+| `ontoserver.env.HTTPS_PROXY_HOST` | Define an HTTPS proxy for Ontoserver app internet access. (Ontoserver does not use system proxy ENV variables)
+| `ontoserver.env.HTTPS_PROXY_PORT` | Define an HTTPS proxy port for Ontoserver app internet access. (Ontoserver does not use system proxy ENV variables)
 | `ingress.class` | This setting tells Kubernetes what kind of ingress class to use. The chart is set up to take `ontoserver-nginx`, the class name set under the `nginx-ingress.*` settings. It can also be set to `azure/application-gateway` or `alb` settings. |
 | `ingress.sslRedirect` | If you want to host Ontoserver on http you need to set this config item to `false` otherwise all http requests are redirected to https. |
 | `ingress.appgw.*` | These are settings for the Azure Application Gateway Ingress Controller. Here you can set `sslcertificate` - to use an Azure Application Gateway installed SSL certificate name - and `requesttimeout` to set request timeout in minutes. |
