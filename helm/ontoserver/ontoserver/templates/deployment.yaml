@@ -123,6 +123,22 @@ spec:
             - name: NO_PROXY
               value: {{ $.Values.ontoserver.noProxy }}
             {{- end }}
+            {{- if $.Values.ontoserver.env.HTTP_PROXY_HOST }}
+            - name: HTTP_PROXY_HOST
+              value: {{ $.Values.ontoserver.env.HTTP_PROXY_HOST }}
+            {{- end }}
+            {{- if $.Values.ontoserver.env.HTTPS_PROXY_HOST }}
+            - name: HTTPS_PROXY_HOST
+              value: {{ $.Values.ontoserver.env.HTTPS_PROXY_HOST }}
+            {{- end }}
+            {{- if $.Values.ontoserver.env.HTTP_PROXY_PORT }}
+            - name: HTTP_PROXY_PORT
+              value: {{ $.Values.ontoserver.env.HTTP_PROXY_PORT | quote }}
+            {{- end }}
+            {{- if $.Values.ontoserver.env.HTTPS_PROXY_PORT }}
+            - name: HTTPS_PROXY_PORT
+              value: {{ $.Values.ontoserver.env.HTTPS_PROXY_PORT | quote }}
+            {{- end }}
             {{- if $.Values.ontoserver.database.user }}
             - name: spring.datasource.username
               value: {{ $.Values.ontoserver.database.user | quote }}
