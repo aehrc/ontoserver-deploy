@@ -111,6 +111,34 @@ spec:
               {{- else }}
               value: "jdbc:postgresql://localhost:5432/{{ $.Values.ontoserver.database.database }}"
               {{- end }}
+            {{- if $.Values.ontoserver.httpProxy }}
+            - name: HTTP_PROXY
+              value: {{ $.Values.ontoserver.httpProxy }}
+            {{- end }}
+            {{- if $.Values.ontoserver.httpsProxy }}
+            - name: HTTPS_PROXY
+              value: {{ $.Values.ontoserver.httpsProxy }}
+            {{- end }}
+            {{- if $.Values.ontoserver.noProxy }}
+            - name: NO_PROXY
+              value: {{ $.Values.ontoserver.noProxy }}
+            {{- end }}
+            {{- if $.Values.ontoserver.env.HTTP_PROXY_HOST }}
+            - name: HTTP_PROXY_HOST
+              value: {{ $.Values.ontoserver.env.HTTP_PROXY_HOST }}
+            {{- end }}
+            {{- if $.Values.ontoserver.env.HTTPS_PROXY_HOST }}
+            - name: HTTPS_PROXY_HOST
+              value: {{ $.Values.ontoserver.env.HTTPS_PROXY_HOST }}
+            {{- end }}
+            {{- if $.Values.ontoserver.env.HTTP_PROXY_PORT }}
+            - name: HTTP_PROXY_PORT
+              value: {{ $.Values.ontoserver.env.HTTP_PROXY_PORT | quote }}
+            {{- end }}
+            {{- if $.Values.ontoserver.env.HTTPS_PROXY_PORT }}
+            - name: HTTPS_PROXY_PORT
+              value: {{ $.Values.ontoserver.env.HTTPS_PROXY_PORT | quote }}
+            {{- end }}
             {{- if $.Values.ontoserver.database.user }}
             - name: spring.datasource.username
               value: {{ $.Values.ontoserver.database.user | quote }}
