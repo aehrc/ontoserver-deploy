@@ -1,5 +1,7 @@
 # Example Ontoserver deployment with horizontal scaling
 
+# DEPRECATED - DO NOT DO THIS
+
 This project provides an example deployment approach for horizontal scaling of [Ontoserver](https://ontoserver.csiro.au).
 It uses an NGINX cache and is based on the default Ontoserver deployment described at https://ontoserver.csiro.au/docs/.
 
