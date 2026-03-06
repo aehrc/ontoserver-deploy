@@ -1,7 +1,6 @@
-version: '2'
 services:
   db:
-    image: postgres
+    image: postgres:12
     container_name: db
     volumes:
       - onto-pg-data:/var/lib/postgresql/data
