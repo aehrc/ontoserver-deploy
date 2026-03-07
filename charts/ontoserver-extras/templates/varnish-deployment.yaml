@@ -1,0 +1,214 @@
+{{- if .Values.varnish.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-varnish
+  labels:
+    {{- include "ontoserver-extras.labels" . | nindent 4 }}
+    {{- include "ontoserver-extras.varnish.selectorLabels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "ontoserver-extras.varnish.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ontoserver-extras.varnish.selectorLabels" . | nindent 8 }}
+    spec:
+      shareProcessNamespace: true
+      {{- if .Values.varnish.tolerations }}
+      tolerations: {{ toJson .Values.varnish.tolerations }}
+      {{- end }}
+      {{- if .Values.varnish.opentelemetry.enabled }}
+      initContainers:
+      - name: init-trace-pipe
+        image: {{ .Values.varnish.image }}
+        command: ["sh", "-c", "touch /traces/spans.log && chmod 666 /traces/spans.log"]
+        volumeMounts:
+        - name: trace-pipe
+          mountPath: /traces
+      {{- end }}
+      containers:
+      - name: varnish
+        image: {{ .Values.varnish.image }}
+        command:
+          - varnishd
+          - -F
+          - -f
+          - /etc/varnish/default.vcl
+          - -a
+          - ":8080,HTTP"
+          - -s
+          - "malloc,{{ .Values.varnish.cache.memorySize }}"
+          - -T
+          - 127.0.0.1:6082
+          - -n
+          - varnish
+          - -S
+          - none
+          - -p
+          - vsl_reclen=4096b
+        ports:
+        - containerPort: 6082
+          name: varnish-stats
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+        - name: varnish-config
+          mountPath: /etc/varnish
+        - name: varnish-varlib
+          mountPath: /var/lib/varnish
+        resources:
+          limits:
+            cpu: {{ .Values.varnish.resources.varnish.limits.cpu | quote }}
+            memory: {{ .Values.varnish.resources.varnish.limits.memory | quote }}
+          requests:
+            cpu: {{ .Values.varnish.resources.varnish.requests.cpu | quote }}
+            memory: {{ .Values.varnish.resources.varnish.requests.memory | quote }}
+
+      {{- if .Values.varnish.metrics.enabled }}
+      - name: varnish-exporter
+        image: {{ .Values.varnish.exporterImage }}
+        env:
+          - name: VARNISH_STAT_PATH
+            value: "/usr/bin/varnishstat"
+          - name: INSTANCE
+            value: "varnish"
+        args: ["-n", "varnish", "-web.listen-address", ":9131",
+               "-exit-on-errors=false"]
+        ports:
+          - name: metrics
+            containerPort: 9131
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        volumeMounts:
+        - name: varnish-varlib
+          mountPath: /var/lib/varnish
+        resources:
+          limits:
+            cpu: {{ .Values.varnish.resources.exporter.limits.cpu | quote }}
+            memory: {{ .Values.varnish.resources.exporter.limits.memory | quote }}
+          requests:
+            cpu: {{ .Values.varnish.resources.exporter.requests.cpu | quote }}
+            memory: {{ .Values.varnish.resources.exporter.requests.memory | quote }}
+      {{- end }}
+
+      {{- if .Values.varnish.opentelemetry.enabled }}
+      - name: varnish-trace-converter
+        image: {{ .Values.varnish.image }}
+        command:
+          - /bin/sh
+          - -c
+        args:
+          - |
+            varnishlog -n varnish -g request -i VCL_Log | tee -a /traces/spans.log
+        volumeMounts:
+        - name: varnish-varlib
+          mountPath: /var/lib/varnish
+        - name: trace-pipe
+          mountPath: /traces
+        resources:
+          limits:
+            cpu: {{ .Values.varnish.resources.traceConverter.limits.cpu | quote }}
+            memory: {{ .Values.varnish.resources.traceConverter.limits.memory | quote }}
+          requests:
+            cpu: {{ .Values.varnish.resources.traceConverter.requests.cpu | quote }}
+            memory: {{ .Values.varnish.resources.traceConverter.requests.memory | quote }}
+
+      - name: trace-forwarder
+        image: {{ .Values.varnish.traceForwarderImage }}
+        env:
+          - name: COLLECTOR_URL
+            value: {{ required "varnish.opentelemetry.collectorEndpoint is required when varnish.opentelemetry.enabled" .Values.varnish.opentelemetry.collectorEndpoint | quote }}
+        command:
+          - /bin/sh
+          - -c
+        args:
+          - |
+            set -e
+            echo "trace-forwarder starting, sending spans to $COLLECTOR_URL" >&2
+            # Escape backslashes and double-quotes for JSON string values
+            json_str() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+
+            tail -n 0 -F /traces/spans.log 2>/dev/null | \
+              while read -r line; do
+                echo "$line" | grep -q "OTEL_SPAN:" || continue
+
+                trace_id=$(  echo "$line" | sed -n 's/.*trace_id=\([0-9a-f]*\).*/\1/p' )
+                span_id=$(   echo "$line" | sed -n 's/.*span_id=\([0-9a-f]*\).*/\1/p' )
+                parent_id=$( echo "$line" | sed -n 's/.*parent_span_id=\([0-9a-f]*\).*/\1/p' )
+                operation=$( echo "$line" | sed -n 's/.*operation=\([^ ]*\).*/\1/p' )
+                method=$(    echo "$line" | sed -n 's/.*http.method=\([^ ]*\).*/\1/p' )
+                url=$(       echo "$line" | sed -n 's/.*http.url=\([^ ]*\).*/\1/p' )
+                status=$(    echo "$line" | sed -n 's/.*http.status_code=\([0-9]*\).*/\1/p' )
+                cache=$(     echo "$line" | sed -n 's/.*cache.status=\([^ ]*\).*/\1/p' )
+
+                # Extract actual timestamps from the log
+                start_time=$( echo "$line" | sed -n 's/.*start_time=\([0-9]*\).*/\1/p' )
+                end_time=$(   echo "$line" | sed -n 's/.*end_time=\([0-9]*\).*/\1/p' )
+
+                # Skip if we don't have both timestamps
+                if [ -z "$start_time" ] || [ -z "$end_time" ]; then
+                  echo "WARN: Missing timestamps for trace_id=$trace_id" >&2
+                  continue
+                fi
+
+                # Calculate duration in microseconds
+                duration=$((end_time - start_time))
+
+                # Ensure minimum duration of 1 microsecond
+                if [ "$duration" -le 0 ]; then
+                  duration=1
+                fi
+
+                # Build single-span Zipkin v2 JSON array
+                body=$(printf '[{"traceId":"%s","id":"%s","parentId":"%s","name":"%s","timestamp":%s,"duration":%s,"localEndpoint":{"serviceName":"{{ .Release.Name }}/varnish-cache"},"tags":{"http.method":"%s","http.url":"%s","http.status_code":"%s","cache.status":"%s"}}]' \
+                  "$(json_str "$trace_id")" \
+                  "$(json_str "${span_id:0:16}")" \
+                  "$(json_str "${parent_id:0:16}")" \
+                  "$(json_str "$operation")" \
+                  "$start_time" \
+                  "$duration" \
+                  "$(json_str "$method")" \
+                  "$(json_str "$url")" \
+                  "$status" \
+                  "$(json_str "$cache")")
+
+                if ! printf '%s' "$body" | curl -s -X POST \
+                     -H "Content-Type: application/json" \
+                     --data-binary @- "$COLLECTOR_URL"; then
+                  echo "WARN: Zipkin POST failed for trace_id=$trace_id" >&2
+                fi
+                sleep 1
+              done
+        volumeMounts:
+          - name: trace-pipe
+            mountPath: /traces
+        resources:
+          limits:
+            cpu: {{ .Values.varnish.resources.traceForwarder.limits.cpu | quote }}
+            memory: {{ .Values.varnish.resources.traceForwarder.limits.memory | quote }}
+          requests:
+            cpu: {{ .Values.varnish.resources.traceForwarder.requests.cpu | quote }}
+            memory: {{ .Values.varnish.resources.traceForwarder.requests.memory | quote }}
+      {{- end }}
+
+      volumes:
+      - name: varnish-config
+        configMap:
+          name: {{ .Release.Name }}-varnish-configmap
+      - name: varnish-varlib
+        emptyDir: {}
+      {{- if .Values.varnish.opentelemetry.enabled }}
+      # trace-pipe is an emptyDir shared between varnish-trace-converter and trace-forwarder.
+      # Individual container restarts preserve buffered data, but a full pod restart will lose
+      # any buffered-but-unsent spans. This is acceptable for tracing (losing some spans is non-critical).
+      - name: trace-pipe
+        emptyDir: {}
+      {{- end }}
+{{- end }}

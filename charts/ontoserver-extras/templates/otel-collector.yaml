@@ -1,0 +1,89 @@
+{{- if .Values.collector.enabled }}
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: {{ .Release.Name }}-otel-collector
+  labels:
+    {{- include "ontoserver-extras.labels" . | nindent 4 }}
+    app: opentelemetry
+    component: otel-operator
+spec:
+  {{- if .Values.collector.tolerations }}
+  tolerations: {{ toJson .Values.collector.tolerations }}
+  {{- end }}
+  config:
+    receivers:
+      zipkin:
+        endpoint: 0.0.0.0:9411
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 15
+      filter/health_checks:
+        traces:
+          span:
+            - attributes["http.url"] != nil and IsMatch(attributes["http.url"], ".*/fhir/metadata.*")
+            - attributes["http.target"] == "/fhir/metadata"
+            - attributes["http.url"] == "/fhir/metadata"
+            - name == "/fhir/metadata"
+            - attributes["http.url"] != nil and IsMatch(attributes["http.url"], ".*/actuator/health.*")
+            - attributes["http.url"] == "/actuator/prometheus"
+            - attributes["http.target"] != nil and IsMatch(attributes["http.target"], ".*/actuator/health.*")
+            - attributes["http.target"] == "/actuator/prometheus"
+            - name != nil and IsMatch(name, ".*/actuator/health.*")
+            - name == "/actuator/prometheus"
+            - name == "get /actuator/prometheus"
+            - attributes["http.route"] == "/actuator/prometheus"
+            - attributes["db.system"] == "postgresql" and attributes["db.statement"] == ""
+            - attributes["otel.scope.name"] == "io.opentelemetry.jdbc" and attributes["db.statement"] == ""
+            - name == "cache_lookup" and IsMatch(attributes["http.url"], "/fhir/metadata")
+            - name == "cache_lookup" and IsMatch(attributes["http.url"], "/actuator/health")
+            - name == "cache_lookup" and attributes["http.url"] == "/actuator/prometheus"
+      batch:
+        send_batch_size: 1000
+        timeout: 0s
+    exporters:
+      {{- if .Values.collector.debug }}
+      debug:
+        verbosity: detailed
+      {{- end }}
+      {{- if .Values.collector.otlpEndpoint }}
+      otlp:
+        endpoint: {{ .Values.collector.otlpEndpoint | quote }}
+        tls:
+          insecure: true
+      {{- end }}
+      {{- if .Values.collector.zipkinEndpoint }}
+      zipkin:
+        endpoint: {{ .Values.collector.zipkinEndpoint | quote }}
+        tls:
+          insecure: true
+      {{- end }}
+    service:
+      pipelines:
+        traces:
+          receivers:
+            - otlp
+            - zipkin
+          processors:
+            - memory_limiter
+            - filter/health_checks
+            - batch
+          exporters:
+            {{- if .Values.collector.debug }}
+            - debug
+            {{- end }}
+            {{- if .Values.collector.otlpEndpoint }}
+            - otlp
+            {{- end }}
+            {{- if .Values.collector.zipkinEndpoint }}
+            - zipkin
+            {{- end }}
+{{- end }}

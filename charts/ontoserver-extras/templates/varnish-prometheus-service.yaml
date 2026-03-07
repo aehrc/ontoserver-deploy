@@ -1,0 +1,18 @@
+{{- if and .Values.varnish.enabled .Values.varnish.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-varnish-prometheus-service
+  labels:
+    {{- include "ontoserver-extras.labels" . | nindent 4 }}
+    {{- include "ontoserver-extras.varnish.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 9131
+      targetPort: 9131
+  selector:
+    {{- include "ontoserver-extras.varnish.selectorLabels" . | nindent 4 }}
+{{- end }}

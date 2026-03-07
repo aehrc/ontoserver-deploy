@@ -1,0 +1,4 @@
+ontoserver:
+  config:
+    spring.datasource.url: "jdbc:postgresql://db:5432/ontoserver"
+    spring.datasource.username: "ontoserver"

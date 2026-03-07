@@ -1,0 +1,359 @@
+#
+# These value defaults provide configuration for a single read-only server using a
+# Kubernetes Deployment with a Postgres database sidecar container and no ingress/gateway,
+# suitable for any Kubernetes cluster without persistence enabled.
+# To expose the server, enable either ontoserver.gateway or ontoserver.ingress.
+#
+
+## @section Deployment
+ontoserver:
+  deployment:
+    ## @param ontoserver.deployment.kind                Kind of controller (Deployment or StatefulSet)
+    kind: Deployment
+    ## @param ontoserver.deployment.type                single|scaled deployment topology
+    type: single
+    ## @param ontoserver.deployment.image                Container image for OntoServer
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    ## @param ontoserver.deployment.imagePullPolicy     Image pull policy
+    imagePullPolicy: IfNotPresent
+    ## @param ontoserver.deployment.imagePullSecrets    Additional pre-created image pull secrets to attach to the pod (merged with the chart-managed pull secret when imageCredentials are set)
+    imagePullSecrets: []
+    ## @param ontoserver.deployment.isReadOnly          Ontoserver in read‑only mode - keep it true for scaled
+    isReadOnly: true
+    ## @param ontoserver.deployment.replicas            Number of replicas - min 2 for scaled deployment - can be set to 0
+    replicas: 1
+    ## @param ontoserver.deployment.clusterName         Cluster name for auto-discovery in scaled deployments (overrides the default "ontoserver" set in application.properties); ignored for single deployments
+    clusterName: ""
+    ## @param ontoserver.deployment.annotations         Deployment/Statefulset manifest annotations
+    annotations: {}
+    ## @param ontoserver.deployment.labels              Deployment/Statefulset manifest labels
+    labels: {}
+    ## @param ontoserver.deployment.podAnnotations      Pod annotations
+    podAnnotations: {}
+    ## @param ontoserver.deployment.podLabels           Pod labels
+    podLabels: {}
+    ## @param ontoserver.deployment.deploymentStrategy  K8s update strategy when using Deployment Kind
+    deploymentStrategy: RollingUpdate
+    startupProbe:
+      ## @param ontoserver.deployment.startupProbe.initialDelaySeconds   Startup probe initial delay
+      initialDelaySeconds: 5
+      ## @param ontoserver.deployment.startupProbe.periodSeconds         Startup probe period
+      periodSeconds: 2
+      ## @param ontoserver.deployment.startupProbe.failureThreshold      Startup probe failure threshold
+      failureThreshold: 150
+      ## @param ontoserver.deployment.startupProbe.timeoutSeconds        Startup probe timeout
+      timeoutSeconds: 5
+    livenessProbe:
+      ## @param ontoserver.deployment.livenessProbe.initialDelaySeconds  Liveness probe initial delay
+      initialDelaySeconds: 15
+      ## @param ontoserver.deployment.livenessProbe.periodSeconds        Liveness probe period
+      periodSeconds: 5
+      ## @param ontoserver.deployment.livenessProbe.failureThreshold     Liveness probe failure threshold
+      failureThreshold: 10
+      ## @param ontoserver.deployment.livenessProbe.timeoutSeconds       Liveness probe timeout
+      timeoutSeconds: 5
+    readinessProbe:
+      ## @param ontoserver.deployment.readinessProbe.initialDelaySeconds Readiness probe initial delay
+      initialDelaySeconds: 60
+      ## @param ontoserver.deployment.readinessProbe.periodSeconds       Readiness probe period
+      periodSeconds: 5
+      ## @param ontoserver.deployment.readinessProbe.failureThreshold    Readiness probe failure threshold
+      failureThreshold: 3
+      ## @param ontoserver.deployment.readinessProbe.timeoutSeconds      Readiness probe timeout
+      timeoutSeconds: 5
+    persistence:
+      ## @param ontoserver.deployment.persistence.enabledForDeployment      Enable PVC on Deployment
+      enabledForDeployment: false
+      ## @param ontoserver.deployment.persistence.mode                      shared | split - Use one or separate PV for db and lucene files
+      mode: split
+      files:
+        ## @param ontoserver.deployment.persistence.files.accessMode  PVC access mode. Use ReadWriteMany (e.g. EFS on EKS) for scaled deployments.
+        accessMode: ReadWriteOnce
+        existingVolume:
+          ## @param ontoserver.deployment.persistence.files.existingVolume.enabled  Bind to existing PV
+          enabled: false
+          ## @param ontoserver.deployment.persistence.files.existingVolume.name     Name of existing PV
+          name: ""
+        storageClass:
+          ## @param ontoserver.deployment.persistence.files.storageClass.name       StorageClass name to use when provided.enabled is false; leave empty to use the cluster default StorageClass
+          name: default
+          provided:
+            ## @param ontoserver.deployment.persistence.files.storageClass.provided.enabled               Use provided storageClass
+            enabled: true
+            ## @param ontoserver.deployment.persistence.files.storageClass.provided.storageProvisioner    CSI driver - the default is AKS/Azure specific, replace for other clouds (e.g. ebs.csi.aws.com for EKS)
+            storageProvisioner: disk.csi.azure.com
+            ## @param ontoserver.deployment.persistence.files.storageClass.provided.reclaimPolicy         Storage Reclaim Policy
+            reclaimPolicy: Retain
+            ## storageParameters are AKS/Azure specific - replace with parameters for your cloud's CSI driver
+            storageParameters:
+              ## @param ontoserver.deployment.persistence.files.storageClass.provided.storageParameters.skuName   Storage SKU name (AKS/Azure specific)
+              skuName: Premium_LRS
+              ## @param ontoserver.deployment.persistence.files.storageClass.provided.storageParameters.kind      Storage kind (AKS/Azure specific)
+              kind: Managed
+            ## @param ontoserver.deployment.persistence.files.storageClass.provided.allowVolumeExpansion  Allow volume expansion
+            allowVolumeExpansion: true
+      dbfiles:
+        ## @param ontoserver.deployment.persistence.dbfiles.accessMode  PVC access mode. Use ReadWriteMany (e.g. EFS on EKS) for scaled deployments.
+        accessMode: ReadWriteOnce
+        existingVolume:
+          ## @param ontoserver.deployment.persistence.dbfiles.existingVolume.enabled  Bind to existing PV
+          enabled: false
+          ## @param ontoserver.deployment.persistence.dbfiles.existingVolume.name     Name of existing PV
+          name: ""
+        storageClass:
+          ## @param ontoserver.deployment.persistence.dbfiles.storageClass.name       StorageClass name to use when provided.enabled is false; leave empty to use the cluster default StorageClass
+          name: default
+          provided:
+            ## @param ontoserver.deployment.persistence.dbfiles.storageClass.provided.enabled               Use provided storageClass
+            enabled: true
+            ## @param ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageProvisioner    CSI driver - the default is AKS/Azure specific, replace for other clouds (e.g. ebs.csi.aws.com for EKS)
+            storageProvisioner: disk.csi.azure.com
+            ## @param ontoserver.deployment.persistence.dbfiles.storageClass.provided.reclaimPolicy         Storage Reclaim Policy
+            reclaimPolicy: Retain
+            ## storageParameters are AKS/Azure specific - replace with parameters for your cloud's CSI driver
+            storageParameters:
+              ## @param ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters.skuName   Storage SKU name (AKS/Azure specific)
+              skuName: Premium_LRS
+              ## @param ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters.kind      Storage kind (AKS/Azure specific)
+              kind: Managed
+            ## @param ontoserver.deployment.persistence.dbfiles.storageClass.provided.allowVolumeExpansion  Allow volume expansion
+            allowVolumeExpansion: true
+    podDisruptionBudget:
+      ## @param ontoserver.deployment.podDisruptionBudget.enabled                     Enable PDB for scaled deployments
+      enabled: true
+      # Pick one of minAvailable or maxUnavailable if you enable PDB.
+      ## @param ontoserver.deployment.podDisruptionBudget.minAvailable                Minimum pods available - If you set this, maxUnavailable will be ignored
+      minAvailable: 1
+      # maxUnavailable: 25%
+      # unhealthyPodEvictionPolicy: AlwaysAllow
+    db:
+      ## @param ontoserver.deployment.db.enabled            Enable Postgres sidecar
+      enabled: true
+      ## @param ontoserver.deployment.db.postgresVersion    Version of Postgres
+      postgresVersion: 16
+  ## @section Registry Credentials
+  ## @param ontoserver.imageCredentials.registry   Registry hostname (default quay.io)
+  ## @param ontoserver.imageCredentials.username   quay.io username; when set with password the chart creates a pull secret automatically
+  ## @param ontoserver.imageCredentials.password   quay.io password; set via --set or populate via External Secrets
+  imageCredentials:
+    registry: quay.io
+    username: ""
+    password: ""
+  ## @section Server
+  ## @param ontoserver.serverName                          Server hostname - must match a hostName at ontoserver.hostNames
+  serverName: localhost
+  ## @param ontoserver.serverPort                          Non-standard port exposed to clients (e.g. 8080 when k3d maps 8080:80). Leave empty for standard ports (80/443).
+  serverPort: ""
+  ## @param ontoserver.hostNames                           Hostnames for ingress/gateway
+  hostNames:
+    - localhost
+  ## @param ontoserver.timeZone                            Server time zone
+  timeZone: UTC
+  ## @param ontoserver.language                            Locale/language
+  language: en_US
+  ## @section Resources
+  resources:
+    ontoserver:
+      ## @param ontoserver.resources.ontoserver.requests.cpu      CPU request
+      ## @param ontoserver.resources.ontoserver.requests.memory   Memory request
+      ## @param ontoserver.resources.ontoserver.requests.storage  Storage request
+      ## @param ontoserver.resources.ontoserver.limits.cpu        CPU limit
+      ## @param ontoserver.resources.ontoserver.limits.memory     Memory limit
+      ## @param ontoserver.resources.ontoserver.initialHeapSize   Java initial heap
+      ## @param ontoserver.resources.ontoserver.maxHeapSize       Java max heap
+      requests:
+        cpu: 2
+        memory: 4G
+        storage: 10G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2800m
+      maxHeapSize: 2800m
+    db:
+      ## @param ontoserver.resources.db.requests.cpu       DB CPU request
+      ## @param ontoserver.resources.db.requests.memory    DB memory request
+      ## @param ontoserver.resources.db.requests.storage   Storage request
+      ## @param ontoserver.resources.db.limits.cpu         DB CPU limit
+      ## @param ontoserver.resources.db.limits.memory      DB memory limit
+      requests:
+        cpu: 1
+        memory: 1G
+        storage: 10G
+      limits:
+        cpu: 1
+        memory: 1G
+  ## @section TLS and Networking
+  ## @param ontoserver.healthCheckOption                  Flag passed to the readiness probe healthcheck.sh; controls what startup/preload conditions must be met before the pod becomes ready (-f: fail if preload failed, -s: wait for successful preload, -l/-L: block while preload runs, -p: fail on unhealthy indexes)
+  healthCheckOption: -f
+  certmanager:
+    ## @param ontoserver.certmanager.enabled               Enable cert-manager (requires cert-manager operator and gateway.enabled)
+    enabled: false
+    ## @param ontoserver.certmanager.clusterIssuerName     ClusterIssuer name or prefix for Geteway's Issuer
+    clusterIssuerName: letsencrypt
+    ## @param ontoserver.certmanager.email                 Notification email for ACME
+    email: noreply@example.com
+  tls:
+    ## @param ontoserver.tls.enabled                       Enable TLS Termination (requires a TLS secret referenced by certRef)
+    enabled: false
+    ## @param ontoserver.tls.certRef                       Reference to Secret containing TLS Certificate
+    certRef: ontoserver-tls
+  gateway:
+    ## @param ontoserver.gateway.enabled                   Enable Gateway API (requires Gateway API CRDs)
+    enabled: false
+    ## @param ontoserver.gateway.listenerPortSecure        Secure listener port -  Depends on the gateway class - Traefik is 8443
+    listenerPortSecure: 443
+    ## @param ontoserver.gateway.annotations               Gateway annotations
+    annotations: {}
+    ## @param ontoserver.gateway.infrastructureAnnotations Infrastructure annotations
+    infrastructureAnnotations: {}
+    ## @param ontoserver.gateway.className                 GatewayClass name
+    className: envoy-gateway-class
+    ## @param ontoserver.gateway.requestTimeout            Request timeout duration
+    requestTimeout: 120s
+    ## @param ontoserver.gateway.backendServiceNameOverride  Override HTTPRoute backend service name (e.g. for varnish proxy)
+    backendServiceNameOverride: ""
+  ingress:
+    ## @param ontoserver.ingress.enabled                   Enable Ingress
+    enabled: false
+    ## @param ontoserver.ingress.annotations               Ingress annotations
+    annotations: {}
+    ## @param ontoserver.ingress.className                 IngressClass name
+    className: ontoserver-nginx
+  ## @section Observability
+  managementService:
+    ## @param ontoserver.managementService.enabled          Enable management service (exposes Spring Boot actuator on port 18080)
+    enabled: false
+  metrics:
+    serviceMonitor:
+      ## @param ontoserver.metrics.serviceMonitor.enabled   Enable Prometheus ServiceMonitor (requires managementService.enabled and Prometheus Operator CRDs)
+      enabled: false
+  opentelemetry:
+    instrumentation:
+      ## @param ontoserver.opentelemetry.instrumentation.enabled           Enable OpenTelemetry Java auto-instrumentation (requires OpenTelemetry Operator)
+      enabled: false
+      ## @param ontoserver.opentelemetry.instrumentation.image             Auto-instrumentation agent image
+      image: otel/autoinstrumentation-java:latest
+      ## @param ontoserver.opentelemetry.instrumentation.serviceName       OTel service name (defaults to releaseName/releaseName-ontoserver)
+      serviceName: ""
+      ## @param ontoserver.opentelemetry.instrumentation.propagators       Trace context propagators
+      propagators: "tracecontext,baggage,b3multi"
+      ## @param ontoserver.opentelemetry.instrumentation.excludedClasses   Classes to exclude from instrumentation
+      excludedClasses: "ca.uhn.fhir.*Interceptor*"
+      exporter:
+        ## @param ontoserver.opentelemetry.instrumentation.exporter.type       Exporter type (zipkin, otlp, etc.)
+        type: zipkin
+        ## @param ontoserver.opentelemetry.instrumentation.exporter.endpoint   Exporter endpoint URL (required when enabled)
+        endpoint: ""
+  ## @section Miscellaneous
+  ## @param ontoserver.tolerations                        Pod tolerations
+  tolerations: []
+  ## @param ontoserver.nodeSelector                       Pod node selector (e.g. for EKS node group targeting)
+  nodeSelector: {}
+  serviceAccount:
+    ## @param ontoserver.serviceAccount.create            Create a ServiceAccount for the pod (required for IRSA on EKS)
+    create: false
+    ## @param ontoserver.serviceAccount.name              ServiceAccount name. When create: true defaults to <release>-ontoserver. When create: false and name is set, references an existing ServiceAccount.
+    name: ""
+    ## @param ontoserver.serviceAccount.annotations       ServiceAccount annotations (e.g. eks.amazonaws.com/role-arn for IRSA). Only used when create: true.
+    annotations: {}
+  ## @param ontoserver.customization                      The name of a ConfigMap containing custom logo and CSS files to be deployed with the application
+  customization: ""
+  ## Additional Ontoserver config entries - https://ontoserver.csiro.au/docs/6/config-all.html
+  config:
+    ## @param ontoserver.config.ONTOSERVER_INSECURE        Disable TLS verification for outgoing connections
+    ONTOSERVER_INSECURE: "true"
+  ## @param ontoserver.secretConfig                      Secret-backed Ontoserver config entries
+  secretConfig: {}
+  ## @section External Secrets
+  externalSecret:
+    ## @param ontoserver.externalSecret.enabled           Enable ExternalSecret resource (requires External Secrets Operator)
+    enabled: false
+    ## @param ontoserver.externalSecret.refreshInterval   How often the external secret is synced
+    refreshInterval: 1h
+    secretStoreRef:
+      ## @param ontoserver.externalSecret.secretStoreRef.name   Name of the SecretStore or ClusterSecretStore
+      name: ""
+      ## @param ontoserver.externalSecret.secretStoreRef.kind   Kind of the secret store (SecretStore or ClusterSecretStore)
+      kind: ClusterSecretStore
+    ## @param ontoserver.externalSecret.data              List of individual secret key mappings
+    ## Example:
+    ## data:
+    ##   - secretKey: spring.datasource.password
+    ##     remoteRef:
+    ##       key: /myapp/db
+    ##       property: password
+    data: []
+    ## @param ontoserver.externalSecret.dataFrom          Bulk secret mappings (extract entire secrets as env vars)
+    ## Example:
+    ## dataFrom:
+    ##   - extract:
+    ##       key: /myapp/ontoserver-secrets
+    dataFrom: []
+## @section Envoy Gateway
+envoygateway:
+  ## @param envoygateway.controlPlaneNamespace   Namespace where Envoy Gateway control plane is installed
+  controlPlaneNamespace: envoy-gateway-system
+  ## @param envoygateway.createGatewayClass Create and manage a GatewayClass and EnvoyProxy resource for this release (requires ontoserver.gateway.enabled)
+  createGatewayClass: false
+  envoyProxy:
+    ## @param envoygateway.envoyProxy.name Name of the EnvoyProxy resource
+    name: default
+    ## @param envoygateway.envoyProxy.replicas Number of Envoy proxy pod replicas
+    replicas: 2
+    ## @param envoygateway.envoyProxy.pdbMinAvailable Minimum available pods for the EnvoyProxy PodDisruptionBudget
+    pdbMinAvailable: 1
+    accessLog:
+      ## @param envoygateway.envoyProxy.accessLog.enabled Enable structured JSON access logging to stdout
+      enabled: true
+      ## @param envoygateway.envoyProxy.accessLog.format Envoy access log format string (single-line JSON template)
+      format: '{"timestamp":"%START_TIME%","authority":"%REQ(:AUTHORITY)%","bytes_received":"%BYTES_RECEIVED%","bytes_sent":"%BYTES_SENT%","traceparent":"%REQ(TRACEPARENT)%","duration":"%DURATION%","method":"%REQ(:METHOD)%","path":"%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%","protocol":"%PROTOCOL%","referer":"%REQ(REFERER)%","request_id":"%REQ(X-REQUEST-ID)%","requested_server_name":"%REQUESTED_SERVER_NAME%","response_code":"%RESPONSE_CODE%","upstream_cluster":"%UPSTREAM_CLUSTER%","user_agent":"%REQ(USER-AGENT)%","x_forwarded_for":"%REQ(X-FORWARDED-FOR)%"}'
+  # gatewayServiceMonitor scrapes the Envoy Gateway control-plane namespace (see controlPlaneNamespace below).
+  # IMPORTANT: This cross-namespace scraping requires two things NOT configured by this chart:
+  #   1. The Prometheus Operator must be configured to watch this release's namespace.
+  #   2. The Prometheus service account must have RBAC (list/watch Services/Endpoints/Pods) in
+  #      controlPlaneNamespace (e.g. envoy-gateway-system). Without this, no scrape targets appear.
+  gatewayServiceMonitor:
+    ## @param envoygateway.gatewayServiceMonitor.enabled   Enable Prometheus ServiceMonitor for Envoy Gateway data plane (requires ontoserver.gateway.enabled and Prometheus Operator CRDs)
+    enabled: false
+  clientTrafficPolicy:
+    ## @param envoygateway.clientTrafficPolicy.enabled       Enable Envoy ClientTrafficPolicy (requires ontoserver.gateway.enabled)
+    enabled: false
+    ## @param envoygateway.clientTrafficPolicy.idleTimeout   HTTP idle timeout
+    idleTimeout: 300s
+    proxyProtocol:
+      ## @param envoygateway.clientTrafficPolicy.proxyProtocol.enabled  Enable PROXY protocol on the Envoy listener (required when upstream load balancer sends PROXY protocol headers, e.g. AWS NLB)
+      enabled: false
+    clientIPDetection:
+      xForwardedFor:
+        ## @param envoygateway.clientTrafficPolicy.clientIPDetection.xForwardedFor.numTrustedHops  Number of trusted XFF hops for client IP detection (0 = use direct peer/PROXY protocol address; omitted when null)
+        numTrustedHops: null
+  backendTrafficPolicy:
+    ## @param envoygateway.backendTrafficPolicy.enabled              Enable Envoy BackendTrafficPolicy (requires ontoserver.gateway.enabled)
+    enabled: false
+    ## @param envoygateway.backendTrafficPolicy.requestBufferLimit   Max request body size
+    requestBufferLimit: 1Gi
+    rateLimit:
+      ## @param envoygateway.backendTrafficPolicy.rateLimit.requests   Rate limit requests per unit
+      requests: 50
+      ## @param envoygateway.backendTrafficPolicy.rateLimit.unit       Rate limit unit (Second, Minute, Hour)
+      unit: Second
+  securityPolicy:
+    ## @param envoygateway.securityPolicy.enabled          Enable Envoy SecurityPolicy (requires ontoserver.gateway.enabled)
+    enabled: false
+    ## @param envoygateway.securityPolicy.defaultAction    Default authorization action (Allow or Deny)
+    defaultAction: Allow
+    ## @param envoygateway.securityPolicy.deniedCIDRs      List of CIDRs to deny
+    deniedCIDRs: []
+## @section Nginx Ingress Controller
+nginx-ingress:
+  ## @param nginx-ingress.enabled                        Enable F5 nginx-ingress-controller
+  enabled: false
+  controller:
+    ingressClass:
+      ## @param nginx-ingress.controller.ingressClass.create    Create a custom IngressClass
+      create: true
+      ## @param nginx-ingress.controller.ingressClass.name      Name of the custom IngressClass
+      name: ontoserver-nginx
+    ## @param nginx-ingress.controller.ingressClassByName       Lookup IngressClasses by name
+    ingressClassByName: true

@@ -1,0 +1,38 @@
+{{- if .Values.ontoserver.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-service-monitor
+spec:
+  selector:
+    matchLabels:
+      service: {{ .Release.Name }}-ontoserver-management
+  endpoints:
+    - port: http-traffic
+      path: "/actuator/prometheus"
+{{- end }}
+{{- if .Values.envoygateway.gatewayServiceMonitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-ontoserver-gateway-servicemonitor
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  namespaceSelector:
+    matchNames:
+      - {{ .Values.envoygateway.controlPlaneNamespace }}
+  selector:
+    matchLabels:
+      gateway.envoyproxy.io/owning-gateway-name: {{ .Release.Name }}-gw
+  endpoints:
+    - port: metrics
+      path: /stats/prometheus
+      interval: 15s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_label_gateway_envoyproxy_io_owning_gateway_name]
+          targetLabel: gateway
+          action: replace
+{{- end }}

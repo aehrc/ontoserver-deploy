@@ -1,0 +1,87 @@
+suite: StatefulSet template tests
+templates:
+  - templates/statefulset.yaml
+tests:
+  - it: renders nothing when kind is Deployment (default)
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a StatefulSet when kind is StatefulSet
+    set:
+      ontoserver.deployment.kind: StatefulSet
+    asserts:
+      - isKind:
+          of: StatefulSet
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-statefulset
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.podManagementPolicy
+          value: Parallel
+
+  - it: sets serviceName to headless service
+    set:
+      ontoserver.deployment.kind: StatefulSet
+    asserts:
+      - equal:
+          path: spec.serviceName
+          value: RELEASE-NAME-ontoserver-headless
+
+  - it: split persistence mode creates two volumeClaimTemplates
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.db.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isNotNull:
+          path: spec.volumeClaimTemplates[1]
+
+  - it: shared persistence mode creates one volumeClaimTemplate
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.persistence.mode: shared
+    asserts:
+      - isNull:
+          path: spec.volumeClaimTemplates[1]
+
+  - it: renders scaled StatefulSet with replicas=2
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: false
+      ontoserver.deployment.persistence.files.accessMode: ReadWriteMany
+      ontoserver.deployment.persistence.dbfiles.accessMode: ReadWriteMany
+    values:
+      - fixtures/external-db-values.yaml
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+
+  - it: fails for scaled StatefulSet with replicas=1
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 1
+    asserts:
+      - failedTemplate:
+          errorMessage: "scaled deployments require ontoserver.deployment.replicas should be greater or equal to 2 or 0"
+
+  - it: fails for scaled StatefulSet with sidecar DB enabled
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "Scaled deployments require shared database and cannot have the default sidecar database. Set ontoserver.deployment.db.enabled to false and set spring.datasource.url in ontoserver.config to an external db jdbc URL."

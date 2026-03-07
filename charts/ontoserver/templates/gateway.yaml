@@ -1,0 +1,108 @@
+{{- if .Values.ontoserver.gateway.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Release.Name }}-gw
+{{- if or (gt (len .Values.ontoserver.gateway.annotations) 0) .Values.ontoserver.certmanager.enabled }}
+  annotations:
+    {{- with .Values.ontoserver.gateway.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if .Values.ontoserver.certmanager.enabled }}
+    cert-manager.io/issuer:          "{{ .Values.ontoserver.certmanager.clusterIssuerName }}-{{ .Release.Name }}"
+    cert-manager.io/issue-temporary-certificate: "true"
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    {{- end }}
+{{- end }}
+spec:
+  gatewayClassName: {{ required "ontoserver.gateway.className is required" .Values.ontoserver.gateway.className }}
+  infrastructure:
+    {{- if gt (len .Values.ontoserver.gateway.infrastructureAnnotations) 0 }}
+    annotations: {{ toJson .Values.ontoserver.gateway.infrastructureAnnotations }}
+    {{- end }}  
+  listeners:
+  {{- if .Values.ontoserver.certmanager.enabled }}
+  # Cert Manager Listener
+    - name: public-http
+      protocol: HTTP
+      port: 80 # This should be always port 80 as per https://cert-manager.io/docs/configuration/acme/http01/#configuring-the-http-01-gateway-api-solver
+      allowedRoutes:
+        namespaces:
+          from: Same
+  {{- end }}
+  {{- if eq (len .Values.ontoserver.hostNames) 0 }}
+    {{- fail "Minimum one entry is required in ontoserver.hostNames" }}
+  {{- end }}
+  {{ $releaseName := .Release.Name }}
+  {{- range $i, $host := .Values.ontoserver.hostNames }}
+    - name: websecure-{{ $i }}
+      hostname: {{ $host }}
+      port: {{ required "ontoserver.gateway.listenerPortSecure is required" $.Values.ontoserver.gateway.listenerPortSecure }}
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: Same
+      {{- if $.Values.ontoserver.tls.enabled }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $.Values.ontoserver.tls.certRef }}
+      {{- end }}
+  {{- end }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Release.Name }}-route
+spec:
+  hostnames:
+    {{- range .Values.ontoserver.hostNames }}
+    - {{ . }}
+    {{- end }}
+  parentRefs:
+  {{- range $i := until (len .Values.ontoserver.hostNames) }}
+    - group: gateway.networking.k8s.io
+      sectionName: websecure-{{ $i }}
+      kind: Gateway
+      name: {{ $.Release.Name }}-gw
+  {{- end }}
+  rules:
+    - backendRefs:
+        - group: ''
+          kind: Service
+          name: {{ .Values.ontoserver.gateway.backendServiceNameOverride | default (printf "%s-ontoserver-service" .Release.Name) }}
+          port: 80
+          weight: 1
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+      {{- if .Values.ontoserver.gateway.requestTimeout }}
+      timeouts:
+        request: "{{ .Values.ontoserver.gateway.requestTimeout }}"
+        backendRequest: "{{ .Values.ontoserver.gateway.requestTimeout }}"
+      {{- end }}
+{{- if .Values.ontoserver.certmanager.enabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: letsencrypt-{{ .Release.Name }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-key
+    email: {{ required "ontoserver.certmanager.email required" .Values.ontoserver.certmanager.email }}
+    solvers:
+      - http01:
+          gatewayHTTPRoute:
+            parentRefs:
+              - name: {{ .Release.Name }}-gw
+                namespace: {{ .Release.Namespace }}
+                kind: Gateway
+{{- end }}
+{{- end }}

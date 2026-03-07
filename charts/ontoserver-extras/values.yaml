@@ -1,0 +1,110 @@
+## @section Varnish
+varnish:
+  ## @param varnish.enabled                                     Enable Varnish caching proxy
+  enabled: false
+  ## @param varnish.backendServiceName                        Kubernetes service name for the Varnish backend (defaults to RELEASE-ontoserver-service)
+  backendServiceName: ""
+  opentelemetry:
+    ## @param varnish.opentelemetry.enabled                     Enable tracing VCL and sidecar containers (trace-converter + trace-forwarder)
+    enabled: false
+    ## @param varnish.opentelemetry.collectorEndpoint           Zipkin endpoint for trace forwarding (required when opentelemetry enabled)
+    collectorEndpoint: ""
+  metrics:
+    ## @param varnish.metrics.enabled                            Enable Prometheus metrics exporter sidecar
+    enabled: true
+    ## @param varnish.metrics.interval                           Prometheus scrape interval
+    interval: 60s
+    ## @param varnish.metrics.scrapeTimeout                      Prometheus scrape timeout (must be less than interval)
+    scrapeTimeout: 55s
+  ## @param varnish.image                                       Varnish container image
+  image: varnish:7.7.1
+  ## @param varnish.exporterImage                               Prometheus exporter image
+  exporterImage: ghcr.io/aehrc/varnish-exporter:7.7-1
+  ## @param varnish.traceForwarderImage                        Trace forwarder container image (must have curl and sh)
+  traceForwarderImage: curlimages/curl:8.14.1
+  resources:
+    varnish:
+      requests:
+        ## @param varnish.resources.varnish.requests.cpu        Varnish CPU request
+        cpu: "200m"
+        ## @param varnish.resources.varnish.requests.memory     Varnish memory request
+        memory: "256Mi"
+      limits:
+        ## @param varnish.resources.varnish.limits.cpu          Varnish CPU limit
+        cpu: "500m"
+        ## @param varnish.resources.varnish.limits.memory       Varnish memory limit
+        memory: "1024Mi"
+    exporter:
+      requests:
+        ## @param varnish.resources.exporter.requests.cpu       Exporter CPU request
+        cpu: "50m"
+        ## @param varnish.resources.exporter.requests.memory    Exporter memory request
+        memory: "64Mi"
+      limits:
+        ## @param varnish.resources.exporter.limits.cpu         Exporter CPU limit
+        cpu: "100m"
+        ## @param varnish.resources.exporter.limits.memory      Exporter memory limit
+        memory: "128Mi"
+    traceConverter:
+      requests:
+        ## @param varnish.resources.traceConverter.requests.cpu     Trace converter CPU request
+        cpu: "25m"
+        ## @param varnish.resources.traceConverter.requests.memory  Trace converter memory request
+        memory: "25Mi"
+      limits:
+        ## @param varnish.resources.traceConverter.limits.cpu       Trace converter CPU limit
+        cpu: "50m"
+        ## @param varnish.resources.traceConverter.limits.memory    Trace converter memory limit
+        memory: "50Mi"
+    traceForwarder:
+      requests:
+        ## @param varnish.resources.traceForwarder.requests.cpu     Trace forwarder CPU request
+        cpu: "25m"
+        ## @param varnish.resources.traceForwarder.requests.memory  Trace forwarder memory request
+        memory: "32Mi"
+      limits:
+        ## @param varnish.resources.traceForwarder.limits.cpu       Trace forwarder CPU limit
+        cpu: "50m"
+        ## @param varnish.resources.traceForwarder.limits.memory    Trace forwarder memory limit
+        memory: "64Mi"
+  ## @param varnish.tolerations                                Pod tolerations for the Varnish deployment
+  tolerations: []
+  cache:
+    ## @param varnish.cache.time200                             Cache TTL for 200 responses
+    time200: 10m
+    ## @param varnish.cache.time404                             Cache TTL for 404 responses
+    time404: 1m
+    ## @param varnish.cache.timeExpand                          Cache TTL for $expand responses (defaults to time200 if empty)
+    timeExpand: ""
+    ## @param varnish.cache.passAuthHeaderRequests             Pass through (bypass cache) for requests with Authorization header
+    passAuthHeaderRequests: true
+    ## @param varnish.cache.memorySize                         Varnish malloc storage pool size (e.g. 800m, 1g)
+    memorySize: "800m"
+
+## @section OpenTelemetry Collector
+collector:
+  ## @param collector.enabled                                   Enable OpenTelemetryCollector CRD (Instrumentation CRD is in the ontoserver chart)
+  enabled: false
+  ## @param collector.otlpEndpoint                              OTLP gRPC exporter endpoint (required when enabled)
+  otlpEndpoint: ""
+  ## @param collector.zipkinEndpoint                            Zipkin exporter endpoint (required when enabled)
+  zipkinEndpoint: ""
+  ## @param collector.tolerations                               Pod tolerations for the OpenTelemetryCollector
+  tolerations: []
+  ## @param collector.debug  Enable debug exporter with detailed verbosity (not suitable for production)
+  debug: false
+
+## @section PersistentVolume
+pv:
+  ## @param pv.enabled                                          Enable Azure Disk PersistentVolume
+  enabled: false
+  ## @param pv.volumeName                                       PV name (required when enabled)
+  volumeName: ""
+  ## @param pv.diskURI                                          Full Azure disk resource ID (required when enabled)
+  diskURI: ""
+  ## @param pv.storageSize                                      Storage capacity
+  storageSize: 10Gi
+  ## @param pv.storageClassName                                 StorageClass name (defaults to RELEASE-ontoserver-files)
+  storageClassName: ""
+  ## @param pv.csiDriver  CSI driver for the PersistentVolume (defaults to disk.csi.azure.com for AKS)
+  csiDriver: "disk.csi.azure.com"

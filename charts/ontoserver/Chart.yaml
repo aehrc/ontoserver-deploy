@@ -1,0 +1,28 @@
+apiVersion: v2
+name: ontoserver
+description: Ontoserver FHIR terminology server helm chart with various deployment configurations
+type: application
+version: 1.0.0
+appVersion: "ctsa-6"
+home: https://ontoserver.csiro.au
+sources:
+  - https://github.com/aehrc/ontoserver-deploy
+keywords:
+  - fhir
+  - terminology
+  - ontoserver
+  - hl7
+maintainers:
+  - name: CSIRO
+    email: ontoserver-support@csiro.au
+dependencies:
+  - name: nginx-ingress
+    condition: nginx-ingress.enabled
+    version: 2.1.0
+    repository: https://helm.nginx.com/stable
+annotations:
+  artifacthub.io/category: integration-delivery
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial public release

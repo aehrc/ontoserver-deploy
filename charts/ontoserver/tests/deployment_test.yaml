@@ -1,0 +1,115 @@
+suite: Deployment template tests
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: renders a Deployment by default
+    asserts:
+      - isKind:
+          of: Deployment
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-deployment
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  - it: sets replicas from values
+    set:
+      ontoserver.deployment.replicas: 0
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 0
+
+  - it: sets image from values
+    set:
+      ontoserver.deployment.image: quay.io/aehrc/ontoserver:test
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: quay.io/aehrc/ontoserver:test
+
+  - it: renders nothing when kind is StatefulSet
+    set:
+      ontoserver.deployment.kind: StatefulSet
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: sets ontoserver.deployment.readOnly env var to true when isReadOnly true
+    set:
+      ontoserver.deployment.isReadOnly: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ontoserver.deployment.readOnly
+            value: "true"
+
+  - it: sets ontoserver.deployment.readOnly env var to false when isReadOnly false
+    set:
+      ontoserver.deployment.isReadOnly: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ontoserver.deployment.readOnly
+            value: "false"
+
+  - it: fails for scaled deployment with replicas=1
+    set:
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 1
+    asserts:
+      - failedTemplate:
+          errorMessage: "scaled deployments require ontoserver.deployment.replicas should be greater or equal to 2 or 0"
+
+  - it: renders scaled deployment with replicas=2
+    set:
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: false
+    values:
+      - fixtures/external-db-values.yaml
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+
+  - it: fails for single deployment with replicas=2
+    set:
+      ontoserver.deployment.type: single
+      ontoserver.deployment.replicas: 2
+    asserts:
+      - failedTemplate:
+          errorMessage: "single deployments require ontoserver.deployment.replicas < 2"
+
+  - it: fails for unrecognised deployment type
+    set:
+      ontoserver.deployment.type: invalid
+    asserts:
+      - failedTemplate:
+          errorPattern: "ontoserver.deployment.type must be one of the following"
+
+  - it: fails for scaled deployment with sidecar DB enabled
+    set:
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "Scaled deployments require shared database and cannot have the default sidecar database. Set ontoserver.deployment.db.enabled to false and set spring.datasource.url in ontoserver.config to an external db jdbc URL."
+
+  - it: renders scaled deployment with replicas=0 (scale-down)
+    set:
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 0
+      ontoserver.deployment.db.enabled: false
+    values:
+      - fixtures/external-db-values.yaml
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 0

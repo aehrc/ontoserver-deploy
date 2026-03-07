@@ -1,0 +1,134 @@
+# aks/single-ro-envoy.yaml
+# Single read-only Ontoserver on Azure Kubernetes Service (AKS).
+# Networking: Gateway API with Envoy Gateway (recommended).
+# Database: external Azure Database for PostgreSQL (production practice).
+#
+# A read-only server cannot accept FHIR write operations. Content is loaded
+# at startup via an Atom preload feed. Suitable for production terminology
+# servers hosting SNOMED CT, LOINC, and FHIR resources — for example, a
+# national clinical terminology service (NCTS-style deployment).
+#
+# For development/testing with a built-in PostgreSQL sidecar (no external DB
+# required) see sidecar-db/single-ro-envoy.yaml.
+# For a read-write authoring server see single-rw-envoy.yaml.
+# For a multi-instance high-availability deployment see scaled-ro-envoy.yaml.
+#
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+#   - Azure Database for PostgreSQL provisioned and accessible from the cluster
+#   - Envoy Gateway installed:
+#       kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/v1.3.1/install.yaml
+#   - Azure Disk CSI driver enabled on the node pool (default on AKS)
+#   - cert-manager installed (optional, for TLS):
+#       helm install cert-manager jetstack/cert-manager --set crds.enabled=true
+#   - External Secrets Operator installed (optional, for Azure Key Vault):
+#       helm install external-secrets external-secrets/external-secrets
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver -f aks/single-ro-envoy.yaml
+
+ontoserver:
+  imageCredentials:
+    username: ""   # quay.io username
+    password: ""   # quay.io password
+
+  serverName: ontoserver.example.com
+  hostNames:
+    - ontoserver.example.com
+
+  deployment:
+    kind: Deployment
+    type: single
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 1
+    isReadOnly: true
+
+    db:
+      enabled: false   # external PostgreSQL — sidecar not used in production
+
+    persistence:
+      enabledForDeployment: true
+      mode: split
+      # Azure Disk (Premium_LRS) — ReadWriteOnce, backed by Azure managed disks.
+      files:
+        accessMode: ReadWriteOnce
+        storageClass:
+          provided:
+            enabled: true
+            storageProvisioner: disk.csi.azure.com
+            reclaimPolicy: Retain
+            allowVolumeExpansion: true
+            storageParameters:
+              skuName: Premium_LRS
+              kind: Managed
+
+  # ── External PostgreSQL connection ────────────────────────────────────────
+  config:
+    spring.datasource.url: "jdbc:postgresql://your-postgres-server.postgres.database.azure.com:5432/ontoserver?sslmode=require"
+    spring.datasource.username: "ontoserver"
+
+  # Supply the password via secretConfig (inline) or externalSecret (Key Vault).
+  # Option A — inline secret (base64-encoded):
+  secretConfig:
+    spring.datasource.password: ""   # base64-encoded PostgreSQL password
+
+  # Option B — Azure Key Vault via External Secrets Operator:
+  # externalSecret:
+  #   enabled: true
+  #   secretStoreRef:
+  #     name: azure-keyvault-store
+  #     kind: ClusterSecretStore
+  #   data:
+  #     - secretKey: spring.datasource.password
+  #       remoteRef:
+  #         key: ontoserver-db-password
+
+  gateway:
+    enabled: true
+    className: envoy-gateway-class
+
+  # ── TLS via cert-manager ──────────────────────────────────────────────────
+  # tls:
+  #   enabled: true
+  #   certRef: ontoserver-tls
+  # certmanager:
+  #   enabled: true
+  #   clusterIssuerName: letsencrypt-prod
+  #   email: your-email@example.com
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2
+        memory: 4G
+        storage: 20G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2800m
+      maxHeapSize: 2800m
+
+  # ── Preload ───────────────────────────────────────────────────────────────
+  # Read-only servers are typically pre-populated via an Atom preload feed on
+  # startup. Mount a preload.xml file into the pod and configure:
+  #
+  # config:
+  #   atom.preload.feedLocation: "file:///data/preload.xml"
+  #   ontoserver.preload.on.start.enabled: "true"
+  #
+  # healthCheckOption: -s   # hold pod unready until preload completes
+
+# ── Envoy Gateway traffic policies (optional) ─────────────────────────────
+# envoygateway:
+#   clientTrafficPolicy:
+#     enabled: true
+#     idleTimeout: 300s
+#   backendTrafficPolicy:
+#     enabled: true
+#     requestBufferLimit: 1Gi
+#     rateLimit:
+#       requests: 50
+#       unit: Second
+#   securityPolicy:
+#     enabled: true
+#     defaultAction: Allow
+#     deniedCIDRs: []

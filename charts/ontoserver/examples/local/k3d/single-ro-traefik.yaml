@@ -1,0 +1,95 @@
+# local/k3d/single-ro-traefik.yaml
+# Single read-only Ontoserver on k3d using Traefik Ingress.
+#
+# k3d ships Traefik by default — no extra operators required.
+# This is the simplest way to expose Ontoserver locally with a URL.
+#
+# ── Quick start ──────────────────────────────────────────────────────────────
+#
+# 1. Create a k3d cluster with port 80 mapped to localhost:
+#
+#      k3d cluster create ontoserver --port "8080:80@loadbalancer"
+#
+#    (Port 80 is often taken on developer machines; this maps cluster port 80
+#    to host port 8080. Use --port "80:80@loadbalancer" if port 80 is free.)
+#
+# 2. Install the chart:
+#
+#      helm install my-ontoserver ./charts/ontoserver -f local/k3d/single-ro-traefik.yaml
+#
+# 3. Wait for the pod to become ready:
+#
+#      kubectl rollout status deployment/my-ontoserver-ontoserver-deployment
+#
+# 4. Open http://localhost:8080/fhir in your browser.
+#
+# ── Notes ─────────────────────────────────────────────────────────────────────
+#   - k3d uses local-path-provisioner for PVCs (the cluster default StorageClass).
+#   - Traefik is installed automatically by k3d with IngressClass 'traefik'.
+#   - For Gateway API on k3d see single-ro-envoy-gateway.yaml.
+
+ontoserver:
+  imageCredentials:
+    username: ""   # quay.io username
+    password: ""   # quay.io password
+
+  serverName: localhost
+  serverPort: "8080"   # matches the k3d port mapping above
+  hostNames:
+    - localhost
+
+  deployment:
+    kind: Deployment
+    type: single
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 1
+    isReadOnly: true
+
+    db:
+      enabled: true
+      postgresVersion: 16
+
+    persistence:
+      enabledForDeployment: true
+      mode: split
+      # local-path is the default StorageClass in k3d/k3s clusters.
+      files:
+        accessMode: ReadWriteOnce
+        storageClass:
+          provided:
+            enabled: false
+          name: ""
+      dbfiles:
+        accessMode: ReadWriteOnce
+        storageClass:
+          provided:
+            enabled: false
+          name: ""
+
+  # Traefik ships with k3d and registers the 'traefik' IngressClass automatically.
+  ingress:
+    enabled: true
+    className: traefik
+
+  tls:
+    enabled: false
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 1
+        memory: 3G
+        storage: 10G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2400m
+      maxHeapSize: 2400m
+    db:
+      requests:
+        cpu: 500m
+        memory: 512M
+        storage: 5G
+      limits:
+        cpu: 1
+        memory: 1G

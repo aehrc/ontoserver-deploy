@@ -1,0 +1,137 @@
+suite: validate-values tests
+templates:
+  - templates/validate-values.yaml
+tests:
+  - it: passes with default values
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when serverName not in hostNames
+    set:
+      ontoserver.serverName: notinlist.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: "ontoserver.serverName 'notinlist.example.com' must be one of hostNames"
+
+  - it: fails when both ingress and gateway enabled
+    set:
+      ontoserver.ingress.enabled: true
+      ontoserver.gateway.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "You must choose between Ingress or Gateway API!"
+
+  - it: fails when nginx-ingress enabled without ingress
+    set:
+      "nginx-ingress.enabled": true
+    asserts:
+      - failedTemplate:
+          errorMessage: "Don't include nginx-ingress-controller when Ingress is disabled!"
+
+  - it: fails when nginx-ingress enabled with gateway
+    set:
+      "nginx-ingress.enabled": true
+      ontoserver.gateway.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "Don't include nginx-ingress-controller when Gateway API is enabled!"
+
+  - it: fails when db sidecar disabled and no datasource url
+    set:
+      ontoserver.deployment.db.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: "If not using sidecar PostgreSQL container ontoserver.deployment.db.enabled=false you must specify ontoserver.config.spring.datasource.url"
+
+  - it: passes when db sidecar disabled but datasource url and username provided
+    values:
+      - fixtures/external-db-values.yaml
+    set:
+      ontoserver.deployment.db.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when datasource url set but username missing
+    values:
+      - fixtures/external-db-no-username.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "If using external database and ontoserver.config.spring.datasource.url is specified you also need to specify ontoserver.config.spring.datasource.username"
+
+  - it: fails when serviceMonitor enabled without managementService
+    set:
+      ontoserver.metrics.serviceMonitor.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "serviceMonitor requires managementService.enabled"
+
+  - it: fails when OTel instrumentation enabled without exporter endpoint
+    set:
+      ontoserver.opentelemetry.instrumentation.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "exporter.endpoint required when instrumentation enabled"
+
+  - it: fails when clientTrafficPolicy enabled without gateway
+    set:
+      envoygateway.clientTrafficPolicy.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "clientTrafficPolicy requires gateway.enabled"
+
+  - it: fails when backendTrafficPolicy enabled without gateway
+    set:
+      envoygateway.backendTrafficPolicy.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "backendTrafficPolicy requires gateway.enabled"
+
+  - it: fails when securityPolicy enabled without gateway
+    set:
+      envoygateway.securityPolicy.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "securityPolicy requires gateway.enabled"
+
+  - it: fails when createGatewayClass enabled without gateway
+    set:
+      envoygateway.createGatewayClass: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "envoygateway.createGatewayClass requires ontoserver.gateway.enabled"
+
+  - it: fails when gatewayServiceMonitor enabled without gateway
+    set:
+      envoygateway.gatewayServiceMonitor.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "envoygateway.gatewayServiceMonitor requires ontoserver.gateway.enabled"
+
+  - it: fails when externalSecret enabled without secretStoreRef name
+    set:
+      ontoserver.externalSecret.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.externalSecret.secretStoreRef.name is required when externalSecret.enabled"
+
+  - it: fails when externalSecret enabled but no data or dataFrom
+    set:
+      ontoserver.externalSecret.enabled: true
+      ontoserver.externalSecret.secretStoreRef.name: "my-store"
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.externalSecret.data or ontoserver.externalSecret.dataFrom must be specified when externalSecret.enabled"
+
+  - it: fails when scaled Deployment uses persistence (must use StatefulSet)
+    values:
+      - fixtures/external-db-values.yaml
+    set:
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: false
+      ontoserver.deployment.persistence.enabledForDeployment: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "Scaled deployments with persistence must use kind: StatefulSet, not Deployment. A scaled Deployment shares a single PVC across all replicas causing Lucene index corruption. StatefulSet volumeClaimTemplates provision a dedicated ReadWriteOnce volume per pod."

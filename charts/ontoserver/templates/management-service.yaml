@@ -1,0 +1,16 @@
+{{- if .Values.ontoserver.managementService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-ontoserver-management-service
+  labels:
+    service: {{ .Release.Name }}-ontoserver-management
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 18080
+      name: http-traffic
+  selector:
+    app: {{ .Release.Name }}-ontoserver
+{{- end }}

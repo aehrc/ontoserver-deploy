@@ -1,0 +1,18 @@
+{{- if .Values.pv.enabled }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ required "pv.volumeName is required" .Values.pv.volumeName }}
+  labels:
+    {{- include "ontoserver-extras.labels" . | nindent 4 }}
+spec:
+  capacity:
+    storage: {{ .Values.pv.storageSize }}
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.pv.storageClassName | default (printf "%s-ontoserver-files" .Release.Name) }}
+  csi:
+    driver: {{ .Values.pv.csiDriver | default "disk.csi.azure.com" }}
+    volumeHandle: {{ required "pv.diskURI is required" .Values.pv.diskURI }}
+{{- end }}

@@ -1,0 +1,254 @@
+{{- if eq .Values.ontoserver.deployment.kind "StatefulSet" }}
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: {{ .Release.Name }}-statefulset
+  {{- with .Values.ontoserver.deployment.labels }}
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.ontoserver.deployment.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if eq .Values.ontoserver.deployment.type "scaled" }}
+    {{- if eq (int .Values.ontoserver.deployment.replicas) 1 }}
+      {{- fail "scaled deployments require ontoserver.deployment.replicas should be greater or equal to 2 or 0" }}
+    {{- end }}
+  {{- else if eq .Values.ontoserver.deployment.type "single" }}
+    {{- if gt (int .Values.ontoserver.deployment.replicas) 1 }}
+      {{- fail "single deployments require ontoserver.deployment.replicas < 2" }}
+    {{- end }}
+  {{- else }}
+    {{- fail (printf "ontoserver.deployment.type must be one of the following: 'single', 'scaled'. Got: '%s'" .Values.ontoserver.deployment.type) }}
+  {{- end }}
+  replicas: {{ .Values.ontoserver.deployment.replicas }}
+  podManagementPolicy: Parallel
+  serviceName: {{ .Release.Name }}-ontoserver-headless
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-ontoserver
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-ontoserver
+        {{- with .Values.ontoserver.deployment.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- if or .Values.ontoserver.deployment.podAnnotations .Values.ontoserver.opentelemetry.instrumentation.enabled }}
+      annotations:
+        {{- with .Values.ontoserver.deployment.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.ontoserver.opentelemetry.instrumentation.enabled }}
+        instrumentation.opentelemetry.io/inject-java: "{{ .Release.Name }}-java-instrumentation"
+        {{- end }}
+      {{- end }}
+    spec:
+      {{- $pullSecrets := .Values.ontoserver.deployment.imagePullSecrets | default list }}
+      {{- if and .Values.ontoserver.imageCredentials.username .Values.ontoserver.imageCredentials.password }}
+        {{- $pullSecrets = append $pullSecrets (dict "name" (printf "%s-ontoserver-pull-secret" .Release.Name)) }}
+      {{- end }}
+      {{- if $pullSecrets }}
+      imagePullSecrets: {{ toJson $pullSecrets }}
+      {{- end }}
+      {{- if .Values.ontoserver.tolerations }}
+      tolerations: {{ toJson .Values.ontoserver.tolerations }}
+      {{- end }}
+      {{- if .Values.ontoserver.nodeSelector }}
+      nodeSelector: {{ toJson .Values.ontoserver.nodeSelector }}
+      {{- end }}
+      {{- if or .Values.ontoserver.serviceAccount.create .Values.ontoserver.serviceAccount.name }}
+      serviceAccountName: {{ .Values.ontoserver.serviceAccount.name | default (printf "%s-ontoserver" .Release.Name) }}
+      {{- end }}
+      containers:
+        - name: {{ .Release.Name }}-ontoserver
+          image: {{ required "ontoserver.deployment.image is required " .Values.ontoserver.deployment.image }}
+          imagePullPolicy: {{ required "ontoserver.deployment.imagePullPolicy is required" .Values.ontoserver.deployment.imagePullPolicy }}
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: {{ required "ontoserver.resources.ontoserver.requests.cpu is required" .Values.ontoserver.resources.ontoserver.requests.cpu }}
+              memory: {{ required "ontoserver.resources.ontoserver.requests.memory is required" .Values.ontoserver.resources.ontoserver.requests.memory }}
+            limits:
+              cpu: {{ required "ontoserver.resources.ontoserver.limits.cpu is required" .Values.ontoserver.resources.ontoserver.limits.cpu }}
+              memory: {{ required "ontoserver.resources.ontoserver.limits.memory is required" .Values.ontoserver.resources.ontoserver.limits.memory }}
+          {{- if .Values.ontoserver.deployment.db.enabled }}
+          startupProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: {{ .Values.ontoserver.deployment.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ontoserver.deployment.startupProbe.periodSeconds }}
+            failureThreshold: {{ .Values.ontoserver.deployment.startupProbe.failureThreshold }}
+            timeoutSeconds: {{ .Values.ontoserver.deployment.startupProbe.timeoutSeconds }}
+          {{- end }}
+          livenessProbe:
+            exec:
+              command:
+                - /healthcheck.sh
+            initialDelaySeconds: {{ .Values.ontoserver.deployment.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ontoserver.deployment.livenessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.ontoserver.deployment.livenessProbe.failureThreshold }}
+            timeoutSeconds: {{ .Values.ontoserver.deployment.livenessProbe.timeoutSeconds }}
+          readinessProbe:
+            exec:
+              command:
+                - /healthcheck.sh
+                - "{{- .Values.ontoserver.healthCheckOption }}"
+            initialDelaySeconds: {{ .Values.ontoserver.deployment.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ontoserver.deployment.readinessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.ontoserver.deployment.readinessProbe.failureThreshold }}
+            timeoutSeconds: {{ .Values.ontoserver.deployment.readinessProbe.timeoutSeconds }}
+          env:
+            - name: JAVA_OPTS
+              value: -Xms{{ required "ontoserver.resources.ontoserver.initialHeapSize is required" .Values.ontoserver.resources.ontoserver.initialHeapSize }} -Xmx{{ required ".Values.ontoserver.resources.ontoserver.maxHeapSize is required" .Values.ontoserver.resources.ontoserver.maxHeapSize }}
+            - name: LC_ALL
+              value: "{{ required "ontoserver.language is required" .Values.ontoserver.language }}.UTF-8"
+            - name: TZ
+              value: "{{ required "ontoserver.timeZone is required" .Values.ontoserver.timeZone }}"
+            {{- $serverName := required "ontoserver.serverName is required" .Values.ontoserver.serverName }}
+            {{- $scheme := ternary "https" "http" .Values.ontoserver.tls.enabled }}
+            {{- $portSuffix := "" }}
+            {{- if .Values.ontoserver.serverPort }}
+            {{- $portSuffix = printf ":%s" (.Values.ontoserver.serverPort | toString) }}
+            {{- end }}
+            - name: ontoserver.synd.base
+              value: {{ $scheme }}://{{ $serverName }}{{ $portSuffix }}/synd
+            - name: ontoserver.fhir.base
+              value: {{ $scheme }}://{{ $serverName }}{{ $portSuffix }}/fhir
+            - name: ontoserver.formats.html.base
+              value: {{ $scheme }}://{{ $serverName }}{{ $portSuffix }}/static
+            {{- if .Values.ontoserver.deployment.db.enabled }}
+            - name: spring.datasource.url
+              value: "jdbc:postgresql://localhost/postgres"
+            {{- end }}
+            {{- if eq .Values.ontoserver.deployment.type "scaled" }}
+            - name: ontoserver.deployment.scaling.dnsQuery
+              value: "{{ .Release.Name }}-ontoserver-clustering-service"
+            - name: ontoserver.deployment.scaled
+              value: "true"
+            - name: ontoserver.internal.deployment.scaledReadOnly
+              {{- if required "ontoserver.deployment.isReadOnly is required" .Values.ontoserver.deployment.isReadOnly }}
+              value: "true"
+              {{- else }}
+              value: "false"
+              {{- end }}
+            {{- if .Values.ontoserver.deployment.clusterName }}
+            - name: ontoserver.cluster.name
+              value: {{ .Values.ontoserver.deployment.clusterName | quote }}
+            {{- end }}
+            {{- end }}
+            - name: ontoserver.deployment.readOnly
+              {{- if required "ontoserver.deployment.isReadOnly is required" .Values.ontoserver.deployment.isReadOnly }}
+              value: "true"
+              {{- else }}
+              value: "false"
+              {{- end }}
+            {{- range $key, $value := .Values.ontoserver.config }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- range $key, $value := .Values.ontoserver.secretConfig }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Release.Name }}-ontoserver-secrets
+                  key: {{ $key }}
+            {{- end }}
+          {{- if .Values.ontoserver.externalSecret.enabled }}
+          envFrom:
+            - secretRef:
+                name: {{ .Release.Name }}-ontoserver-external-secrets
+          {{- end }}
+          volumeMounts:
+            - name: {{ .Release.Name }}-ontoserver-files
+              mountPath: /var/onto
+            {{- if .Values.ontoserver.customization }}
+            - name: customization
+              mountPath: /well-known
+            {{- end }}
+        {{- if and (eq .Values.ontoserver.deployment.type "scaled") .Values.ontoserver.deployment.db.enabled }}
+          {{- fail "Scaled deployments require shared database and cannot have the default sidecar database. Set ontoserver.deployment.db.enabled to false and set spring.datasource.url in ontoserver.config to an external db jdbc URL." }}
+        {{- end }}
+        {{- if and .Values.ontoserver.deployment.db.enabled (not (eq .Values.ontoserver.deployment.type "scaled")) }}
+        - name: {{ .Release.Name }}-ontoserver-db
+          image: "postgres:{{ required "ontoserver.deployment.db.postgresVersion is required" .Values.ontoserver.deployment.db.postgresVersion }}"
+          ports:
+            - containerPort: 5432
+          resources:
+            requests:
+              cpu: {{ required "ontoserver.resources.db.requests.cpu is required" .Values.ontoserver.resources.db.requests.cpu }}
+              memory: {{ required "ontoserver.resources.db.requests.memory is required" .Values.ontoserver.resources.db.requests.memory }}
+            limits:
+              cpu: {{ required "ontoserver.resources.db.limits.cpu is required" .Values.ontoserver.resources.db.limits.cpu }}
+              memory: {{ required "ontoserver.resources.db.limits.memory is required" .Values.ontoserver.resources.db.limits.memory }}
+          env:
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: "trust"
+            - name: LC_ALL
+              value: "{{ required "ontoserver.language is required" .Values.ontoserver.language }}.UTF-8"
+            - name: TZ
+              value: "{{ required "ontoserver.timeZone is required" .Values.ontoserver.timeZone }}"
+          command: ['sh', '-c']
+          args:
+          - |
+            # Generate locale using localedef (lighter than apt-get install locales)
+            localedef -i {{ .Values.ontoserver.language }} -c -f UTF-8 -A /usr/share/locale/locale.alias {{ .Values.ontoserver.language }}.UTF-8
+            # Start postgres normally
+            exec docker-entrypoint.sh postgres
+          volumeMounts:
+          {{- if eq .Values.ontoserver.deployment.persistence.mode "split" }}
+            - name: {{ .Release.Name }}-ontoserver-db-files
+              mountPath: /var/lib/postgresql/data
+          {{- else }}
+            - name: {{ .Release.Name }}-ontoserver-files
+              mountPath: /var/lib/postgresql/data
+              subPath: db
+          {{- end }}
+        {{- end }}
+      {{- if not (empty .Values.ontoserver.customization) }}
+      volumes:
+        - name: customization
+          configMap:
+            name: {{ .Values.ontoserver.customization }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: {{ .Release.Name }}-ontoserver-files
+      spec:
+        {{- if .Values.ontoserver.deployment.persistence.files.existingVolume.enabled }}
+        volumeName: {{ .Values.ontoserver.deployment.persistence.files.existingVolume.name }}
+        {{- else }}
+        resources:
+          requests:
+            storage: {{ required "ontoserver.resources.ontoserver.requests.storage is required for Scaled deployments" .Values.ontoserver.resources.ontoserver.requests.storage }}
+        accessModes:
+          - "{{ .Values.ontoserver.deployment.persistence.files.accessMode }}"
+        {{- if .Values.ontoserver.deployment.persistence.files.storageClass.provided.enabled }}
+        storageClassName: {{ .Release.Name }}-ontoserver-files
+        {{- else}}
+        storageClassName: {{ .Values.ontoserver.deployment.persistence.files.storageClass.name }}
+        {{- end }}
+        {{- end }}
+    {{- if and (eq .Values.ontoserver.deployment.persistence.mode "split") .Values.ontoserver.deployment.db.enabled }}
+    - metadata:
+        name: {{ .Release.Name }}-ontoserver-db-files
+      spec:
+        {{- if .Values.ontoserver.deployment.persistence.dbfiles.existingVolume.enabled }}
+        volumeName: {{ .Values.ontoserver.deployment.persistence.dbfiles.existingVolume.name }}
+        {{- else }}
+        resources:
+          requests:
+            storage: {{ required "ontoserver.resources.db.requests.storage is required for Scaled deployments" .Values.ontoserver.resources.db.requests.storage }}
+        accessModes:
+          - "{{ .Values.ontoserver.deployment.persistence.dbfiles.accessMode }}"
+        {{- if .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.enabled }}
+        storageClassName: {{ .Release.Name }}-ontoserver-db-files
+        {{- else}}
+        storageClassName: {{ .Values.ontoserver.deployment.persistence.dbfiles.storageClass.name }}
+        {{- end }}
+        {{- end }}
+    {{- end }}
+{{- end }}

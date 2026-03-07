@@ -1,0 +1,41 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ .Release.Name }}-ontoserver-service
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  selector:
+    app: {{ .Release.Name }}-ontoserver
+{{- if eq .Values.ontoserver.deployment.type "scaled" }}
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ .Release.Name }}-ontoserver-clustering-service
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: cluster-bind
+      port: 7800
+    - name: multicast
+      port: 46655
+      protocol: UDP
+  selector:
+    app: {{ .Release.Name }}-ontoserver
+{{- end }}
+{{- if eq .Values.ontoserver.deployment.kind "StatefulSet" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-ontoserver-headless
+spec:
+  clusterIP: None
+  selector:
+    app: {{ .Release.Name }}-ontoserver
+{{- end }}

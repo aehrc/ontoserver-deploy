@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.18.4
+
+      - name: Install helm-unittest plugin
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest
+
+      - name: Run unit tests
+        run: helm unittest ./charts/ontoserver
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.18.4
+
+      - name: Create k3d cluster
+        uses: AbsaOSS/k3d-action@v2
+        with:
+          cluster-name: ontoserver-test
+          args: >-
+            --agents 1
+            --no-lb
+            --k3s-arg "--disable=traefik@server:0"
+
+      - name: Build chart dependencies
+        run: helm dependency build ./charts/ontoserver
+
+      - name: Install chart
+        run: |
+          helm install ontoserver ./charts/ontoserver \
+            --set ontoserver.deployment.isReadOnly=false \
+            --set ontoserver.managementService.enabled=true \
+            --set ontoserver.imageCredentials.username=${{ secrets.QUAY_USERNAME }} \
+            --set ontoserver.imageCredentials.password=${{ secrets.QUAY_PASSWORD }} \
+            --set ontoserver.resources.ontoserver.requests.cpu=500m \
+            --set ontoserver.resources.ontoserver.limits.cpu=2 \
+            --set ontoserver.resources.ontoserver.requests.memory=2G \
+            --set ontoserver.resources.ontoserver.limits.memory=2G \
+            --set ontoserver.resources.ontoserver.initialHeapSize=1500m \
+            --set ontoserver.resources.ontoserver.maxHeapSize=1500m \
+            --set ontoserver.resources.db.requests.cpu=250m \
+            --set ontoserver.resources.db.limits.cpu=1 \
+            --set ontoserver.resources.db.requests.memory=512Mi \
+            --set ontoserver.resources.db.limits.memory=1G \
+            --wait \
+            --timeout 10m
+
+      - name: Diagnose failed install
+        if: failure()
+        run: |
+          echo "=== Pod status ==="
+          kubectl get pods -o wide
+          echo "=== Pod description ==="
+          kubectl describe pods
+          echo "=== Pod logs ==="
+          kubectl logs -l app=ontoserver-ontoserver --all-containers=true --tail=100 || true
+          echo "=== Events ==="
+          kubectl get events --sort-by='.lastTimestamp'
+
+      - name: Run integration tests
+        run: helm test ontoserver --timeout 10m
+
+      - name: Collect test logs
+        if: always()
+        run: |
+          echo "=== Events ==="
+          kubectl get events --sort-by='.lastTimestamp'
+          echo "=== Ontoserver pod logs (all containers) ==="
+          kubectl logs -l app=ontoserver-ontoserver --all-containers=true --tail=50 || true
+          echo "=== test-metadata job ==="
+          kubectl describe job ontoserver-ontoserver-test-metadata || true
+          echo "=== test-metadata logs ==="
+          kubectl logs -l job-name=ontoserver-ontoserver-test-metadata --tail=200 || true
+          echo "=== test-fhir-rw logs ==="
+          kubectl logs -l job-name=ontoserver-ontoserver-test-fhir-rw --tail=200 || true

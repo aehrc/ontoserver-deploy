@@ -1,0 +1,57 @@
+{{- if and .Values.envoygateway.createGatewayClass .Values.ontoserver.gateway.enabled }}
+{{- $controllerNs := .Values.envoygateway.controlPlaneNamespace | default "envoy-gateway-system" }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: {{ .Values.ontoserver.gateway.className }}
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: {{ .Values.envoygateway.envoyProxy.name | default "default" }}
+    namespace: {{ $controllerNs }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: {{ .Values.envoygateway.envoyProxy.name | default "default" }}
+  namespace: {{ $controllerNs }}
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        replicas: {{ .Values.envoygateway.envoyProxy.replicas | default 2 }}
+      envoyPDB:
+        minAvailable: {{ .Values.envoygateway.envoyProxy.pdbMinAvailable | default 1 }}
+      envoyService:
+        annotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "metrics"
+          prometheus.io/path: "/stats/prometheus"
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              ports:
+                - name: metrics
+                  port: 19001
+                  targetPort: 19001
+                - name: admin
+                  port: 19000
+                  targetPort: 19000
+  {{- if .Values.envoygateway.envoyProxy.accessLog.enabled }}
+  telemetry:
+    accessLog:
+      settings:
+        - format:
+            type: Text
+            text: |-
+              {{ .Values.envoygateway.envoyProxy.accessLog.format | trim }}
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout
+  {{- end }}
+{{- end }}

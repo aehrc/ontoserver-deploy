@@ -1,0 +1,74 @@
+{{- if not .Values.ontoserver.deployment.isReadOnly }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-ontoserver-test-fixtures
+data:
+  codesystem.json: |
+    {
+      "resourceType": "CodeSystem",
+      "url": "http://example.org/fhir/CodeSystem/test-cs",
+      "version": "1.0.0",
+      "name": "TestCodeSystem",
+      "title": "Test Code System",
+      "status": "active",
+      "content": "complete",
+      "concept": [
+        { "code": "code-a", "display": "Code A" },
+        { "code": "code-b", "display": "Code B" },
+        { "code": "code-c", "display": "Code C" }
+      ]
+    }
+  valueset.json: |
+    {
+      "resourceType": "ValueSet",
+      "url": "http://example.org/fhir/ValueSet/test-vs",
+      "version": "1.0.0",
+      "name": "TestValueSet",
+      "title": "Test Value Set",
+      "status": "active",
+      "compose": {
+        "include": [
+          { "system": "http://example.org/fhir/CodeSystem/test-cs" }
+        ]
+      }
+    }
+  conceptmap.json: |
+    {
+      "resourceType": "ConceptMap",
+      "url": "http://example.org/fhir/ConceptMap/test-cm",
+      "version": "1.0.0",
+      "name": "TestConceptMap",
+      "title": "Test Concept Map",
+      "status": "active",
+      "group": [
+        {
+          "source": "http://example.org/fhir/CodeSystem/test-cs",
+          "target": "http://example.org/fhir/CodeSystem/test-target",
+          "element": [
+            {
+              "code": "code-a",
+              "display": "Code A",
+              "target": [
+                {
+                  "code": "target-a",
+                  "display": "Target A",
+                  "equivalence": "equivalent"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  expand-request.json: |
+    {
+      "resourceType": "Parameters",
+      "parameter": [
+        {
+          "name": "url",
+          "valueUri": "http://example.org/fhir/ValueSet/test-vs"
+        }
+      ]
+    }
+{{- end }}

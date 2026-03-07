@@ -1,0 +1,45 @@
+{{- if .Values.ontoserver.ingress.enabled }}
+{{- $releaseName := .Release.Name }}
+kind: Ingress
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: {{ .Release.Name }}-ontoserver-ingress
+{{- if or (gt (len .Values.ontoserver.ingress.annotations) 0) .Values.ontoserver.certmanager.enabled }}
+  annotations:
+    {{- range $k, $v := .Values.ontoserver.ingress.annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+    {{- if .Values.ontoserver.certmanager.enabled }}
+    cert-manager.io/cluster-issuer:          "{{ .Values.ontoserver.certmanager.clusterIssuerName }}"
+    cert-manager.io/issue-temporary-certificate: "true"
+    acme.cert-manager.io/http01-edit-in-place:    "true"
+    {{- end }}
+{{- end }}
+
+spec:
+  ingressClassName: {{ required "ontoserver.ingress.className is required" .Values.ontoserver.ingress.className }}
+  {{- if .Values.ontoserver.tls.enabled }}
+  {{- if eq (len .Values.ontoserver.hostNames) 0 }}
+    {{- fail "Minimum one entry is required in ontoserver.hostNames" }}
+  {{- end }}
+  tls:
+    - hosts:
+      {{- range .Values.ontoserver.hostNames }}
+        - {{ . | quote }}
+      {{- end }}
+      secretName: {{ .Values.ontoserver.tls.certRef }}
+  {{- end }}
+  rules:
+  {{- range .Values.ontoserver.hostNames }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $releaseName }}-ontoserver-service
+                port:
+                  number: 80
+  {{- end }}
+{{- end }}

@@ -1,0 +1,31 @@
+{{- if and (or .Values.ontoserver.deployment.persistence.enabledForDeployment (eq .Values.ontoserver.deployment.kind "StatefulSet")) .Values.ontoserver.deployment.persistence.files.storageClass.provided.enabled }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Release.Name }}-ontoserver-files
+provisioner: {{ required "ontoserver.deployment.persistence.files.storageClass.provided.storageProvisioner is required" .Values.ontoserver.deployment.persistence.files.storageClass.provided.storageProvisioner }}
+reclaimPolicy: {{ required "ontoserver.deployment.persistence.files.storageClass.provided.reclaimPolicy is required" .Values.ontoserver.deployment.persistence.files.storageClass.provided.reclaimPolicy }}
+volumeBindingMode: WaitForFirstConsumer
+{{- if empty .Values.ontoserver.deployment.persistence.files.storageClass.provided.storageParameters }}
+  {{- fail "Provide storage parameters in ontoserver.deployment.persistence.files.storageClass.provided.storageParameters" }}
+{{- end }}
+parameters:  {{ toJson .Values.ontoserver.deployment.persistence.files.storageClass.provided.storageParameters }}
+allowVolumeExpansion: {{ .Values.ontoserver.deployment.persistence.files.storageClass.provided.allowVolumeExpansion }}
+{{- end }}
+---
+{{- if and (eq .Values.ontoserver.deployment.persistence.mode "split") .Values.ontoserver.deployment.db.enabled }}
+{{- if and (or .Values.ontoserver.deployment.persistence.enabledForDeployment (eq .Values.ontoserver.deployment.kind "StatefulSet")) .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Release.Name }}-ontoserver-db-files
+provisioner: {{ required "ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageProvisioner is required" .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageProvisioner }}
+reclaimPolicy: {{ required "ontoserver.deployment.persistence.dbfiles.storageClass.provided.reclaimPolicy is required" .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.reclaimPolicy }}
+volumeBindingMode: WaitForFirstConsumer
+{{- if empty .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters }}
+  {{- fail "Provide storage parameters in ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters" }}
+{{- end }}
+parameters:  {{ toJson .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters }}
+allowVolumeExpansion: {{ .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.allowVolumeExpansion }}
+{{- end }}
+{{- end }}

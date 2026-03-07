@@ -1,0 +1,149 @@
+# eks/scaled-ro-envoy.yaml
+# Scaled read-only Ontoserver on Amazon EKS.
+# Networking: Gateway API with Envoy Gateway.
+#
+# Runs multiple read-only instances behind a shared PostgreSQL database.
+# Each instance maintains its own local Lucene index cache on a dedicated
+# EBS volume — indexes are NOT shared between instances. Infinispan
+# handles cache invalidation across the cluster so all instances stay
+# consistent after content updates.
+#
+# This is the recommended topology for high-availability production servers
+# where downtime is unacceptable, for example: tx.ontoserver.csiro.au/fhir
+#
+# ── How it works ──────────────────────────────────────────────────────────────
+#   - PostgreSQL (RDS) is the single source of truth for all FHIR resources.
+#   - Each pod builds and caches Lucene indexes locally on its own EBS volume.
+#     Ontoserver checks at startup whether indexes exist and builds any missing.
+#   - Infinispan cluster communication (via headless DNS service) propagates
+#     cache invalidation so instances evict stale indexes after a write.
+#   - New pods experience a warm-up period while indexes are built on first use.
+#   - Pre-attaching a volume with existing indexes (e.g. from a snapshot) avoids
+#     the warm-up delay on pod replacement.
+#
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+#   - External PostgreSQL (Amazon RDS for PostgreSQL)
+#   - EBS CSI driver add-on enabled
+#   - Envoy Gateway installed:
+#       kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/v1.3.1/install.yaml
+#   - AWS Load Balancer Controller installed
+#   - cert-manager installed (optional, for TLS)
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver -f eks/scaled-ro-envoy.yaml
+
+ontoserver:
+  imageCredentials:
+    username: ""   # quay.io username
+    password: ""   # quay.io password
+
+  serverName: ontoserver.example.com
+  hostNames:
+    - ontoserver.example.com
+
+  deployment:
+    kind: StatefulSet
+    type: scaled
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 3
+    isReadOnly: true
+
+    # clusterName scopes Infinispan discovery to this deployment.
+    # Change this if running multiple Ontoserver StatefulSets in the same namespace.
+    clusterName: "ontoserver-prod"
+
+    db:
+      enabled: false   # external PostgreSQL required — sidecar not supported for scaled
+
+    persistence:
+      mode: split
+      # EBS (gp3) — ReadWriteOnce per pod via StatefulSet volumeClaimTemplates.
+      # Each pod receives its own dedicated EBS volume so Lucene indexes
+      # are never shared between instances.
+      files:
+        accessMode: ReadWriteOnce
+        storageClass:
+          provided:
+            enabled: true
+            storageProvisioner: ebs.csi.aws.com
+            reclaimPolicy: Retain
+            allowVolumeExpansion: true
+            storageParameters:
+              skuName: ""
+              kind: ""
+              type: gp3
+              encrypted: "true"
+
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 2   # keep at least 2 instances available during updates
+
+  config:
+    # External PostgreSQL connection — replace with your RDS endpoint.
+    spring.datasource.url: "jdbc:postgresql://your-rds-endpoint.rds.amazonaws.com:5432/ontoserver"
+    spring.datasource.username: "ontoserver"
+    # spring.datasource.password — set via secretConfig or externalSecret below
+
+  serviceAccount:
+    create: true
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/ontoserver-role
+
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: ontoserver-nodes
+
+  gateway:
+    enabled: true
+    className: envoy-gateway-class
+
+  # ── TLS via cert-manager ──────────────────────────────────────────────────
+  # tls:
+  #   enabled: true
+  #   certRef: ontoserver-tls
+  # certmanager:
+  #   enabled: true
+  #   clusterIssuerName: letsencrypt-prod
+  #   email: your-email@example.com
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2
+        memory: 4G
+        storage: 50G   # per-pod disk for Lucene indexes — size for your terminology set
+      limits:
+        cpu: 4
+        memory: 8G
+      initialHeapSize: 6000m
+      maxHeapSize: 6000m
+
+  # ── Database password ─────────────────────────────────────────────────────
+  # secretConfig:
+  #   spring.datasource.password: "your-password"
+  #
+  # externalSecret:
+  #   enabled: true
+  #   secretStoreRef:
+  #     name: aws-secrets-manager
+  #     kind: ClusterSecretStore
+  #   data:
+  #     - secretKey: spring.datasource.password
+  #       remoteRef:
+  #         key: /ontoserver/db
+  #         property: password
+
+# ── Envoy Gateway traffic policies (optional) ─────────────────────────────
+# envoygateway:
+#   clientTrafficPolicy:
+#     enabled: true
+#     idleTimeout: 300s
+#   backendTrafficPolicy:
+#     enabled: true
+#     requestBufferLimit: 1Gi
+#     rateLimit:
+#       requests: 100
+#       unit: Second
+#   securityPolicy:
+#     enabled: true
+#     defaultAction: Allow
+#     deniedCIDRs: []

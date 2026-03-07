@@ -1,0 +1,108 @@
+suite: Optional features tests
+tests:
+  - it: renders no management service by default
+    templates:
+      - templates/management-service.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders management service when enabled
+    templates:
+      - templates/management-service.yaml
+    set:
+      ontoserver.managementService.enabled: true
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-management-service
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 18080
+
+  - it: renders no ServiceMonitor by default
+    templates:
+      - templates/servicemonitor.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders ServiceMonitor when enabled with managementService
+    templates:
+      - templates/servicemonitor.yaml
+    set:
+      ontoserver.metrics.serviceMonitor.enabled: true
+      ontoserver.managementService.enabled: true
+    asserts:
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-service-monitor
+
+  - it: renders no OTel Instrumentation by default
+    templates:
+      - templates/opentelemetry-instrumentation.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders OTel Instrumentation when enabled
+    templates:
+      - templates/opentelemetry-instrumentation.yaml
+    set:
+      ontoserver.opentelemetry.instrumentation.enabled: true
+      ontoserver.opentelemetry.instrumentation.exporter.endpoint: "http://jaeger:4317"
+    asserts:
+      - isKind:
+          of: Instrumentation
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-java-instrumentation
+      - equal:
+          path: spec.exporter.endpoint
+          value: "http://jaeger:4317"
+
+  - it: renders no Envoy policies by default
+    templates:
+      - templates/envoy-gateway-policies.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders ClientTrafficPolicy when enabled with gateway
+    templates:
+      - templates/envoy-gateway-policies.yaml
+    set:
+      ontoserver.gateway.enabled: true
+      envoygateway.clientTrafficPolicy.enabled: true
+    asserts:
+      - isKind:
+          of: ClientTrafficPolicy
+          documentIndex: 0
+      - equal:
+          path: metadata.name
+          documentIndex: 0
+          value: RELEASE-NAME-client-settings
+
+  - it: renders no gateway ServiceMonitor by default
+    templates:
+      - templates/servicemonitor.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders gateway ServiceMonitor when enabled with gateway
+    templates:
+      - templates/servicemonitor.yaml
+    set:
+      ontoserver.gateway.enabled: true
+      envoygateway.gatewayServiceMonitor.enabled: true
+    asserts:
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-gateway-servicemonitor

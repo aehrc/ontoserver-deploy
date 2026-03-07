@@ -1,0 +1,17 @@
+{{- if .Values.varnish.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-varnish-service
+  labels:
+    {{- include "ontoserver-extras.labels" . | nindent 4 }}
+    {{- include "ontoserver-extras.varnish.selectorLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  selector:
+    {{- include "ontoserver-extras.varnish.selectorLabels" . | nindent 4 }}
+{{- end }}

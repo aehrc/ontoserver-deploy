@@ -1,0 +1,75 @@
+{{- /* Validate serverName is in hostNames */ -}}
+{{- $sn := .Values.ontoserver.serverName }}
+{{- $found := false }}
+{{- range .Values.ontoserver.hostNames }}
+  {{- if eq . $sn }}
+    {{- $found = true }}
+  {{- end }}
+{{- end }}
+{{- if not $found }}
+  {{- fail (printf "ontoserver.serverName '%s' must be one of hostNames: %v" $sn .Values.ontoserver.hostNames) }}
+{{- end }}
+
+{{- if and .Values.ontoserver.ingress.enabled .Values.ontoserver.gateway.enabled }}
+  {{- fail "You must choose between Ingress or Gateway API!" }}
+{{- end }}
+
+{{- $ngi := index .Values "nginx-ingress" }}
+{{- if and  $ngi.enabled .Values.ontoserver.gateway.enabled }}
+  {{- fail "Don't include nginx-ingress-controller when Gateway API is enabled!" }}
+{{- end }}
+{{- if and  $ngi.enabled  (not .Values.ontoserver.ingress.enabled) }}
+  {{- fail "Don't include nginx-ingress-controller when Ingress is disabled!" }}
+{{- end }}
+
+{{- if and (not .Values.ontoserver.deployment.db.enabled) (empty (index .Values.ontoserver.config "spring.datasource.url")) }}
+  {{- fail "If not using sidecar PostgreSQL container ontoserver.deployment.db.enabled=false you must specify ontoserver.config.spring.datasource.url" }}
+{{- end }}
+
+{{- if and (index .Values.ontoserver.config "spring.datasource.url") (and (empty (index .Values.ontoserver.config "spring.datasource.username")) (empty (index .Values.ontoserver.secretConfig "spring.datasource.username"))) }}
+  {{- fail "If using external database and ontoserver.config.spring.datasource.url is specified you also need to specify ontoserver.config.spring.datasource.username" }}
+{{- end }}
+
+{{- if and .Values.ontoserver.metrics.serviceMonitor.enabled (not .Values.ontoserver.managementService.enabled) }}
+  {{- fail "serviceMonitor requires managementService.enabled" }}
+{{- end }}
+
+{{- if and .Values.envoygateway.createGatewayClass (not .Values.ontoserver.gateway.enabled) }}
+  {{- fail "envoygateway.createGatewayClass requires ontoserver.gateway.enabled" }}
+{{- end }}
+
+{{- if and .Values.envoygateway.gatewayServiceMonitor.enabled (not .Values.ontoserver.gateway.enabled) }}
+  {{- fail "envoygateway.gatewayServiceMonitor requires ontoserver.gateway.enabled" }}
+{{- end }}
+
+{{- if and .Values.envoygateway.clientTrafficPolicy.enabled (not .Values.ontoserver.gateway.enabled) }}
+  {{- fail "clientTrafficPolicy requires gateway.enabled" }}
+{{- end }}
+
+{{- if and .Values.envoygateway.backendTrafficPolicy.enabled (not .Values.ontoserver.gateway.enabled) }}
+  {{- fail "backendTrafficPolicy requires gateway.enabled" }}
+{{- end }}
+
+{{- if and .Values.envoygateway.securityPolicy.enabled (not .Values.ontoserver.gateway.enabled) }}
+  {{- fail "securityPolicy requires gateway.enabled" }}
+{{- end }}
+
+{{- if and .Values.ontoserver.opentelemetry.instrumentation.enabled (empty .Values.ontoserver.opentelemetry.instrumentation.exporter.endpoint) }}
+  {{- fail "exporter.endpoint required when instrumentation enabled" }}
+{{- end }}
+
+{{- if and .Values.ontoserver.externalSecret.enabled (empty .Values.ontoserver.externalSecret.secretStoreRef.name) }}
+  {{- fail "ontoserver.externalSecret.secretStoreRef.name is required when externalSecret.enabled" }}
+{{- end }}
+
+{{- if and .Values.ontoserver.externalSecret.enabled (empty .Values.ontoserver.externalSecret.data) (empty .Values.ontoserver.externalSecret.dataFrom) }}
+  {{- fail "ontoserver.externalSecret.data or ontoserver.externalSecret.dataFrom must be specified when externalSecret.enabled" }}
+{{- end }}
+
+{{- /* Scaled deployments must use StatefulSet. A scaled Deployment with persistence enabled
+     would share a single PVC across all replicas — Lucene cannot handle concurrent index
+     writes from multiple instances and this would cause index corruption. StatefulSet
+     volumeClaimTemplates provision a dedicated ReadWriteOnce volume per pod instead. */ -}}
+{{- if and (eq .Values.ontoserver.deployment.type "scaled") (eq .Values.ontoserver.deployment.kind "Deployment") .Values.ontoserver.deployment.persistence.enabledForDeployment }}
+  {{- fail "Scaled deployments with persistence must use kind: StatefulSet, not Deployment. A scaled Deployment shares a single PVC across all replicas causing Lucene index corruption. StatefulSet volumeClaimTemplates provision a dedicated ReadWriteOnce volume per pod." }}
+{{- end }}

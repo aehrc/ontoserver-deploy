@@ -1,0 +1,100 @@
+# networking/single-ro-nginx-ingress.yaml
+# Single read-only Ontoserver using the bundled F5 nginx-ingress subchart.
+# Works on any Kubernetes cluster — no pre-installed ingress controller required.
+#
+# The chart includes an optional nginx-ingress subchart that deploys its own
+# dedicated ingress controller scoped to this release. This is the simplest
+# option for clusters that don't have an ingress controller installed, or
+# when you want an isolated controller that won't affect other workloads.
+#
+# For cloud-native networking options see:
+#   - aks/single-ro-envoy.yaml         — AKS with Envoy Gateway (recommended)
+#   - networking/single-ro-aks-agic.yaml — AKS with Application Gateway
+#   - eks/single-ro-envoy.yaml         — EKS with Envoy Gateway (recommended)
+#   - networking/single-ro-eks-alb.yaml  — EKS with ALB
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver -f networking/single-ro-nginx-ingress.yaml
+
+ontoserver:
+  imageCredentials:
+    username: ""   # quay.io username
+    password: ""   # quay.io password
+
+  serverName: ontoserver.example.com
+  hostNames:
+    - ontoserver.example.com
+
+  deployment:
+    kind: Deployment
+    type: single
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 1
+    isReadOnly: true
+
+    db:
+      enabled: true
+      postgresVersion: 16
+
+    persistence:
+      enabledForDeployment: true
+      mode: split
+      # No chart-managed StorageClass — uses the cluster default.
+      # Override storageClass.provided if your cluster requires a specific CSI driver.
+      files:
+        accessMode: ReadWriteOnce
+        storageClass:
+          provided:
+            enabled: false
+          name: ""
+      dbfiles:
+        accessMode: ReadWriteOnce
+        storageClass:
+          provided:
+            enabled: false
+          name: ""
+
+  # The bundled nginx-ingress subchart creates an IngressClass named 'ontoserver-nginx'.
+  # This controller is scoped to this Helm release and won't affect other ingress resources.
+  ingress:
+    enabled: true
+    className: ontoserver-nginx
+
+  tls:
+    enabled: false
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2
+        memory: 4G
+        storage: 20G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2800m
+      maxHeapSize: 2800m
+    db:
+      requests:
+        cpu: 1
+        memory: 1G
+        storage: 10G
+      limits:
+        cpu: 1
+        memory: 1G
+
+  # ── Preload ───────────────────────────────────────────────────────────────
+  # config:
+  #   atom.preload.feedLocation: "file:///data/preload.xml"
+  #   ontoserver.preload.on.start.enabled: "true"
+  # healthCheckOption: -s
+
+# ── Enable the bundled nginx-ingress subchart ──────────────────────────────
+# This deploys an F5 nginx ingress controller dedicated to this release.
+nginx-ingress:
+  enabled: true
+  controller:
+    ingressClass:
+      create: true
+      name: ontoserver-nginx
+    ingressClassByName: true

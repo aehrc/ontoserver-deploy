@@ -1,0 +1,128 @@
+# eks/sidecar-db/single-ro-envoy.yaml
+# Single read-only Ontoserver on EKS with built-in PostgreSQL sidecar.
+# Networking: Gateway API with Envoy Gateway.
+#
+# Uses the chart's built-in PostgreSQL 16 sidecar container — convenient for
+# development, testing, or low-traffic deployments where managing an external
+# database is not justified.
+#
+# For production deployments with an external managed database (Amazon RDS)
+# see ../single-ro-envoy.yaml.
+# For a multi-instance high-availability deployment see ../scaled-ro-envoy.yaml.
+#
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+#   - EBS CSI driver add-on enabled
+#   - Envoy Gateway installed:
+#       kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/v1.3.1/install.yaml
+#   - AWS Load Balancer Controller installed
+#   - cert-manager installed (optional, for TLS)
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver -f eks/sidecar-db/single-ro-envoy.yaml
+
+ontoserver:
+  imageCredentials:
+    username: ""   # quay.io username
+    password: ""   # quay.io password
+
+  serverName: ontoserver.example.com
+  hostNames:
+    - ontoserver.example.com
+
+  deployment:
+    kind: Deployment
+    type: single
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 1
+    isReadOnly: true
+
+    db:
+      enabled: true
+      postgresVersion: 16
+
+    persistence:
+      enabledForDeployment: true
+      mode: split
+      # EBS (gp3) — ReadWriteOnce, suitable for single-instance deployments.
+      files:
+        accessMode: ReadWriteOnce
+        storageClass:
+          provided:
+            enabled: true
+            storageProvisioner: ebs.csi.aws.com
+            reclaimPolicy: Retain
+            allowVolumeExpansion: true
+            storageParameters:
+              skuName: ""
+              kind: ""
+              type: gp3
+              encrypted: "true"
+      dbfiles:
+        accessMode: ReadWriteOnce
+        storageClass:
+          provided:
+            enabled: true
+            storageProvisioner: ebs.csi.aws.com
+            reclaimPolicy: Retain
+            allowVolumeExpansion: true
+            storageParameters:
+              skuName: ""
+              kind: ""
+              type: gp3
+              encrypted: "true"
+
+  serviceAccount:
+    create: true
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/ontoserver-role
+
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: ontoserver-nodes
+
+  gateway:
+    enabled: true
+    className: envoy-gateway-class
+
+  # ── TLS via cert-manager ──────────────────────────────────────────────────
+  # tls:
+  #   enabled: true
+  #   certRef: ontoserver-tls
+  # certmanager:
+  #   enabled: true
+  #   clusterIssuerName: letsencrypt-prod
+  #   email: your-email@example.com
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2
+        memory: 4G
+        storage: 20G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2800m
+      maxHeapSize: 2800m
+    db:
+      requests:
+        cpu: 1
+        memory: 1G
+        storage: 10G
+      limits:
+        cpu: 1
+        memory: 1G
+
+  # ── Preload ───────────────────────────────────────────────────────────────
+  # config:
+  #   atom.preload.feedLocation: "file:///data/preload.xml"
+  #   ontoserver.preload.on.start.enabled: "true"
+  # healthCheckOption: -s
+
+# ── Envoy Gateway traffic policies (optional) ─────────────────────────────
+# envoygateway:
+#   clientTrafficPolicy:
+#     enabled: true
+#     idleTimeout: 300s
+#   backendTrafficPolicy:
+#     enabled: true
+#     requestBufferLimit: 1Gi

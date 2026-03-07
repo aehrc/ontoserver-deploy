@@ -1,0 +1,137 @@
+# eks/single-ro-envoy.yaml
+# Single read-only Ontoserver on Amazon EKS.
+# Networking: Gateway API with Envoy Gateway.
+# Database: external Amazon RDS for PostgreSQL (production practice).
+#
+# A read-only server cannot accept FHIR write operations. Content is loaded
+# at startup via an Atom preload feed. Suitable for production terminology
+# servers hosting SNOMED CT, LOINC, and FHIR resources.
+#
+# For development/testing with a built-in PostgreSQL sidecar (no external DB
+# required) see sidecar-db/single-ro-envoy.yaml.
+# For a read-write authoring server see single-rw-envoy.yaml.
+# For a multi-instance high-availability deployment see scaled-ro-envoy.yaml.
+# For ALB ingress instead of Envoy Gateway see networking/single-ro-eks-alb.yaml.
+#
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+#   - Amazon RDS for PostgreSQL provisioned and accessible from the cluster
+#   - EBS CSI driver add-on enabled
+#   - Envoy Gateway installed:
+#       kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/v1.3.1/install.yaml
+#   - AWS Load Balancer Controller installed (manages the NLB for Envoy Gateway)
+#   - cert-manager installed (optional, for TLS)
+#   - External Secrets Operator installed (optional, for AWS Secrets Manager)
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver -f eks/single-ro-envoy.yaml
+
+ontoserver:
+  imageCredentials:
+    username: ""   # quay.io username
+    password: ""   # quay.io password
+
+  serverName: ontoserver.example.com
+  hostNames:
+    - ontoserver.example.com
+
+  deployment:
+    kind: Deployment
+    type: single
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 1
+    isReadOnly: true
+
+    db:
+      enabled: false   # external PostgreSQL (RDS) — sidecar not used in production
+
+    persistence:
+      enabledForDeployment: true
+      mode: split
+      # EBS (gp3) — ReadWriteOnce, suitable for single-instance deployments.
+      files:
+        accessMode: ReadWriteOnce
+        storageClass:
+          provided:
+            enabled: true
+            storageProvisioner: ebs.csi.aws.com
+            reclaimPolicy: Retain
+            allowVolumeExpansion: true
+            storageParameters:
+              skuName: ""
+              kind: ""
+              type: gp3
+              encrypted: "true"
+
+  # ── External PostgreSQL connection (Amazon RDS) ───────────────────────────
+  config:
+    spring.datasource.url: "jdbc:postgresql://your-rds-endpoint.rds.amazonaws.com:5432/ontoserver"
+    spring.datasource.username: "ontoserver"
+
+  # Supply the password via secretConfig (inline) or externalSecret (Secrets Manager).
+  # Option A — inline secret (base64-encoded):
+  secretConfig:
+    spring.datasource.password: ""   # base64-encoded RDS password
+
+  # Option B — AWS Secrets Manager via External Secrets Operator:
+  # externalSecret:
+  #   enabled: true
+  #   secretStoreRef:
+  #     name: aws-secrets-manager
+  #     kind: ClusterSecretStore
+  #   data:
+  #     - secretKey: spring.datasource.password
+  #       remoteRef:
+  #         key: /ontoserver/db
+  #         property: password
+
+  # IRSA: grant the pod AWS permissions via an IAM role.
+  serviceAccount:
+    create: true
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/ontoserver-role
+
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: ontoserver-nodes
+
+  gateway:
+    enabled: true
+    className: envoy-gateway-class
+
+  # ── TLS via cert-manager ──────────────────────────────────────────────────
+  # tls:
+  #   enabled: true
+  #   certRef: ontoserver-tls
+  # certmanager:
+  #   enabled: true
+  #   clusterIssuerName: letsencrypt-prod
+  #   email: your-email@example.com
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2
+        memory: 4G
+        storage: 20G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2800m
+      maxHeapSize: 2800m
+
+  # ── Preload ───────────────────────────────────────────────────────────────
+  # config:
+  #   atom.preload.feedLocation: "file:///data/preload.xml"
+  #   ontoserver.preload.on.start.enabled: "true"
+  # healthCheckOption: -s
+
+# ── Envoy Gateway traffic policies (optional) ─────────────────────────────
+# For NLB + PROXY protocol to preserve real client IPs, see
+# networking/single-ro-eks-envoy-gateway-nlb.yaml which has this pre-configured.
+#
+# envoygateway:
+#   clientTrafficPolicy:
+#     enabled: true
+#     idleTimeout: 300s
+#   backendTrafficPolicy:
+#     enabled: true
+#     requestBufferLimit: 1Gi

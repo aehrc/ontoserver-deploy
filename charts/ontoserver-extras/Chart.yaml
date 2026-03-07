@@ -1,0 +1,24 @@
+apiVersion: v2
+name: ontoserver-extras
+description: Optional infrastructure components for Ontoserver (Varnish cache, OTel Collector, PV)
+type: application
+version: 1.0.0
+appVersion: "ctsa-6"
+home: https://ontoserver.csiro.au
+sources:
+  - https://github.com/aehrc/ontoserver-deploy
+keywords:
+  - fhir
+  - terminology
+  - ontoserver
+  - varnish
+  - opentelemetry
+maintainers:
+  - name: CSIRO
+    email: ontoserver-support@csiro.au
+annotations:
+  artifacthub.io/category: integration-delivery
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial public release

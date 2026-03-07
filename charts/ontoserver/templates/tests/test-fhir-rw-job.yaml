@@ -1,0 +1,171 @@
+{{- if not .Values.ontoserver.deployment.isReadOnly }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-ontoserver-test-rw-script
+data:
+  test.sh: |
+    #!/bin/sh
+    set -e
+
+    BASE_URL="http://{{ .Release.Name }}-ontoserver-service"
+    FIXTURES="/fixtures"
+    PASS=0
+    FAIL=0
+
+    check() {
+      local desc="$1"
+      local result="$2"
+      if [ "$result" = "ok" ]; then
+        echo "  PASS: $desc"
+        PASS=$((PASS+1))
+      else
+        echo "  FAIL: $desc -- $result"
+        FAIL=$((FAIL+1))
+      fi
+    }
+
+    http_post() {
+      curl -s -o /tmp/response.json -w "%{http_code}" \
+        -X POST \
+        -H "Content-Type: application/fhir+json" \
+        -H "Accept: application/fhir+json" \
+        --data-binary "@$2" \
+        "$1" || echo "000"
+    }
+
+    http_get() {
+      curl -s -o /tmp/response.json -w "%{http_code}" \
+        -H "Accept: application/fhir+json" \
+        "$1" || echo "000"
+    }
+
+    # Delete all instances of a resource type matching a canonical URL.
+    # Ontoserver does not support conditional DELETE, so we search by URL
+    # and delete each match by ID to prevent duplicates from accumulating.
+    delete_by_url() {
+      local type="$1" url="$2"
+      local ids
+      ids=$(curl -s -H "Accept: application/fhir+json" -G \
+        --data-urlencode "url=$url" "$BASE_URL/fhir/$type" \
+        | grep -o '"fullUrl":"[^"]*"' | cut -d'"' -f4 | sed 's|.*/||')
+      for id in $ids; do
+        curl -s -o /dev/null -X DELETE -H "Accept: application/fhir+json" \
+          "$BASE_URL/fhir/$type/$id" || true
+      done
+    }
+
+    echo "=== Detecting FHIR version ==="
+    FHIR_VERSION=$(curl -s -H "Accept: application/fhir+json" "$BASE_URL/fhir/metadata" \
+      | grep -o '"fhirVersion":"[^"]*"' | cut -d'"' -f4)
+    echo "  fhirVersion: $FHIR_VERSION"
+    # R4 (4.0.x) uses "equivalence"; R4B (4.3.x) and R5 (5.x) use "relationship"
+    case "$FHIR_VERSION" in
+      4.0.*) CM_EQUIV_FIELD="equivalence" ;;
+      *)     CM_EQUIV_FIELD="relationship" ;;
+    esac
+    echo "  ConceptMap equivalence field: $CM_EQUIV_FIELD"
+    # Fixture uses "equivalence" (R4 default); replace key for R4B/R5
+    sed "s/\"equivalence\":/\"$CM_EQUIV_FIELD\":/" "$FIXTURES/conceptmap.json" > /tmp/conceptmap.json
+
+    echo "=== Pre-test cleanup (remove any leftovers from prior runs) ==="
+    delete_by_url ConceptMap "http://example.org/fhir/ConceptMap/test-cm"
+    delete_by_url ValueSet "http://example.org/fhir/ValueSet/test-vs"
+    delete_by_url CodeSystem "http://example.org/fhir/CodeSystem/test-cs"
+
+    echo "=== Test: Load FHIR resources ==="
+    CODE=$(http_post "$BASE_URL/fhir/CodeSystem" "$FIXTURES/codesystem.json")
+    check "POST CodeSystem returns 201" "$([ "$CODE" = "201" ] && echo ok || echo "http $CODE")"
+    CS_ID=$(grep -o '"id":"[^"]*"' /tmp/response.json | head -1 | cut -d'"' -f4)
+    echo "  Created CodeSystem id: $CS_ID"
+
+    CODE=$(http_post "$BASE_URL/fhir/ValueSet" "$FIXTURES/valueset.json")
+    check "POST ValueSet returns 201" "$([ "$CODE" = "201" ] && echo ok || echo "http $CODE")"
+
+    CODE=$(http_post "$BASE_URL/fhir/ConceptMap" "/tmp/conceptmap.json")
+    check "POST ConceptMap returns 201" "$([ "$CODE" = "201" ] && echo ok || echo "http $CODE")"
+
+    echo "  Waiting for indexing..."
+    sleep 5
+
+    echo "=== Test: CodeSystem \$lookup ==="
+    CODE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+      -H "Accept: application/fhir+json" \
+      -G \
+      --data-urlencode "system=http://example.org/fhir/CodeSystem/test-cs" \
+      --data-urlencode "code=code-a" \
+      "$BASE_URL/fhir/CodeSystem/\$lookup" || echo "000")
+    check "GET CodeSystem/\$lookup returns 200" "$([ "$CODE" = "200" ] && echo ok || echo "http $CODE")"
+    check "\$lookup returns Parameters resource" "$(grep -q '"resourceType":"Parameters"' /tmp/response.json && echo ok || echo "not found")"
+    check "\$lookup display is 'Code A'" "$(grep -q '"Code A"' /tmp/response.json && echo ok || echo "not found")"
+
+    echo "=== Test: CodeSystem \$validate-code ==="
+    CODE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+      -H "Accept: application/fhir+json" \
+      -G \
+      --data-urlencode "url=http://example.org/fhir/CodeSystem/test-cs" \
+      --data-urlencode "code=code-b" \
+      "$BASE_URL/fhir/CodeSystem/\$validate-code" || echo "000")
+    check "GET CodeSystem/\$validate-code returns 200" "$([ "$CODE" = "200" ] && echo ok || echo "http $CODE")"
+    check "\$validate-code result is true" "$(grep -q '"valueBoolean":true' /tmp/response.json && echo ok || echo "not found")"
+
+    echo "=== Test: ValueSet \$expand ==="
+    CODE=$(http_post "$BASE_URL/fhir/ValueSet/\$expand" "$FIXTURES/expand-request.json")
+    check "POST ValueSet/\$expand returns 200" "$([ "$CODE" = "200" ] && echo ok || echo "http $CODE")"
+    check "\$expand returns ValueSet" "$(grep -q '"resourceType":"ValueSet"' /tmp/response.json && echo ok || echo "not found")"
+    check "\$expand contains code-a" "$(grep -q '"code-a"' /tmp/response.json && echo ok || echo "not found")"
+    check "\$expand contains code-b" "$(grep -q '"code-b"' /tmp/response.json && echo ok || echo "not found")"
+    check "\$expand contains code-c" "$(grep -q '"code-c"' /tmp/response.json && echo ok || echo "not found")"
+
+    echo "=== Test: ConceptMap \$translate ==="
+    CODE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+      -H "Accept: application/fhir+json" \
+      -G \
+      --data-urlencode "system=http://example.org/fhir/CodeSystem/test-cs" \
+      --data-urlencode "code=code-a" \
+      --data-urlencode "targetSystem=http://example.org/fhir/CodeSystem/test-target" \
+      "$BASE_URL/fhir/ConceptMap/\$translate" || echo "000")
+    check "GET ConceptMap/\$translate returns 200" "$([ "$CODE" = "200" ] && echo ok || echo "http $CODE")"
+    check "\$translate returns Parameters" "$(grep -q '"resourceType":"Parameters"' /tmp/response.json && echo ok || echo "not found")"
+    check "\$translate maps to target-a" "$(grep -q '"target-a"' /tmp/response.json && echo ok || echo "not found")"
+
+    echo "=== Cleanup: Delete test resources ==="
+    delete_by_url ConceptMap "http://example.org/fhir/ConceptMap/test-cm"
+    delete_by_url ValueSet "http://example.org/fhir/ValueSet/test-vs"
+    delete_by_url CodeSystem "http://example.org/fhir/CodeSystem/test-cs"
+    echo "  Done"
+
+    echo ""
+    echo "Results: $PASS passed, $FAIL failed"
+    [ "$FAIL" = "0" ]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-ontoserver-test-fhir-rw
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: script
+          configMap:
+            name: {{ .Release.Name }}-ontoserver-test-rw-script
+            defaultMode: 0755
+        - name: fixtures
+          configMap:
+            name: {{ .Release.Name }}-ontoserver-test-fixtures
+      containers:
+        - name: test
+          image: curlimages/curl:8.11.1
+          command: ["/bin/sh", "/scripts/test.sh"]
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+            - name: fixtures
+              mountPath: /fixtures
+{{- end }}

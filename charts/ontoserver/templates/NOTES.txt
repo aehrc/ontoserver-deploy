@@ -1,0 +1,59 @@
+Ontoserver has been installed.
+
+  Release:    {{ .Release.Name }}
+  Namespace:  {{ .Release.Namespace }}
+  Image:      {{ .Values.ontoserver.deployment.image }}
+
+Deployment
+  Kind:       {{ .Values.ontoserver.deployment.kind }}
+  Type:       {{ .Values.ontoserver.deployment.type }}
+  Replicas:   {{ .Values.ontoserver.deployment.replicas }}
+  Mode:       {{ if .Values.ontoserver.deployment.isReadOnly }}read-only{{ else }}read-write{{ end }}
+  Database:   {{ if .Values.ontoserver.deployment.db.enabled }}Postgres sidecar (v{{ .Values.ontoserver.deployment.db.postgresVersion }}){{ else }}external{{ end }}
+
+{{- if or .Values.ontoserver.gateway.enabled .Values.ontoserver.ingress.enabled }}
+
+Access
+{{- $scheme := ternary "https" "http" .Values.ontoserver.tls.enabled }}
+{{- $port := .Values.ontoserver.serverPort }}
+{{- $portSuffix := "" }}
+{{- if $port }}
+  {{- $portSuffix = printf ":%s" (toString $port) }}
+{{- end }}
+  FHIR endpoint: {{ $scheme }}://{{ .Values.ontoserver.serverName }}{{ $portSuffix }}/fhir
+{{- if .Values.ontoserver.gateway.enabled }}
+  Networking:    Gateway API (class: {{ .Values.ontoserver.gateway.className }})
+{{- else if .Values.ontoserver.ingress.enabled }}
+  Networking:    Ingress (class: {{ .Values.ontoserver.ingress.className }})
+{{- end }}
+{{- if .Values.ontoserver.tls.enabled }}
+  TLS:           enabled (secret: {{ .Values.ontoserver.tls.certRef }})
+{{- end }}
+{{- else }}
+
+Access
+  No ingress or gateway is enabled. To access Ontoserver, port-forward the service:
+
+    kubectl port-forward -n {{ .Release.Namespace }} svc/{{ .Release.Name }}-ontoserver-service 8080:80
+
+  Then open: http://localhost:8080/fhir
+
+{{- end }}
+
+{{- if or .Values.ontoserver.managementService.enabled .Values.ontoserver.metrics.serviceMonitor.enabled .Values.ontoserver.opentelemetry.instrumentation.enabled }}
+
+Observability
+{{- if .Values.ontoserver.managementService.enabled }}
+  Management service (actuator): {{ .Release.Name }}-ontoserver-management-service:80 (→ pod port 18080)
+{{- end }}
+{{- if .Values.ontoserver.metrics.serviceMonitor.enabled }}
+  Prometheus ServiceMonitor:     enabled
+{{- end }}
+{{- if .Values.ontoserver.opentelemetry.instrumentation.enabled }}
+  OpenTelemetry instrumentation: enabled
+{{- end }}
+{{- end }}
+
+Check status:
+  kubectl get {{ lower .Values.ontoserver.deployment.kind }} -n {{ .Release.Namespace }} {{ .Release.Name }}-ontoserver
+  kubectl get pods -n {{ .Release.Namespace }} -l app={{ .Release.Name }}-ontoserver

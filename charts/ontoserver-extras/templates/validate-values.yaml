@@ -1,0 +1,11 @@
+{{- if and .Values.collector.enabled (empty .Values.collector.otlpEndpoint) (empty .Values.collector.zipkinEndpoint) }}
+  {{- fail "collector requires at least one of collector.otlpEndpoint or collector.zipkinEndpoint" }}
+{{- end }}
+
+{{- if and .Values.varnish.opentelemetry.enabled (not .Values.varnish.enabled) }}
+  {{- fail "varnish.opentelemetry.enabled requires varnish.enabled" }}
+{{- end }}
+
+{{- if and .Values.varnish.opentelemetry.enabled (empty .Values.varnish.opentelemetry.collectorEndpoint) }}
+  {{- fail "varnish.opentelemetry.collectorEndpoint is required when varnish.opentelemetry.enabled" }}
+{{- end }}

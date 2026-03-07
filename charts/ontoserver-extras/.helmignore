@@ -1,0 +1,2 @@
+# Patterns to exclude from the Helm chart package
+*.md

@@ -1,0 +1,98 @@
+# local/k3d/single-ro-envoy-gateway.yaml
+# Single read-only Ontoserver on k3d using Gateway API with Envoy Gateway.
+#
+# This is the configuration tested by the chart developers and mirrors
+# the setup used in production cloud deployments (aks/, eks/).
+# Use this if you want parity between local and cloud networking stacks.
+#
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+#   - Docker running locally
+#   - k3d installed  (https://k3d.io)
+#   - kubectl and helm installed
+#   - Envoy Gateway installed:
+#       kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/v1.3.1/install.yaml
+#
+# ── Quick start ──────────────────────────────────────────────────────────────
+#
+# 1. Create a k3d cluster with port 80 mapped to localhost:
+#
+#      k3d cluster create ontoserver --port "8080:80@loadbalancer"
+#
+# 2. Install Envoy Gateway:
+#
+#      kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/v1.3.1/install.yaml
+#
+# 3. Install the chart:
+#
+#      helm install my-ontoserver ./charts/ontoserver -f local/k3d/single-ro-envoy-gateway.yaml
+#
+# 4. Open http://localhost:8080/fhir in your browser.
+#
+# ── Notes ─────────────────────────────────────────────────────────────────────
+#   - For Traefik (no extra install on k3d), see single-ro-traefik.yaml.
+#   - For a server without any ingress, see ../single-ro.yaml.
+
+ontoserver:
+  imageCredentials:
+    username: ""   # quay.io username
+    password: ""   # quay.io password
+
+  serverName: localhost
+  serverPort: "8080"   # matches the k3d port mapping above
+  hostNames:
+    - localhost
+
+  deployment:
+    kind: Deployment
+    type: single
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 1
+    isReadOnly: true
+
+    db:
+      enabled: true
+      postgresVersion: 16
+
+    persistence:
+      enabledForDeployment: true
+      mode: split
+      # local-path is the default StorageClass in k3d/k3s clusters.
+      files:
+        accessMode: ReadWriteOnce
+        storageClass:
+          provided:
+            enabled: false
+          name: ""
+      dbfiles:
+        accessMode: ReadWriteOnce
+        storageClass:
+          provided:
+            enabled: false
+          name: ""
+
+  gateway:
+    enabled: true
+    className: envoy-gateway-class   # default — matches Envoy Gateway install
+
+  tls:
+    enabled: false
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 1
+        memory: 3G
+        storage: 10G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2400m
+      maxHeapSize: 2400m
+    db:
+      requests:
+        cpu: 500m
+        memory: 512M
+        storage: 5G
+      limits:
+        cpu: 1
+        memory: 1G

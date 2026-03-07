@@ -1,0 +1,104 @@
+# aks/sidecar-db/single-rw-envoy.yaml
+# Single read-write Ontoserver on AKS with built-in PostgreSQL sidecar.
+# Networking: Gateway API with Envoy Gateway.
+#
+# Uses the chart's built-in PostgreSQL 16 sidecar container — convenient for
+# development, testing, content authoring, or sandbox servers where managing
+# an external database is not justified.
+#
+# For production deployments with an external managed database
+# (Azure Database for PostgreSQL) see ../single-rw-envoy.yaml.
+#
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+#   - Envoy Gateway installed:
+#       kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/v1.3.1/install.yaml
+#   - Azure Disk CSI driver enabled on the node pool (default on AKS)
+#   - cert-manager installed (optional, for TLS):
+#       helm install cert-manager jetstack/cert-manager --set crds.enabled=true
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver -f aks/sidecar-db/single-rw-envoy.yaml
+
+ontoserver:
+  imageCredentials:
+    username: ""   # quay.io username
+    password: ""   # quay.io password
+
+  serverName: ontoserver.example.com
+  hostNames:
+    - ontoserver.example.com
+
+  deployment:
+    kind: Deployment
+    type: single
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 1
+    isReadOnly: false   # ← read-write: accepts FHIR write operations
+
+    db:
+      enabled: true
+      postgresVersion: 16
+
+    persistence:
+      enabledForDeployment: true
+      mode: split
+      # Azure Disk (Premium_LRS) — ReadWriteOnce, backed by Azure managed disks.
+      files:
+        accessMode: ReadWriteOnce
+        storageClass:
+          provided:
+            enabled: true
+            storageProvisioner: disk.csi.azure.com
+            reclaimPolicy: Retain
+            allowVolumeExpansion: true
+            storageParameters:
+              skuName: Premium_LRS
+              kind: Managed
+      dbfiles:
+        accessMode: ReadWriteOnce
+        storageClass:
+          provided:
+            enabled: true
+            storageProvisioner: disk.csi.azure.com
+            reclaimPolicy: Retain
+            allowVolumeExpansion: true
+            storageParameters:
+              skuName: Premium_LRS
+              kind: Managed
+
+  gateway:
+    enabled: true
+    className: envoy-gateway-class
+
+  # ── TLS via cert-manager ──────────────────────────────────────────────────
+  # tls:
+  #   enabled: true
+  #   certRef: ontoserver-tls
+  # certmanager:
+  #   enabled: true
+  #   clusterIssuerName: letsencrypt-prod
+  #   email: your-email@example.com
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2
+        memory: 4G
+        storage: 20G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2800m
+      maxHeapSize: 2800m
+    db:
+      requests:
+        cpu: 1
+        memory: 1G
+        storage: 10G
+      limits:
+        cpu: 1
+        memory: 1G
+
+  # ── Syndication (optional) ────────────────────────────────────────────────
+  # config:
+  #   atom.syndication.feedLocation: "https://api.healthterminologies.gov.au/syndication/v1/syndication.xml"
