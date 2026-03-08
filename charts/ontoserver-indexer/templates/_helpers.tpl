@@ -9,21 +9,21 @@ Job name — use job.name if set, otherwise Release.Name
 Secret name for inline auth credentials
 */}}
 {{- define "ontoserver-indexer.secretName" -}}
-{{ .Release.Name }}-indexer-auth
+{{- printf "%s-indexer-auth" .Release.Name }}
 {{- end }}
 
 {{/*
 Resolved OAuth2 secret name — inline chart secret or user-supplied secretRef
 */}}
 {{- define "ontoserver-indexer.oauth2SecretName" -}}
-{{- if .Values.auth.oauth2.clientId }}{{ include "ontoserver-indexer.secretName" . }}
-{{- else }}{{ .Values.auth.oauth2.secretRef }}{{- end }}
+{{- if .Values.auth.oauth2.clientId }}{{- include "ontoserver-indexer.secretName" . }}
+{{- else }}{{- .Values.auth.oauth2.secretRef }}{{- end }}
 {{- end }}
 
 {{/*
 Resolved Basic auth secret name
 */}}
 {{- define "ontoserver-indexer.basicSecretName" -}}
-{{- if .Values.auth.basic.username }}{{ include "ontoserver-indexer.secretName" . }}
-{{- else }}{{ .Values.auth.basic.secretRef }}{{- end }}
+{{- if .Values.auth.basic.username }}{{- include "ontoserver-indexer.secretName" . }}
+{{- else }}{{- .Values.auth.basic.secretRef }}{{- end }}
 {{- end }}

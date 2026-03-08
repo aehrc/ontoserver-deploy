@@ -17,4 +17,8 @@ maintainers:
   - name: CSIRO
     email: ontoserver-support@csiro.au
 annotations:
+  artifacthub.io/category: integration-delivery
   artifacthub.io/license: Apache-2.0
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial public release

@@ -4,12 +4,12 @@ image:
   pullSecret: ""            # name of an existing imagePullSecret
 
 job:
-  name: ""                  # defaults to {{ .Release.Name }}
+  name: ""                  # leave empty to use the Helm release name
   activeDeadlineSeconds: 7200
   ttlSecondsAfterFinished: 3600
 
 resources:
-  memoryGb: 20              # sets both -Xmx and memory request/limit
+  memoryGb: 20              # gigabytes (integer) — sets both -Xmx JVM flag and Kubernetes memory request/limit
 
 codeSystem:
   url: ""                   # e.g. http://snomed.info/sct/32506021000036107
