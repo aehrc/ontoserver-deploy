@@ -3,7 +3,9 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'ontoserver-v*'
+      - 'ontoserver-extras-v*'
+      - 'ontoserver-indexer-v*'
 
 jobs:
   release-charts:
@@ -37,11 +39,19 @@ jobs:
   push-charts-oci:
     name: Push Helm Charts to OCI
     runs-on: ubuntu-latest
+    needs: release-charts
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Extract chart name and version from tag
+        id: chart
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          echo "chart=${tag%-v*}" >> $GITHUB_OUTPUT
+          echo "version=${tag#*-v}" >> $GITHUB_OUTPUT
 
       - name: Install Helm
         uses: azure/setup-helm@v4
@@ -51,40 +61,9 @@ jobs:
       - name: Log in to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io --username ${{ github.actor }} --password-stdin
 
-      - name: Package and push charts
+      - name: Package and push chart
         run: |
-          helm package charts/ontoserver
-          helm package charts/ontoserver-extras
-          helm package charts/ontoserver-indexer
-          helm push ontoserver-*.tgz oci://ghcr.io/aehrc
-          helm push ontoserver-extras-*.tgz oci://ghcr.io/aehrc
-          helm push ontoserver-indexer-*.tgz oci://ghcr.io/aehrc
-
-  release-varnish-exporter:
-    name: Build and Push varnish-exporter
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract tag version
-        id: version
-        run: echo "tag=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Build and push varnish-exporter
-        uses: docker/build-push-action@v6
-        with:
-          context: docker/varnish-exporter
-          push: true
-          tags: |
-            ghcr.io/aehrc/varnish-exporter:${{ steps.version.outputs.tag }}
-            ghcr.io/aehrc/varnish-exporter:latest
+          chart="${{ steps.chart.outputs.chart }}"
+          version="${{ steps.chart.outputs.version }}"
+          helm package charts/$chart -d charts-pkg
+          helm push charts-pkg/$chart-$version.tgz oci://ghcr.io/aehrc

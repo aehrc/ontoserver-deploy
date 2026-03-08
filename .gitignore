@@ -1,1 +1,6 @@
 .claude
+
+# Helm dependency downloads and packaged charts
+charts/*/charts/
+charts/*/*.tgz
+charts/*/Chart.lock
