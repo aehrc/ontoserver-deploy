@@ -62,6 +62,53 @@ spec:
       {{- if or .Values.ontoserver.serviceAccount.create .Values.ontoserver.serviceAccount.name }}
       serviceAccountName: {{ .Values.ontoserver.serviceAccount.name | default (printf "%s-ontoserver" .Release.Name) }}
       {{- end }}
+      {{- if .Values.ontoserver.deployment.db.enabled }}
+        {{- if eq .Values.ontoserver.deployment.type "scaled" }}
+          {{- fail "Scaled deployments require shared database and cannot have the default sidecar database. Set ontoserver.deployment.db.enabled to false and set spring.datasource.url in ontoserver.config to an external db jdbc URL." }}
+        {{- end }}
+      initContainers:
+        - name: {{ .Release.Name }}-ontoserver-db
+          image: "postgres:{{ required "ontoserver.deployment.db.postgresVersion is required" .Values.ontoserver.deployment.db.postgresVersion }}"
+          restartPolicy: Always
+          ports:
+            - containerPort: 5432
+          resources:
+            requests:
+              cpu: {{ required "ontoserver.resources.db.requests.cpu is required" .Values.ontoserver.resources.db.requests.cpu }}
+              memory: {{ required "ontoserver.resources.db.requests.memory is required" .Values.ontoserver.resources.db.requests.memory }}
+            limits:
+              cpu: {{ required "ontoserver.resources.db.limits.cpu is required" .Values.ontoserver.resources.db.limits.cpu }}
+              memory: {{ required "ontoserver.resources.db.limits.memory is required" .Values.ontoserver.resources.db.limits.memory }}
+          readinessProbe:
+            exec:
+              command: ['pg_isready', '-U', 'postgres']
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            failureThreshold: 30
+          env:
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: "trust"
+            - name: LC_ALL
+              value: "{{ required "ontoserver.language is required" .Values.ontoserver.language }}.UTF-8"
+            - name: TZ
+              value: "{{ required "ontoserver.timeZone is required" .Values.ontoserver.timeZone }}"
+          command: ['sh', '-c']
+          args:
+          - |
+            # Generate locale using localedef (lighter than apt-get install locales)
+            localedef -i {{ .Values.ontoserver.language }} -c -f UTF-8 -A /usr/share/locale/locale.alias {{ .Values.ontoserver.language }}.UTF-8
+            # Start postgres normally
+            exec docker-entrypoint.sh postgres
+          volumeMounts:
+          {{- if eq .Values.ontoserver.deployment.persistence.mode "split" }}
+            - name: {{ .Release.Name }}-ontoserver-db-files
+              mountPath: /var/lib/postgresql/data
+          {{- else }}
+            - name: {{ .Release.Name }}-ontoserver-files
+              mountPath: /var/lib/postgresql/data
+              subPath: db
+          {{- end }}
+      {{- end }}
       containers:
         - name: {{ .Release.Name }}-ontoserver
           image: {{ required "ontoserver.deployment.image is required " .Values.ontoserver.deployment.image }}
@@ -75,15 +122,14 @@ spec:
             limits:
               cpu: {{ required "ontoserver.resources.ontoserver.limits.cpu is required" .Values.ontoserver.resources.ontoserver.limits.cpu }}
               memory: {{ required "ontoserver.resources.ontoserver.limits.memory is required" .Values.ontoserver.resources.ontoserver.limits.memory }}
-          {{- if .Values.ontoserver.deployment.db.enabled }}
           startupProbe:
-            tcpSocket:
-              port: 5432
+            exec:
+              command:
+                - /healthcheck.sh
             initialDelaySeconds: {{ .Values.ontoserver.deployment.startupProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.ontoserver.deployment.startupProbe.periodSeconds }}
             failureThreshold: {{ .Values.ontoserver.deployment.startupProbe.failureThreshold }}
             timeoutSeconds: {{ .Values.ontoserver.deployment.startupProbe.timeoutSeconds }}
-          {{- end }}
           livenessProbe:
             exec:
               command:
@@ -169,45 +215,6 @@ spec:
             - name: customization
               mountPath: /well-known
             {{- end }}
-        {{- if and (eq .Values.ontoserver.deployment.type "scaled") .Values.ontoserver.deployment.db.enabled }}
-          {{- fail "Scaled deployments require shared database and cannot have the default sidecar database. Set ontoserver.deployment.db.enabled to false and set spring.datasource.url in ontoserver.config to an external db jdbc URL." }}
-        {{- end }}
-        {{- if and .Values.ontoserver.deployment.db.enabled (not (eq .Values.ontoserver.deployment.type "scaled")) }}
-        - name: {{ .Release.Name }}-ontoserver-db
-          image: "postgres:{{ required "ontoserver.deployment.db.postgresVersion is required" .Values.ontoserver.deployment.db.postgresVersion }}"
-          ports:
-            - containerPort: 5432
-          resources:
-            requests:
-              cpu: {{ required "ontoserver.resources.db.requests.cpu is required" .Values.ontoserver.resources.db.requests.cpu }}
-              memory: {{ required "ontoserver.resources.db.requests.memory is required" .Values.ontoserver.resources.db.requests.memory }}
-            limits:
-              cpu: {{ required "ontoserver.resources.db.limits.cpu is required" .Values.ontoserver.resources.db.limits.cpu }}
-              memory: {{ required "ontoserver.resources.db.limits.memory is required" .Values.ontoserver.resources.db.limits.memory }}
-          env:
-            - name: POSTGRES_HOST_AUTH_METHOD
-              value: "trust"
-            - name: LC_ALL
-              value: "{{ required "ontoserver.language is required" .Values.ontoserver.language }}.UTF-8"
-            - name: TZ
-              value: "{{ required "ontoserver.timeZone is required" .Values.ontoserver.timeZone }}"
-          command: ['sh', '-c']
-          args:
-          - |
-            # Generate locale using localedef (lighter than apt-get install locales)
-            localedef -i {{ .Values.ontoserver.language }} -c -f UTF-8 -A /usr/share/locale/locale.alias {{ .Values.ontoserver.language }}.UTF-8
-            # Start postgres normally
-            exec docker-entrypoint.sh postgres
-          volumeMounts:
-          {{- if eq .Values.ontoserver.deployment.persistence.mode "split" }}
-            - name: {{ .Release.Name }}-ontoserver-db-files
-              mountPath: /var/lib/postgresql/data
-          {{- else }}
-            - name: {{ .Release.Name }}-ontoserver-files
-              mountPath: /var/lib/postgresql/data
-              subPath: db
-          {{- end }}
-        {{- end }}
       {{- if not (empty .Values.ontoserver.customization) }}
       volumes:
         - name: customization

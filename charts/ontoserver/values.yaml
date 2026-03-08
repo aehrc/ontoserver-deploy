@@ -54,7 +54,7 @@ ontoserver:
       timeoutSeconds: 5
     readinessProbe:
       ## @param ontoserver.deployment.readinessProbe.initialDelaySeconds Readiness probe initial delay
-      initialDelaySeconds: 60
+      initialDelaySeconds: 0
       ## @param ontoserver.deployment.readinessProbe.periodSeconds       Readiness probe period
       periodSeconds: 5
       ## @param ontoserver.deployment.readinessProbe.failureThreshold    Readiness probe failure threshold

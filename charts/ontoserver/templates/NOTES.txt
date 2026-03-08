@@ -55,5 +55,5 @@ Observability
 {{- end }}
 
 Check status:
-  kubectl get {{ lower .Values.ontoserver.deployment.kind }} -n {{ .Release.Namespace }} {{ .Release.Name }}-ontoserver
+  kubectl get {{ lower .Values.ontoserver.deployment.kind }} -n {{ .Release.Namespace }} {{- if eq .Values.ontoserver.deployment.kind "StatefulSet" }} {{ .Release.Name }}-statefulset{{- else }} {{ .Release.Name }}-ontoserver-deployment{{- end }}
   kubectl get pods -n {{ .Release.Namespace }} -l app={{ .Release.Name }}-ontoserver
