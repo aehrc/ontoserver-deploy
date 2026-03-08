@@ -75,7 +75,7 @@ ontoserver:
           ## @param ontoserver.deployment.persistence.files.existingVolume.name     Name of existing PV
           name: ""
         pv:
-          ## @param ontoserver.deployment.persistence.files.pv.enabled       Create an Azure Disk PersistentVolume for the files PVC (requires existingVolume.enabled and existingVolume.name)
+          ## @param ontoserver.deployment.persistence.files.pv.enabled       Create a PersistentVolume for the files PVC backed by a pre-provisioned disk (requires existingVolume.enabled and existingVolume.name)
           enabled: false
           ## @param ontoserver.deployment.persistence.files.pv.diskURI       Full Azure disk resource ID (required when enabled)
           diskURI: ""
@@ -112,7 +112,7 @@ ontoserver:
           ## @param ontoserver.deployment.persistence.dbfiles.existingVolume.name     Name of existing PV
           name: ""
         pv:
-          ## @param ontoserver.deployment.persistence.dbfiles.pv.enabled       Create an Azure Disk PersistentVolume for the db-files PVC (requires existingVolume.enabled and existingVolume.name; only used in split mode with db.enabled)
+          ## @param ontoserver.deployment.persistence.dbfiles.pv.enabled       Create a PersistentVolume for the db-files PVC backed by a pre-provisioned disk (requires existingVolume.enabled and existingVolume.name; only used in split mode with db.enabled)
           enabled: false
           ## @param ontoserver.deployment.persistence.dbfiles.pv.diskURI       Full Azure disk resource ID (required when enabled)
           diskURI: ""
