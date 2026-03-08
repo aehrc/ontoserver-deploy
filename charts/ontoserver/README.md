@@ -45,6 +45,32 @@ The combination of `kind`, `type`, database, and storage determines whether a se
 
 **Why shared storage always fails for scaled deployments:** Ontoserver uses stateless clustering — each pod maintains its own local Lucene index cache, rebuilt on demand from syndication feeds. Indexes are not designed to be shared across processes. Lucene's `IndexWriter` acquires an exclusive `write.lock` file; concurrent access from multiple pods to the same index directory will either fail with `LockObtainFailedException` or silently corrupt the index. Any shared PVC (RWO mounted by one pod, or RWX mounted by all) violates this constraint. The correct patterns are `StatefulSet` with per-pod `ReadWriteOnce` PVCs, or `Deployment` with no persistence (ephemeral local storage per pod).
 
+### Production recommendations
+
+The recommended production topology separates content development from publication. Content is authored on a read-write instance, published to a syndication server, and pulled by read-only instances. See [Ontoserver's deployment planning guidance](https://ontoserver.csiro.au/site/technical-documentation/ontoserver-technical-documentation/planning-a-deployment/) for background.
+
+| Setting | Production read-only cluster | Production read-write (content dev) | Development / local |
+|---|---|---|---|
+| `deployment.kind` | `StatefulSet` | `StatefulSet` | `Deployment` |
+| `deployment.type` | `scaled` | `single` | `single` |
+| `deployment.isReadOnly` | `true` | `false` | `false` |
+| `deployment.replicas` | ≥ 2 | 1 | 1 |
+| `deployment.db.enabled` | `false` | `false` | `true` (sidecar) |
+| Database | External managed PostgreSQL | External managed PostgreSQL | Sidecar (in-pod) |
+| `persistence.files.accessMode` | `ReadWriteOnce` (per-pod via `volumeClaimTemplates`) | `ReadWriteOnce` | None (ephemeral) |
+| `healthCheckOption` | `-s` | `-f` (default) | `-f` (default) |
+| `deployment.clusterName` | Set (isolates cluster on shared networks) | — | — |
+
+**Production read-only** — the [absolutely preferred model](https://ontoserver.csiro.au/site/technical-documentation/ontoserver-technical-documentation/planning-a-deployment/design-considerations-infrastructure-implications/horizontally-scaled-read-only-endpoint/) for a public endpoint. Instances auto-discover each other via DNS, share a single external PostgreSQL database, and each maintain their own local Lucene index on a per-pod attached disk. Per-pod attached disks are essential: a full SNOMED CT index takes hours to rebuild from scratch — without persistence, every pod restart would leave the pod unready for that entire period (with `-s`), degrading cluster capacity during rolling updates. `healthCheckOption: -s` holds a pod out of the load balancer until its startup preload completes, enabling [zero-downtime rolling updates](https://ontoserver.csiro.au/site/technical-documentation/ontoserver-technical-documentation/planning-a-deployment/design-considerations-infrastructure-implications/zero-down-time-deployments/).
+
+**Production read-write** — single instance only (horizontal write scaling is not supported). External PostgreSQL is strongly recommended so database data is backed up and managed independently of the pod lifecycle. Attached disk preserves the Lucene index across pod restarts. This instance is typically not public-facing — content is promoted to the read-only cluster via a syndication server, optionally via a staging read-only instance for validation before publication.
+
+**Development / local** — ephemeral storage with the sidecar PostgreSQL avoids cloud disk provisioning. The index is rebuilt from syndication feeds on each start, which is acceptable at small scale.
+
+> **`$closure` note:** The [`$closure` FHIR operation](https://www.hl7.org/fhir/conceptmap-operation-closure.html) is stateful. On a scaled read-only cluster it requires either sticky sessions (client-side routing) or a dedicated stateful instance alongside the cluster — the scaled cluster provides no built-in sticky session support.
+>
+> **Feeds must stay available:** New instances (after a pod is rescheduled or the cluster is scaled up) rebuild their local index from the syndication feeds that originally loaded the content. If those feeds become unavailable, new instances cannot complete startup and will not become ready.
+
 ## Registry Credentials (Required)
 
 The Ontoserver image is hosted on [quay.io](https://quay.io/repository/aehrc/ontoserver) and **requires authentication**. The chart can manage the pull secret for you.
