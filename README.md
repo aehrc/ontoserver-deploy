@@ -11,12 +11,13 @@ Deployment resources for [Ontoserver](https://ontoserver.csiro.au) — a FHIR te
 
 ## Helm Charts (Kubernetes)
 
-Two charts are published from this repository:
+Three charts are published from this repository:
 
 | Chart | Description |
 |-------|-------------|
 | [`ontoserver`](charts/ontoserver/) | Main chart — single/scaled deployments, Gateway API or Ingress, optional Postgres sidecar, Prometheus, OTel, External Secrets |
 | [`ontoserver-extras`](charts/ontoserver-extras/) | Optional add-ons — Varnish cache, OTel Collector, PersistentVolume |
+| [`ontoserver-indexer`](charts/ontoserver-indexer/) | One-shot Job to index SNOMED CT or LOINC and publish to a syndication server and/or write to a PVC |
 
 ### Installing
 
@@ -29,11 +30,15 @@ helm install my-ontoserver ontoserver/ontoserver -f your-values.yaml
 
 **From OCI (GitHub Container Registry):**
 ```bash
-helm install my-ontoserver oci://ghcr.io/aehrc/ontoserver --version 1.0.0 -f your-values.yaml
-helm install my-ontoserver-extras oci://ghcr.io/aehrc/ontoserver-extras --version 1.0.0 -f your-extras-values.yaml
+helm install my-ontoserver oci://ghcr.io/aehrc/ontoserver --version <version> -f your-values.yaml
+helm install my-ontoserver-extras oci://ghcr.io/aehrc/ontoserver-extras --version <version> -f your-extras-values.yaml
+helm install my-indexer oci://ghcr.io/aehrc/ontoserver-indexer --version <version> -f your-indexer-values.yaml
 ```
 
-See [`charts/ontoserver/README.md`](charts/ontoserver/README.md) for full configuration reference and platform-specific examples (AKS, EKS, local k3d).
+See each chart's README for full configuration reference:
+- [`charts/ontoserver/README.md`](charts/ontoserver/README.md) — platform-specific examples (AKS, EKS, local k3d)
+- [`charts/ontoserver-extras/README.md`](charts/ontoserver-extras/README.md)
+- [`charts/ontoserver-indexer/README.md`](charts/ontoserver-indexer/README.md) — SNOMED CT and LOINC indexing examples
 
 ### Prerequisites
 
@@ -46,6 +51,8 @@ Depending on features enabled, you may need these cluster components:
 | `ontoserver.opentelemetry.instrumentation.enabled` | [OpenTelemetry Operator](https://opentelemetry.io/docs/kubernetes/operator/) |
 | `ontoserver.externalSecret.enabled` | [External Secrets Operator](https://external-secrets.io/) |
 | TLS certificates | [cert-manager](https://cert-manager.io/) |
+| `ontoserver-indexer` with spot nodes | Node pool with `kubernetes.azure.com/scalesetpriority=spot` taint |
+| `ontoserver-indexer` with local output | PersistentVolumeClaim (e.g. Azure Files CSI) pre-created in the target namespace |
 
 **Installing cert-manager with a Let's Encrypt ClusterIssuer:**
 ```bash
