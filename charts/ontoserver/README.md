@@ -9,50 +9,41 @@ This chart provides flexible deployment options for [Ontoserver](https://ontoser
 > - **[F5 Nginx Ingress Controller](https://docs.nginx.com/nginx-ingress-controller/)** — required when `ontoserver.ingress.enabled: true` and you are **not** using the bundled `nginx-ingress` subchart (`nginx-ingress.enabled: false`)
 > - **[External Secrets Operator](https://external-secrets.io/)** — required when `ontoserver.externalSecrets.enabled: true`
 
-## Testing
+## Deployment Modes
 
-### Unit Tests
+The chart supports four deployment combinations controlled by `ontoserver.deployment.kind` and `ontoserver.deployment.type`:
 
-Unit tests render chart templates and assert on the output without requiring a cluster. They use the [`helm-unittest`](https://github.com/helm-unittest/helm-unittest) plugin.
+|  | `single` | `scaled` |
+|---|---|---|
+| **`Deployment`** | One-replica Deployment | Multi-replica Deployment |
+| **`StatefulSet`** | One-replica StatefulSet (per-pod PVCs) | Multi-replica StatefulSet (per-pod PVCs) |
 
-**Install the plugin (one-time):**
+**Constraints:**
+- `scaled` requires `replicas` ≥ 2 (or 0 to scale to zero). `single` requires `replicas` < 2.
+- `scaled` deployments cannot use the Postgres sidecar — an external database is required.
+- `isReadOnly: true` is strongly recommended for all scaled deployments. Scaled read-write mode is highly experimental, has not been tested, and **must not be used in production**.
+- `clusterName` sets `ontoserver.cluster.name` for auto-discovery, allowing independent scaled clusters on the same network. Defaults to `ontoserver` (the application default) when unset.
+- `StatefulSet` kind always provisions PVCs via `volumeClaimTemplates`. `Deployment` kind requires `persistence.enabledForDeployment: true` to use PVCs.
 
-```bash
-helm plugin install https://github.com/helm-unittest/helm-unittest
-```
+### Supported configurations
 
-**Run unit tests:**
+The combination of `kind`, `type`, database, and storage determines whether a setup is viable:
 
-```bash
-helm unittest ./charts/ontoserver
-```
+| `kind` | `type` | Database | Storage | Supported? |
+|---|---|---|---|---|
+| `Deployment` | `single` | Sidecar (`db.enabled: true`) | `ReadWriteOnce` | Yes |
+| `Deployment` | `single` | External | Any / none | Yes |
+| `Deployment` | `scaled` | Sidecar | — | **No** — hard rejected by the chart |
+| `Deployment` | `scaled` | External | `ReadWriteOnce` | **No** — all pods share one PVC; only one can mount it |
+| `Deployment` | `scaled` | External | `ReadWriteMany` | **No** — all pods share the same directory; Lucene `write.lock` conflicts corrupt indexes |
+| `Deployment` | `scaled` | External | None (ephemeral) | Yes — each pod uses its own local ephemeral storage; indexes rebuilt from syndication feeds |
+| `StatefulSet` | `single` | Sidecar | `ReadWriteOnce` | Yes |
+| `StatefulSet` | `single` | External | Any / none | Yes |
+| `StatefulSet` | `scaled` | Sidecar | — | **No** — hard rejected by the chart |
+| `StatefulSet` | `scaled` | External | `ReadWriteOnce` | Yes — each pod gets its own PVC via `volumeClaimTemplates` |
+| `StatefulSet` | `scaled` | External | `ReadWriteMany` | **No** — all pods share the same directory; Lucene `write.lock` conflicts corrupt indexes |
 
-### Integration Tests
-
-Integration tests run against a live deployment using `helm test`. They require no extra plugins — just a running cluster with the chart installed.
-
-The **metadata test** (always runs) checks the FHIR CapabilityStatement and, if `ontoserver.managementService.enabled=true`, the Spring Boot Actuator health endpoint.
-
-The **FHIR read-write test** (only runs when `ontoserver.deployment.isReadOnly=false`) loads a CodeSystem, ValueSet, and ConceptMap, then exercises `$lookup`, `$validate-code`, `$expand`, and `$translate` operations.
-
-```bash
-# Install in read-write mode to enable all integration tests
-helm install my-ontoserver ./charts/ontoserver \
-  --set ontoserver.deployment.isReadOnly=false \
-  --set ontoserver.managementService.enabled=true \
-  --set ontoserver.imageCredentials.username=<quay-username> \
-  --set ontoserver.imageCredentials.password=<quay-password> \
-  -f your-values.yaml
-
-# Run integration tests
-helm test my-ontoserver
-```
-
-> **Note:** `helm test --logs` does not work with Job-based test hooks in Helm 3.17+. To collect test output, use kubectl label selectors after the run:
-> ```bash
-> kubectl logs -l job-name=my-ontoserver-ontoserver-test-metadata
-> kubectl logs -l job-name=my-ontoserver-ontoserver-test-fhir-rw
-> ```
+**Why shared storage always fails for scaled deployments:** Ontoserver uses stateless clustering — each pod maintains its own local Lucene index cache, rebuilt on demand from syndication feeds. Indexes are not designed to be shared across processes. Lucene's `IndexWriter` acquires an exclusive `write.lock` file; concurrent access from multiple pods to the same index directory will either fail with `LockObtainFailedException` or silently corrupt the index. Any shared PVC (RWO mounted by one pod, or RWX mounted by all) violates this constraint. The correct patterns are `StatefulSet` with per-pod `ReadWriteOnce` PVCs, or `Deployment` with no persistence (ephemeral local storage per pod).
 
 ## Registry Credentials (Required)
 
@@ -139,41 +130,50 @@ ontoserver:
       - name: my-pull-secret
 ```
 
-## Deployment Modes
+## Testing
 
-The chart supports four deployment combinations controlled by `ontoserver.deployment.kind` and `ontoserver.deployment.type`:
+### Unit Tests
 
-|  | `single` | `scaled` |
-|---|---|---|
-| **`Deployment`** | One-replica Deployment | Multi-replica Deployment |
-| **`StatefulSet`** | One-replica StatefulSet (per-pod PVCs) | Multi-replica StatefulSet (per-pod PVCs) |
+Unit tests render chart templates and assert on the output without requiring a cluster. They use the [`helm-unittest`](https://github.com/helm-unittest/helm-unittest) plugin.
 
-**Constraints:**
-- `scaled` requires `replicas` ≥ 2 (or 0 to scale to zero). `single` requires `replicas` < 2.
-- `scaled` deployments cannot use the Postgres sidecar — an external database is required.
-- `isReadOnly: true` is strongly recommended for all scaled deployments. Scaled read-write mode is highly experimental, has not been tested, and **must not be used in production**.
-- `clusterName` sets `ontoserver.cluster.name` for auto-discovery, allowing independent scaled clusters on the same network. Defaults to `ontoserver` (the application default) when unset.
-- `StatefulSet` kind always provisions PVCs via `volumeClaimTemplates`. `Deployment` kind requires `persistence.enabledForDeployment: true` to use PVCs.
+**Install the plugin (one-time):**
 
-### Supported configurations
+```bash
+helm plugin install https://github.com/helm-unittest/helm-unittest
+```
 
-The combination of `kind`, `type`, database, and storage determines whether a setup is viable:
+**Run unit tests:**
 
-| `kind` | `type` | Database | Storage | Supported? |
-|---|---|---|---|---|
-| `Deployment` | `single` | Sidecar (`db.enabled: true`) | `ReadWriteOnce` | Yes |
-| `Deployment` | `single` | External | Any / none | Yes |
-| `Deployment` | `scaled` | Sidecar | — | **No** — hard rejected by the chart |
-| `Deployment` | `scaled` | External | `ReadWriteOnce` | **No** — all pods share one PVC; only one can mount it |
-| `Deployment` | `scaled` | External | `ReadWriteMany` | Yes — all pods share one RWX PVC |
-| `Deployment` | `scaled` | External | None (no persistence) | Yes |
-| `StatefulSet` | `single` | Sidecar | `ReadWriteOnce` | Yes |
-| `StatefulSet` | `single` | External | Any / none | Yes |
-| `StatefulSet` | `scaled` | Sidecar | — | **No** — hard rejected by the chart |
-| `StatefulSet` | `scaled` | External | `ReadWriteOnce` | Yes — each pod gets its own PVC via `volumeClaimTemplates` |
-| `StatefulSet` | `scaled` | External | `ReadWriteMany` | **No** — Lucene indexes are pod-local; sharing a volume across pods will corrupt them |
+```bash
+helm unittest ./charts/ontoserver
+```
 
-The key distinction for scaled deployments: a `Deployment` creates a **single shared PVC** for all pods, so `ReadWriteOnce` disks (EBS, Azure Disk) do not work — only one pod can mount them. A `StatefulSet` creates a **separate PVC per pod** via `volumeClaimTemplates`, making per-pod `ReadWriteOnce` disks the correct choice.
+### Integration Tests
+
+Integration tests run against a live deployment using `helm test`. They require no extra plugins — just a running cluster with the chart installed.
+
+The **metadata test** (always runs) checks the FHIR CapabilityStatement and, if `ontoserver.managementService.enabled=true`, the Spring Boot Actuator health endpoint.
+
+The **FHIR read-write test** (only runs when `ontoserver.deployment.isReadOnly=false`) loads a CodeSystem, ValueSet, and ConceptMap, then exercises `$lookup`, `$validate-code`, `$expand`, and `$translate` operations.
+
+```bash
+# Install in read-write mode to enable all integration tests
+helm install my-ontoserver ./charts/ontoserver \
+  --set ontoserver.deployment.isReadOnly=false \
+  --set ontoserver.managementService.enabled=true \
+  --set ontoserver.imageCredentials.username=<quay-username> \
+  --set ontoserver.imageCredentials.password=<quay-password> \
+  -f your-values.yaml
+
+# Run integration tests
+helm test my-ontoserver
+```
+
+> **Note:** `helm test --logs` does not work with Job-based test hooks in Helm 3.17+. To collect test output, use kubectl label selectors after the run:
+> ```bash
+> kubectl logs -l job-name=my-ontoserver-ontoserver-test-metadata
+> kubectl logs -l job-name=my-ontoserver-ontoserver-test-fhir-rw
+> ```
 
 ## Persistence
 
@@ -439,69 +439,69 @@ See [`examples/k3d-traefik-values.yaml`](examples/k3d-traefik-values.yaml) for t
 
 ### Deployment
 
-| Name                                                                                        | Description                                                                                                                                                                        | Value                             |
-| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| `ontoserver.deployment.kind`                                                                | Kind of controller (Deployment or StatefulSet)                                                                                                                                     | `Deployment`                      |
-| `ontoserver.deployment.type`                                                                | single|scaled deployment topology                                                                                                                                                  | `single`                          |
-| `ontoserver.deployment.image`                                                               | Container image for OntoServer                                                                                                                                                     | `quay.io/aehrc/ontoserver:ctsa-6` |
-| `ontoserver.deployment.imagePullPolicy`                                                     | Image pull policy                                                                                                                                                                  | `IfNotPresent`                    |
-| `ontoserver.deployment.imagePullSecrets`                                                    | Additional pre-created image pull secrets to attach to the pod (merged with the chart-managed pull secret when imageCredentials are set)                                           | `[]`                              |
-| `ontoserver.deployment.isReadOnly`                                                          | Ontoserver in read‑only mode - keep it true for scaled                                                                                                                             | `true`                            |
-| `ontoserver.deployment.replicas`                                                            | Number of replicas - min 2 for scaled deployment - can be set to 0                                                                                                                 | `1`                               |
-| `ontoserver.deployment.clusterName`                                                         | Cluster name for auto-discovery in scaled deployments (overrides the default "ontoserver" set in application.properties); ignored for single deployments                           | `""`                              |
-| `ontoserver.deployment.annotations`                                                         | Deployment/Statefulset manifest annotations                                                                                                                                        | `{}`                              |
-| `ontoserver.deployment.labels`                                                              | Deployment/Statefulset manifest labels                                                                                                                                             | `{}`                              |
-| `ontoserver.deployment.podAnnotations`                                                      | Pod annotations                                                                                                                                                                    | `{}`                              |
-| `ontoserver.deployment.podLabels`                                                           | Pod labels                                                                                                                                                                         | `{}`                              |
-| `ontoserver.deployment.deploymentStrategy`                                                  | K8s update strategy when using Deployment Kind                                                                                                                                     | `RollingUpdate`                   |
-| `ontoserver.deployment.startupProbe.initialDelaySeconds`                                    | Startup probe initial delay                                                                                                                                                        | `5`                               |
-| `ontoserver.deployment.startupProbe.periodSeconds`                                          | Startup probe period                                                                                                                                                               | `2`                               |
-| `ontoserver.deployment.startupProbe.failureThreshold`                                       | Startup probe failure threshold                                                                                                                                                    | `150`                             |
-| `ontoserver.deployment.startupProbe.timeoutSeconds`                                         | Startup probe timeout                                                                                                                                                              | `5`                               |
-| `ontoserver.deployment.livenessProbe.initialDelaySeconds`                                   | Liveness probe initial delay                                                                                                                                                       | `15`                              |
-| `ontoserver.deployment.livenessProbe.periodSeconds`                                         | Liveness probe period                                                                                                                                                              | `5`                               |
-| `ontoserver.deployment.livenessProbe.failureThreshold`                                      | Liveness probe failure threshold                                                                                                                                                   | `10`                              |
-| `ontoserver.deployment.livenessProbe.timeoutSeconds`                                        | Liveness probe timeout                                                                                                                                                             | `5`                               |
-| `ontoserver.deployment.readinessProbe.initialDelaySeconds`                                  | Readiness probe initial delay                                                                                                                                                      | `0`                               |
-| `ontoserver.deployment.readinessProbe.periodSeconds`                                        | Readiness probe period                                                                                                                                                             | `5`                               |
-| `ontoserver.deployment.readinessProbe.failureThreshold`                                     | Readiness probe failure threshold                                                                                                                                                  | `3`                               |
-| `ontoserver.deployment.readinessProbe.timeoutSeconds`                                       | Readiness probe timeout                                                                                                                                                            | `5`                               |
-| `ontoserver.deployment.persistence.enabledForDeployment`                                    | Enable PVC on Deployment                                                                                                                                                           | `false`                           |
-| `ontoserver.deployment.persistence.mode`                                                    | shared | split - Use one or separate PV for db and lucene files                                                                                                                    | `split`                           |
-| `ontoserver.deployment.persistence.files.accessMode`                                        | PVC access mode. For scaled StatefulSet (recommended) use ReadWriteOnce — each pod gets its own PVC. For scaled Deployment only, use ReadWriteMany (e.g. EFS/Azure Files).         | `ReadWriteOnce`                   |
-| `ontoserver.deployment.persistence.files.existingVolume.enabled`                            | Bind to existing PV                                                                                                                                                                | `false`                           |
-| `ontoserver.deployment.persistence.files.existingVolume.name`                               | Name of existing PV                                                                                                                                                                | `""`                              |
-| `ontoserver.deployment.persistence.files.pv.enabled`                                        | Create a PersistentVolume for the files PVC backed by a pre-provisioned disk (requires existingVolume.enabled and existingVolume.name)                                             | `false`                           |
-| `ontoserver.deployment.persistence.files.pv.diskURI`                                        | CSI volumeHandle — cloud-specific disk identifier (required when enabled, e.g. Azure disk resource ID or EBS volume ID)                                                            | `""`                              |
-| `ontoserver.deployment.persistence.files.pv.csiDriver`                                      | CSI driver (required when enabled, e.g. disk.csi.azure.com or ebs.csi.aws.com)                                                                                                     | `""`                              |
-| `ontoserver.deployment.persistence.files.pv.storageSize`                                    | Storage capacity                                                                                                                                                                   | `10Gi`                            |
-| `ontoserver.deployment.persistence.files.pv.storageClassName`                               | StorageClass name (defaults to RELEASE-ontoserver-files)                                                                                                                           | `""`                              |
-| `ontoserver.deployment.persistence.files.storageClass.name`                                 | StorageClass name to use when provided.enabled is false; leave empty to use the cluster default StorageClass                                                                       | `default`                         |
-| `ontoserver.deployment.persistence.files.storageClass.provided.enabled`                     | Use provided storageClass                                                                                                                                                          | `true`                            |
-| `ontoserver.deployment.persistence.files.storageClass.provided.storageProvisioner`          | CSI driver - the default is AKS/Azure specific, replace for other clouds (e.g. ebs.csi.aws.com for EKS)                                                                            | `disk.csi.azure.com`              |
-| `ontoserver.deployment.persistence.files.storageClass.provided.reclaimPolicy`               | Storage Reclaim Policy                                                                                                                                                             | `Retain`                          |
-| `ontoserver.deployment.persistence.files.storageClass.provided.storageParameters.skuName`   | Storage SKU name (AKS/Azure specific)                                                                                                                                              | `Premium_LRS`                     |
-| `ontoserver.deployment.persistence.files.storageClass.provided.storageParameters.kind`      | Storage kind (AKS/Azure specific)                                                                                                                                                  | `Managed`                         |
-| `ontoserver.deployment.persistence.files.storageClass.provided.allowVolumeExpansion`        | Allow volume expansion                                                                                                                                                             | `true`                            |
-| `ontoserver.deployment.persistence.dbfiles.accessMode`                                      | PVC access mode. For scaled StatefulSet (recommended) use ReadWriteOnce — each pod gets its own PVC. For scaled Deployment only, use ReadWriteMany (e.g. EFS/Azure Files).         | `ReadWriteOnce`                   |
-| `ontoserver.deployment.persistence.dbfiles.existingVolume.enabled`                          | Bind to existing PV                                                                                                                                                                | `false`                           |
-| `ontoserver.deployment.persistence.dbfiles.existingVolume.name`                             | Name of existing PV                                                                                                                                                                | `""`                              |
-| `ontoserver.deployment.persistence.dbfiles.pv.enabled`                                      | Create a PersistentVolume for the db-files PVC backed by a pre-provisioned disk (requires existingVolume.enabled and existingVolume.name; only used in split mode with db.enabled) | `false`                           |
-| `ontoserver.deployment.persistence.dbfiles.pv.diskURI`                                      | CSI volumeHandle — cloud-specific disk identifier (required when enabled, e.g. Azure disk resource ID or EBS volume ID)                                                            | `""`                              |
-| `ontoserver.deployment.persistence.dbfiles.pv.csiDriver`                                    | CSI driver (required when enabled, e.g. disk.csi.azure.com or ebs.csi.aws.com)                                                                                                     | `""`                              |
-| `ontoserver.deployment.persistence.dbfiles.pv.storageSize`                                  | Storage capacity                                                                                                                                                                   | `10Gi`                            |
-| `ontoserver.deployment.persistence.dbfiles.pv.storageClassName`                             | StorageClass name (defaults to RELEASE-ontoserver-db-files)                                                                                                                        | `""`                              |
-| `ontoserver.deployment.persistence.dbfiles.storageClass.name`                               | StorageClass name to use when provided.enabled is false; leave empty to use the cluster default StorageClass                                                                       | `default`                         |
-| `ontoserver.deployment.persistence.dbfiles.storageClass.provided.enabled`                   | Use provided storageClass                                                                                                                                                          | `true`                            |
-| `ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageProvisioner`        | CSI driver - the default is AKS/Azure specific, replace for other clouds (e.g. ebs.csi.aws.com for EKS)                                                                            | `disk.csi.azure.com`              |
-| `ontoserver.deployment.persistence.dbfiles.storageClass.provided.reclaimPolicy`             | Storage Reclaim Policy                                                                                                                                                             | `Retain`                          |
-| `ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters.skuName` | Storage SKU name (AKS/Azure specific)                                                                                                                                              | `Premium_LRS`                     |
-| `ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters.kind`    | Storage kind (AKS/Azure specific)                                                                                                                                                  | `Managed`                         |
-| `ontoserver.deployment.persistence.dbfiles.storageClass.provided.allowVolumeExpansion`      | Allow volume expansion                                                                                                                                                             | `true`                            |
-| `ontoserver.deployment.podDisruptionBudget.enabled`                                         | Enable PDB for scaled deployments                                                                                                                                                  | `true`                            |
-| `ontoserver.deployment.podDisruptionBudget.minAvailable`                                    | Minimum pods available - If you set this, maxUnavailable will be ignored                                                                                                           | `1`                               |
-| `ontoserver.deployment.db.enabled`                                                          | Enable Postgres sidecar                                                                                                                                                            | `true`                            |
-| `ontoserver.deployment.db.postgresVersion`                                                  | Version of Postgres                                                                                                                                                                | `16`                              |
+| Name                                                                                        | Description                                                                                                                                                                                                                   | Value                             |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `ontoserver.deployment.kind`                                                                | Kind of controller (Deployment or StatefulSet)                                                                                                                                                                                | `Deployment`                      |
+| `ontoserver.deployment.type`                                                                | single|scaled deployment topology                                                                                                                                                                                             | `single`                          |
+| `ontoserver.deployment.image`                                                               | Container image for OntoServer                                                                                                                                                                                                | `quay.io/aehrc/ontoserver:ctsa-6` |
+| `ontoserver.deployment.imagePullPolicy`                                                     | Image pull policy                                                                                                                                                                                                             | `IfNotPresent`                    |
+| `ontoserver.deployment.imagePullSecrets`                                                    | Additional pre-created image pull secrets to attach to the pod (merged with the chart-managed pull secret when imageCredentials are set)                                                                                      | `[]`                              |
+| `ontoserver.deployment.isReadOnly`                                                          | Ontoserver in read‑only mode - keep it true for scaled                                                                                                                                                                        | `true`                            |
+| `ontoserver.deployment.replicas`                                                            | Number of replicas - min 2 for scaled deployment - can be set to 0                                                                                                                                                            | `1`                               |
+| `ontoserver.deployment.clusterName`                                                         | Cluster name for auto-discovery in scaled deployments (overrides the default "ontoserver" set in application.properties); ignored for single deployments                                                                      | `""`                              |
+| `ontoserver.deployment.annotations`                                                         | Deployment/Statefulset manifest annotations                                                                                                                                                                                   | `{}`                              |
+| `ontoserver.deployment.labels`                                                              | Deployment/Statefulset manifest labels                                                                                                                                                                                        | `{}`                              |
+| `ontoserver.deployment.podAnnotations`                                                      | Pod annotations                                                                                                                                                                                                               | `{}`                              |
+| `ontoserver.deployment.podLabels`                                                           | Pod labels                                                                                                                                                                                                                    | `{}`                              |
+| `ontoserver.deployment.deploymentStrategy`                                                  | K8s update strategy when using Deployment Kind                                                                                                                                                                                | `RollingUpdate`                   |
+| `ontoserver.deployment.startupProbe.initialDelaySeconds`                                    | Startup probe initial delay                                                                                                                                                                                                   | `5`                               |
+| `ontoserver.deployment.startupProbe.periodSeconds`                                          | Startup probe period                                                                                                                                                                                                          | `2`                               |
+| `ontoserver.deployment.startupProbe.failureThreshold`                                       | Startup probe failure threshold                                                                                                                                                                                               | `150`                             |
+| `ontoserver.deployment.startupProbe.timeoutSeconds`                                         | Startup probe timeout                                                                                                                                                                                                         | `5`                               |
+| `ontoserver.deployment.livenessProbe.initialDelaySeconds`                                   | Liveness probe initial delay                                                                                                                                                                                                  | `15`                              |
+| `ontoserver.deployment.livenessProbe.periodSeconds`                                         | Liveness probe period                                                                                                                                                                                                         | `5`                               |
+| `ontoserver.deployment.livenessProbe.failureThreshold`                                      | Liveness probe failure threshold                                                                                                                                                                                              | `10`                              |
+| `ontoserver.deployment.livenessProbe.timeoutSeconds`                                        | Liveness probe timeout                                                                                                                                                                                                        | `5`                               |
+| `ontoserver.deployment.readinessProbe.initialDelaySeconds`                                  | Readiness probe initial delay                                                                                                                                                                                                 | `0`                               |
+| `ontoserver.deployment.readinessProbe.periodSeconds`                                        | Readiness probe period                                                                                                                                                                                                        | `5`                               |
+| `ontoserver.deployment.readinessProbe.failureThreshold`                                     | Readiness probe failure threshold                                                                                                                                                                                             | `3`                               |
+| `ontoserver.deployment.readinessProbe.timeoutSeconds`                                       | Readiness probe timeout                                                                                                                                                                                                       | `5`                               |
+| `ontoserver.deployment.persistence.enabledForDeployment`                                    | Enable PVC on Deployment                                                                                                                                                                                                      | `false`                           |
+| `ontoserver.deployment.persistence.mode`                                                    | shared | split - Use one or separate PV for db and lucene files                                                                                                                                                               | `split`                           |
+| `ontoserver.deployment.persistence.files.accessMode`                                        | PVC access mode. Use ReadWriteOnce for single instances and StatefulSet scaled deployments (each pod gets its own PVC via volumeClaimTemplates). Shared volumes across pods are not supported — Lucene indexes are pod-local. | `ReadWriteOnce`                   |
+| `ontoserver.deployment.persistence.files.existingVolume.enabled`                            | Bind to existing PV                                                                                                                                                                                                           | `false`                           |
+| `ontoserver.deployment.persistence.files.existingVolume.name`                               | Name of existing PV                                                                                                                                                                                                           | `""`                              |
+| `ontoserver.deployment.persistence.files.pv.enabled`                                        | Create a PersistentVolume for the files PVC backed by a pre-provisioned disk (requires existingVolume.enabled and existingVolume.name)                                                                                        | `false`                           |
+| `ontoserver.deployment.persistence.files.pv.diskURI`                                        | CSI volumeHandle — cloud-specific disk identifier (required when enabled, e.g. Azure disk resource ID or EBS volume ID)                                                                                                       | `""`                              |
+| `ontoserver.deployment.persistence.files.pv.csiDriver`                                      | CSI driver (required when enabled, e.g. disk.csi.azure.com or ebs.csi.aws.com)                                                                                                                                                | `""`                              |
+| `ontoserver.deployment.persistence.files.pv.storageSize`                                    | Storage capacity                                                                                                                                                                                                              | `10Gi`                            |
+| `ontoserver.deployment.persistence.files.pv.storageClassName`                               | StorageClass name (defaults to RELEASE-ontoserver-files)                                                                                                                                                                      | `""`                              |
+| `ontoserver.deployment.persistence.files.storageClass.name`                                 | StorageClass name to use when provided.enabled is false; leave empty to use the cluster default StorageClass                                                                                                                  | `default`                         |
+| `ontoserver.deployment.persistence.files.storageClass.provided.enabled`                     | Use provided storageClass                                                                                                                                                                                                     | `true`                            |
+| `ontoserver.deployment.persistence.files.storageClass.provided.storageProvisioner`          | CSI driver - the default is AKS/Azure specific, replace for other clouds (e.g. ebs.csi.aws.com for EKS)                                                                                                                       | `disk.csi.azure.com`              |
+| `ontoserver.deployment.persistence.files.storageClass.provided.reclaimPolicy`               | Storage Reclaim Policy                                                                                                                                                                                                        | `Retain`                          |
+| `ontoserver.deployment.persistence.files.storageClass.provided.storageParameters.skuName`   | Storage SKU name (AKS/Azure specific)                                                                                                                                                                                         | `Premium_LRS`                     |
+| `ontoserver.deployment.persistence.files.storageClass.provided.storageParameters.kind`      | Storage kind (AKS/Azure specific)                                                                                                                                                                                             | `Managed`                         |
+| `ontoserver.deployment.persistence.files.storageClass.provided.allowVolumeExpansion`        | Allow volume expansion                                                                                                                                                                                                        | `true`                            |
+| `ontoserver.deployment.persistence.dbfiles.accessMode`                                      | PVC access mode. Use ReadWriteOnce; only relevant for single-instance deployments with sidecar db (scaled deployments require external PostgreSQL and do not use dbfiles).                                                    | `ReadWriteOnce`                   |
+| `ontoserver.deployment.persistence.dbfiles.existingVolume.enabled`                          | Bind to existing PV                                                                                                                                                                                                           | `false`                           |
+| `ontoserver.deployment.persistence.dbfiles.existingVolume.name`                             | Name of existing PV                                                                                                                                                                                                           | `""`                              |
+| `ontoserver.deployment.persistence.dbfiles.pv.enabled`                                      | Create a PersistentVolume for the db-files PVC backed by a pre-provisioned disk (requires existingVolume.enabled and existingVolume.name; only used in split mode with db.enabled)                                            | `false`                           |
+| `ontoserver.deployment.persistence.dbfiles.pv.diskURI`                                      | CSI volumeHandle — cloud-specific disk identifier (required when enabled, e.g. Azure disk resource ID or EBS volume ID)                                                                                                       | `""`                              |
+| `ontoserver.deployment.persistence.dbfiles.pv.csiDriver`                                    | CSI driver (required when enabled, e.g. disk.csi.azure.com or ebs.csi.aws.com)                                                                                                                                                | `""`                              |
+| `ontoserver.deployment.persistence.dbfiles.pv.storageSize`                                  | Storage capacity                                                                                                                                                                                                              | `10Gi`                            |
+| `ontoserver.deployment.persistence.dbfiles.pv.storageClassName`                             | StorageClass name (defaults to RELEASE-ontoserver-db-files)                                                                                                                                                                   | `""`                              |
+| `ontoserver.deployment.persistence.dbfiles.storageClass.name`                               | StorageClass name to use when provided.enabled is false; leave empty to use the cluster default StorageClass                                                                                                                  | `default`                         |
+| `ontoserver.deployment.persistence.dbfiles.storageClass.provided.enabled`                   | Use provided storageClass                                                                                                                                                                                                     | `true`                            |
+| `ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageProvisioner`        | CSI driver - the default is AKS/Azure specific, replace for other clouds (e.g. ebs.csi.aws.com for EKS)                                                                                                                       | `disk.csi.azure.com`              |
+| `ontoserver.deployment.persistence.dbfiles.storageClass.provided.reclaimPolicy`             | Storage Reclaim Policy                                                                                                                                                                                                        | `Retain`                          |
+| `ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters.skuName` | Storage SKU name (AKS/Azure specific)                                                                                                                                                                                         | `Premium_LRS`                     |
+| `ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters.kind`    | Storage kind (AKS/Azure specific)                                                                                                                                                                                             | `Managed`                         |
+| `ontoserver.deployment.persistence.dbfiles.storageClass.provided.allowVolumeExpansion`      | Allow volume expansion                                                                                                                                                                                                        | `true`                            |
+| `ontoserver.deployment.podDisruptionBudget.enabled`                                         | Enable PDB for scaled deployments                                                                                                                                                                                             | `true`                            |
+| `ontoserver.deployment.podDisruptionBudget.minAvailable`                                    | Minimum pods available - If you set this, maxUnavailable will be ignored                                                                                                                                                      | `1`                               |
+| `ontoserver.deployment.db.enabled`                                                          | Enable Postgres sidecar                                                                                                                                                                                                       | `true`                            |
+| `ontoserver.deployment.db.postgresVersion`                                                  | Version of Postgres                                                                                                                                                                                                           | `16`                              |
 
 ### Registry Credentials
 
