@@ -1,5 +1,11 @@
 # Ontoserver Deployment
 
+[![Unit Tests](https://github.com/aehrc/ontoserver-deploy/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/aehrc/ontoserver-deploy/actions/workflows/unit-tests.yml)
+[![Integration Tests](https://github.com/aehrc/ontoserver-deploy/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/aehrc/ontoserver-deploy/actions/workflows/integration-tests.yml)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/package/helm/ontoserver/ontoserver)](https://artifacthub.io/packages/helm/ontoserver/ontoserver)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/package/helm/ontoserver/ontoserver-extras)](https://artifacthub.io/packages/helm/ontoserver/ontoserver-extras)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/package/helm/ontoserver/ontoserver-indexer)](https://artifacthub.io/packages/helm/ontoserver/ontoserver-indexer)
+
 Deployment resources for [Ontoserver](https://ontoserver.csiro.au) — a FHIR terminology server — across different platforms and technologies.
 
 | Directory | Description |

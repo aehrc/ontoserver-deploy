@@ -36,6 +36,15 @@ jobs:
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
+      - name: Publish artifacthub-repo.yml to gh-pages
+        run: |
+          git fetch origin gh-pages
+          git checkout gh-pages
+          git checkout ${{ github.sha }} -- artifacthub-repo.yml
+          git add artifacthub-repo.yml
+          git diff --staged --quiet || git commit -m "Update artifacthub-repo.yml [skip ci]"
+          git push origin gh-pages
+
   push-charts-oci:
     name: Push Helm Charts to OCI
     runs-on: ubuntu-latest
