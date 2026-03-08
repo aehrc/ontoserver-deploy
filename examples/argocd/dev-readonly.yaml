@@ -46,6 +46,7 @@ spec:
       helm:
         valuesObject:
           ontoserver:
+            serverPort: 8001               # port forward the onto or varnish service to this local port
             deployment:
               kind: Deployment
               type: single
@@ -54,7 +55,7 @@ spec:
               imagePullSecrets:
                 - name: quay-pull-secret   # must exist in ontoserver-dev — see app-of-apps.yaml
               db:
-                enabled: true       # sidecar PostgreSQL
+                enabled: true              # sidecar PostgreSQL
 
             timeZone: Australia/Brisbane
             language: en_AU
