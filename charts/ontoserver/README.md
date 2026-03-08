@@ -58,7 +58,7 @@ The recommended production topology separates content development from publicati
 | `deployment.db.enabled` | `false` | `false` | `true` (sidecar) |
 | Database | External managed PostgreSQL | External managed PostgreSQL | Sidecar (in-pod) |
 | `persistence.files.accessMode` | `ReadWriteOnce` (per-pod via `volumeClaimTemplates`) | `ReadWriteOnce` | None (ephemeral) |
-| `healthCheckOption` | `-s` | `-f` (default) | `-f` (default) |
+| `healthCheckOption` | `-s` | `-f` (default) | `-l` |
 | `deployment.clusterName` | Set (isolates cluster on shared networks) | — | — |
 
 **Production read-only** — the [absolutely preferred model](https://ontoserver.csiro.au/site/technical-documentation/ontoserver-technical-documentation/planning-a-deployment/design-considerations-infrastructure-implications/horizontally-scaled-read-only-endpoint/) for a public endpoint. Instances auto-discover each other via DNS, share a single external PostgreSQL database, and each maintain their own local Lucene index on a per-pod attached disk. Per-pod attached disks are essential: a full SNOMED CT index takes hours to rebuild from scratch — without persistence, every pod restart would leave the pod unready for that entire period (with `-s`), degrading cluster capacity during rolling updates. `healthCheckOption: -s` holds a pod out of the load balancer until its startup preload completes, enabling [zero-downtime rolling updates](https://ontoserver.csiro.au/site/technical-documentation/ontoserver-technical-documentation/planning-a-deployment/design-considerations-infrastructure-implications/zero-down-time-deployments/).
