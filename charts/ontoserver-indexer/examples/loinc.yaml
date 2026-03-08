@@ -50,6 +50,12 @@ auth:
   oauth2:
     secretRef: loinc-indexer-oauth
 
+# tolerations:
+#   - key: "kubernetes.azure.com/scalesetpriority"
+#     operator: "Equal"
+#     value: "spot"
+#     effect: "NoSchedule"
+
 # sentry:
 #   dsn: ""
 #   environment: "Indexer"

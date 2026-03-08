@@ -1,7 +1,7 @@
-Job {{ include "ontoserver-indexer.jobName" . }} submitted.
+Job {{ include "ontoserver-indexer.jobName" . }} submitted to namespace {{ .Release.Namespace }}.
 
 Monitor progress:
-  kubectl logs -f job/{{ include "ontoserver-indexer.jobName" . }}
+  kubectl logs -f job/{{ include "ontoserver-indexer.jobName" . }} -n {{ .Release.Namespace }}
 
 Check status:
-  kubectl get job {{ include "ontoserver-indexer.jobName" . }}
+  kubectl get job {{ include "ontoserver-indexer.jobName" . }} -n {{ .Release.Namespace }}

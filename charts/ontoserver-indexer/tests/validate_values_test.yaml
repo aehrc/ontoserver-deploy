@@ -93,13 +93,65 @@ tests:
       - failedTemplate:
           errorMessage: "rf2.kind must be one of: FULL, SNAPSHOT"
 
-  - it: fails when syndication.endpoint is empty
+  - it: fails when neither syndication.endpoint nor output.path is set
     set:
       <<: *snomed
       syndication.endpoint: ""
     asserts:
       - failedTemplate:
-          errorMessage: "syndication.endpoint is required"
+          errorMessage: "either syndication.endpoint or output.path must be set"
+
+  - it: passes with output.path only (no syndication.endpoint)
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      rf2.kind: FULL
+      output.path: /output/snomed-au-20231130.zip
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: passes with both syndication.endpoint and output.path set
+    set:
+      <<: *snomed
+      output.path: /output/snomed-au-20231130.zip
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when syndication.endpoint set but syndication.feed is empty
+    set:
+      <<: *snomed
+      syndication.feed: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "syndication.feed is required when syndication.endpoint is set"
+
+  - it: fails when syndication.endpoint set but syndication.entryTitle is empty
+    set:
+      <<: *snomed
+      syndication.entryTitle: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "syndication.entryTitle is required when syndication.endpoint is set"
+
+  - it: fails when output.pvcName set but output.path is empty
+    set:
+      <<: *snomed
+      output.pvcName: my-pvc
+    asserts:
+      - failedTemplate:
+          errorMessage: "output.path is required when output.pvcName is set"
+
+  - it: passes when output.pvcName and output.path are both set
+    set:
+      <<: *snomed
+      output.pvcName: my-pvc
+      output.path: /output/snomed-au-20231130.zip
+    asserts:
+      - hasDocuments:
+          count: 0
 
   - it: fails when oauth2 configured but syndication.tokenEndpoint is empty
     set:
@@ -118,22 +170,6 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
-
-  - it: fails when syndication.feed is empty
-    set:
-      <<: *snomed
-      syndication.feed: ""
-    asserts:
-      - failedTemplate:
-          errorMessage: "syndication.feed is required"
-
-  - it: fails when syndication.entryTitle is empty
-    set:
-      <<: *snomed
-      syndication.entryTitle: ""
-    asserts:
-      - failedTemplate:
-          errorMessage: "syndication.entryTitle is required"
 
   - it: fails when both oauth2 and basic auth configured
     set:

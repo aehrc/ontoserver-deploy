@@ -50,6 +50,12 @@ languageRefsets:
   forModule:
     "32506021000036107": "32570271000036106,900000000000509007"
 
+# tolerations:
+#   - key: "kubernetes.azure.com/scalesetpriority"
+#     operator: "Equal"
+#     value: "spot"
+#     effect: "NoSchedule"
+
 # sentry:
 #   dsn: ""
 #   environment: "Indexer"

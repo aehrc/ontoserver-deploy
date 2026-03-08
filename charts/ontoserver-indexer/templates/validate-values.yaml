@@ -17,23 +17,27 @@
   {{- end }}
 {{- end }}
 
-{{- if empty .Values.syndication.endpoint }}
-  {{- fail "syndication.endpoint is required" }}
+{{- if and (empty .Values.syndication.endpoint) (empty .Values.output.path) }}
+  {{- fail "either syndication.endpoint or output.path must be set" }}
+{{- end }}
+
+{{- if .Values.syndication.endpoint }}
+  {{- if empty .Values.syndication.feed }}
+    {{- fail "syndication.feed is required when syndication.endpoint is set" }}
+  {{- end }}
+  {{- if empty .Values.syndication.entryTitle }}
+    {{- fail "syndication.entryTitle is required when syndication.endpoint is set" }}
+  {{- end }}
+{{- end }}
+
+{{- if and .Values.output.pvcName (empty .Values.output.path) }}
+  {{- fail "output.path is required when output.pvcName is set" }}
 {{- end }}
 
 {{- $hasOauth2 := or .Values.auth.oauth2.secretRef .Values.auth.oauth2.clientId }}
 {{- if and $hasOauth2 (empty .Values.syndication.tokenEndpoint) }}
   {{- fail "syndication.tokenEndpoint is required when oauth2 auth is configured" }}
 {{- end }}
-
-{{- if empty .Values.syndication.feed }}
-  {{- fail "syndication.feed is required" }}
-{{- end }}
-
-{{- if empty .Values.syndication.entryTitle }}
-  {{- fail "syndication.entryTitle is required" }}
-{{- end }}
-
 
 {{- $hasOauth2 := or .Values.auth.oauth2.secretRef .Values.auth.oauth2.clientId }}
 {{- $hasBasic  := or .Values.auth.basic.secretRef  .Values.auth.basic.username }}

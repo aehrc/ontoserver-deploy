@@ -14,9 +14,26 @@ spec:
         app: {{ include "ontoserver-indexer.jobName" . }}
     spec:
       restartPolicy: Never
+      {{- if .Values.tolerations }}
+      tolerations: {{ toJson .Values.tolerations }}
+      {{- end }}
       {{- if .Values.image.pullSecret }}
       imagePullSecrets:
         - name: {{ .Values.image.pullSecret }}
+      {{- end }}
+      {{- if or .Values.output.pvcName .Values.input.pvcName }}
+      volumes:
+        {{- if .Values.output.pvcName }}
+        - name: output-volume
+          persistentVolumeClaim:
+            claimName: {{ .Values.output.pvcName }}
+        {{- end }}
+        {{- if .Values.input.pvcName }}
+        - name: input-volume
+          persistentVolumeClaim:
+            claimName: {{ .Values.input.pvcName }}
+            readOnly: true
+        {{- end }}
       {{- end }}
       containers:
         - name: indexer
@@ -36,6 +53,7 @@ spec:
             - -k
             - {{ .Values.rf2.kind | lower | quote }}
             {{- end }}
+            {{- if .Values.syndication.endpoint }}
             - -synd
             - {{ .Values.syndication.endpoint | quote }}
             - -feed
@@ -50,6 +68,23 @@ spec:
             - -perms
             - {{ . | quote }}
             {{- end }}
+            {{- end }}
+            {{- if .Values.output.path }}
+            - -o
+            - {{ .Values.output.path | quote }}
+            {{- end }}
+          {{- if or .Values.output.pvcName .Values.input.pvcName }}
+          volumeMounts:
+            {{- if .Values.output.pvcName }}
+            - name: output-volume
+              mountPath: /output
+            {{- end }}
+            {{- if .Values.input.pvcName }}
+            - name: input-volume
+              mountPath: {{ .Values.input.mountPath }}
+              readOnly: true
+            {{- end }}
+          {{- end }}
           env:
             - name: JAVA_OPTS
               value: "-Xmx{{ .Values.resources.memoryGb }}g"

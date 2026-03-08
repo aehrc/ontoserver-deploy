@@ -103,6 +103,26 @@ tests:
           path: spec.template.spec.imagePullSecrets[0].name
           value: my-pull-secret
 
+  - it: sets tolerations when provided
+    set:
+      <<: *snomed
+      tolerations:
+        - key: "kubernetes.azure.com/scalesetpriority"
+          operator: "Equal"
+          value: "spot"
+          effect: "NoSchedule"
+    asserts:
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: "kubernetes.azure.com/scalesetpriority"
+
+  - it: omits tolerations when not set
+    set:
+      <<: *snomed
+    asserts:
+      - isNull:
+          path: spec.template.spec.tolerations
+
   - it: omits imagePullSecrets when pullSecret empty
     set:
       <<: *snomed
@@ -229,6 +249,108 @@ tests:
       - notContains:
           path: spec.template.spec.containers[0].args
           content: "-file"
+
+  - it: omits -synd and -feed args when syndication.endpoint empty and output.path set
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      output.path: /output/snomed-au-20231130.zip
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "-synd"
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "-feed"
+
+  - it: includes -o arg when output.path set
+    set:
+      <<: *snomed
+      output.path: /output/snomed-au-20231130.zip
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-o"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "/output/snomed-au-20231130.zip"
+
+  - it: omits -o arg when output.path empty
+    set:
+      <<: *snomed
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "-o"
+
+  - it: mounts PVC at /output when output.pvcName set
+    set:
+      <<: *snomed
+      output.pvcName: my-azure-fileshare
+      output.path: /output/snomed-au-20231130.zip
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: output-volume
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: my-azure-fileshare
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /output
+
+  - it: omits volumes and volumeMounts when neither output.pvcName nor input.pvcName set
+    set:
+      <<: *snomed
+    asserts:
+      - isNull:
+          path: spec.template.spec.volumes
+      - isNull:
+          path: spec.template.spec.containers[0].volumeMounts
+
+  - it: mounts input PVC read-only at input.mountPath
+    set:
+      <<: *snomed
+      input.pvcName: my-release-share
+      input.mountPath: /releases
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: input-volume
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: my-release-share
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.readOnly
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /releases
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].readOnly
+          value: true
+
+  - it: mounts both input and output PVCs when both set
+    set:
+      <<: *snomed
+      output.pvcName: my-binaries
+      output.path: /output/snomed.zip
+      input.pvcName: my-releases
+      input.mountPath: /releases
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: output-volume
+      - equal:
+          path: spec.template.spec.volumes[1].name
+          value: input-volume
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].name
+          value: output-volume
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].name
+          value: input-volume
 
   - it: passes each security label as a separate -perms arg
     values:
