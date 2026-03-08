@@ -46,6 +46,25 @@ spec:
           env:
             - name: JAVA_OPTS
               value: "-Xmx{{ .Values.resources.memoryGb }}g"
+            {{- $oauth2SecretName := include "ontoserver-indexer.oauth2SecretName" . }}
+            {{- if $oauth2SecretName }}
+            - name: authentication.oauth.endpoint.0
+              value: {{ .Values.syndication.endpoint | quote }}
+            - name: authentication.oauth.endpoint.token_endpoint.0
+              value: {{ .Values.syndication.tokenEndpoint | quote }}
+            - name: authentication.oauth.endpoint.strategy.0
+              value: body
+            - name: authentication.oauth.endpoint.client_id.0
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $oauth2SecretName }}
+                  key: clientId
+            - name: authentication.oauth.endpoint.client_secret.0
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $oauth2SecretName }}
+                  key: clientSecret
+            {{- end }}
           resources:
             requests:
               memory: {{ .Values.resources.memoryGb }}G

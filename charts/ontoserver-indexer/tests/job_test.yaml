@@ -334,3 +334,82 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].args
           content: "http://snomed.info/sct/900000000000207008"
+
+  - it: adds OAuth2 env vars when oauth2 secretRef provided
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      auth.oauth2.secretRef: my-oauth-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.oauth.endpoint.0
+            value: https://synd.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.oauth.endpoint.token_endpoint.0
+            value: https://auth.example.com/token
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.oauth.endpoint.strategy.0
+            value: body
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.oauth.endpoint.client_id.0
+            valueFrom:
+              secretKeyRef:
+                name: my-oauth-secret
+                key: clientId
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.oauth.endpoint.client_secret.0
+            valueFrom:
+              secretKeyRef:
+                name: my-oauth-secret
+                key: clientSecret
+
+  - it: adds OAuth2 env vars using chart-created secret when clientId provided inline
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      auth.oauth2.clientId: my-client
+      auth.oauth2.clientSecret: my-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.oauth.endpoint.client_id.0
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-indexer-auth
+                key: clientId
+
+  - it: omits OAuth2 env vars when no auth configured
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.oauth.endpoint.0
