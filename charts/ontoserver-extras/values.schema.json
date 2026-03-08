@@ -204,55 +204,6 @@
       },
       "required": ["enabled"],
       "additionalProperties": false
-    },
-    "pv": {
-      "type": "object",
-      "description": "Azure Disk PersistentVolume",
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": false,
-          "description": "Create an Azure Disk PersistentVolume"
-        },
-        "volumeName": {
-          "type": "string",
-          "default": "",
-          "description": "PV metadata.name and CSI volumeHandle suffix. Required when pv is enabled."
-        },
-        "diskURI": {
-          "type": "string",
-          "default": "",
-          "description": "Full Azure disk resource ID. Required when pv is enabled."
-        },
-        "storageSize": {
-          "type": "string",
-          "default": "10Gi",
-          "description": "Storage capacity for the PersistentVolume (e.g. 10Gi, 50Gi)",
-          "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$"
-        },
-        "storageClassName": {
-          "type": "string",
-          "default": "",
-          "description": "StorageClass name. If empty, defaults to RELEASE-ontoserver-files."
-        },
-        "csiDriver": {
-          "type": "string",
-          "default": "disk.csi.azure.com",
-          "description": "CSI driver for the PersistentVolume (e.g. disk.csi.azure.com for AKS, ebs.csi.aws.com for EKS)"
-        }
-      },
-      "required": ["enabled"],
-      "additionalProperties": false,
-      "if": {
-        "properties": { "enabled": { "const": true } }
-      },
-      "then": {
-        "required": ["enabled", "volumeName", "diskURI"],
-        "properties": {
-          "volumeName": { "minLength": 1 },
-          "diskURI": { "minLength": 1 }
-        }
-      }
     }
   },
   "additionalProperties": false,

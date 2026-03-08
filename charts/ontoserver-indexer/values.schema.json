@@ -1,0 +1,134 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository":      { "type": "string" },
+        "tag":             { "type": "string" },
+        "imagePullSecrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" }
+            },
+            "required": ["name"]
+          }
+        },
+        "credentials": {
+          "type": "object",
+          "properties": {
+            "registry": { "type": "string" },
+            "username": { "type": "string" },
+            "password": { "type": "string" }
+          }
+        }
+      }
+    },
+    "job": {
+      "type": "object",
+      "properties": {
+        "name":                   { "type": "string" },
+        "activeDeadlineSeconds":  { "type": "integer", "minimum": 0 },
+        "ttlSecondsAfterFinished": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "memoryGb": { "type": "integer", "minimum": 1 },
+        "cpu":      { "type": ["string", "integer", "number"] }
+      }
+    },
+    "codeSystem": {
+      "type": "object",
+      "properties": {
+        "url":     { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "rf2": {
+      "type": "object",
+      "properties": {
+        "kind":  { "type": "string" },
+        "files": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "syndication": {
+      "type": "object",
+      "properties": {
+        "endpoint":       { "type": "string" },
+        "tokenEndpoint":  { "type": "string" },
+        "feed":           { "type": "string" },
+        "entryTitle":     { "type": "string" },
+        "entryFileName":  { "type": "string" },
+        "securityLabels": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "pvcName": { "type": "string" },
+        "path":    { "type": "string" }
+      }
+    },
+    "input": {
+      "type": "object",
+      "properties": {
+        "pvcName":   { "type": "string" },
+        "mountPath": { "type": "string" }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "properties": {
+        "oauth2": {
+          "type": "object",
+          "properties": {
+            "secretRef":    { "type": "string" },
+            "clientId":     { "type": "string" },
+            "clientSecret": { "type": "string" }
+          }
+        },
+        "basic": {
+          "type": "object",
+          "properties": {
+            "secretRef": { "type": "string" },
+            "username":  { "type": "string" },
+            "password":  { "type": "string" }
+          }
+        }
+      }
+    },
+    "languageRefsets": {
+      "type": "object",
+      "properties": {
+        "forModule": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "tolerations": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "resolveSkew": { "type": "string" },
+    "sentry": {
+      "type": "object",
+      "properties": {
+        "dsn":         { "type": "string" },
+        "environment": { "type": "string" },
+        "serverName":  { "type": "string" }
+      }
+    }
+  }
+}

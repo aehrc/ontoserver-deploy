@@ -14,7 +14,13 @@
             "imagePullPolicy":      { "type": "string", "enum": ["Always","IfNotPresent","Never"] },
             "imagePullSecrets": {
               "type": "array",
-              "items": { "type": "string" }
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" }
+                },
+                "required": ["name"]
+              }
             },
             "isReadOnly":         { "type": "boolean" },
             "replicas":           { "type": "integer", "minimum": 0 },
@@ -73,6 +79,16 @@
                         "name":    { "type": "string" }
                       }
                     },
+                    "pv": {
+                      "type": "object",
+                      "properties": {
+                        "enabled":          { "type": "boolean" },
+                        "diskURI":          { "type": "string" },
+                        "csiDriver":        { "type": "string" },
+                        "storageSize":      { "type": "string" },
+                        "storageClassName": { "type": "string" }
+                      }
+                    },
                     "storageClass": {
                       "type": "object",
                       "properties": {
@@ -103,6 +119,16 @@
                       "properties": {
                         "enabled": { "type": "boolean" },
                         "name":    { "type": "string" }
+                      }
+                    },
+                    "pv": {
+                      "type": "object",
+                      "properties": {
+                        "enabled":          { "type": "boolean" },
+                        "diskURI":          { "type": "string" },
+                        "csiDriver":        { "type": "string" },
+                        "storageSize":      { "type": "string" },
+                        "storageClassName": { "type": "string" }
                       }
                     },
                     "storageClass": {
@@ -144,7 +170,16 @@
           },
           "required": ["kind","type","image","isReadOnly"]
         },
+        "imageCredentials": {
+          "type": "object",
+          "properties": {
+            "registry": { "type": "string" },
+            "username": { "type": "string" },
+            "password": { "type": "string" }
+          }
+        },
         "serverName": { "type": "string" },
+        "serverPort": { "type": ["string", "integer"] },
         "hostNames": {
           "type": "array",
           "items": { "type": "string" }
