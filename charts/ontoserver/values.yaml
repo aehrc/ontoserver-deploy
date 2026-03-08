@@ -67,7 +67,7 @@ ontoserver:
       ## @param ontoserver.deployment.persistence.mode                      shared | split - Use one or separate PV for db and lucene files
       mode: split
       files:
-        ## @param ontoserver.deployment.persistence.files.accessMode  PVC access mode. Use ReadWriteMany (e.g. EFS on EKS) for scaled deployments.
+        ## @param ontoserver.deployment.persistence.files.accessMode  PVC access mode. For scaled StatefulSet (recommended) use ReadWriteOnce — each pod gets its own PVC. For scaled Deployment only, use ReadWriteMany (e.g. EFS/Azure Files).
         accessMode: ReadWriteOnce
         existingVolume:
           ## @param ontoserver.deployment.persistence.files.existingVolume.enabled  Bind to existing PV
@@ -104,7 +104,7 @@ ontoserver:
             ## @param ontoserver.deployment.persistence.files.storageClass.provided.allowVolumeExpansion  Allow volume expansion
             allowVolumeExpansion: true
       dbfiles:
-        ## @param ontoserver.deployment.persistence.dbfiles.accessMode  PVC access mode. Use ReadWriteMany (e.g. EFS on EKS) for scaled deployments.
+        ## @param ontoserver.deployment.persistence.dbfiles.accessMode  PVC access mode. For scaled StatefulSet (recommended) use ReadWriteOnce — each pod gets its own PVC. For scaled Deployment only, use ReadWriteMany (e.g. EFS/Azure Files).
         accessMode: ReadWriteOnce
         existingVolume:
           ## @param ontoserver.deployment.persistence.dbfiles.existingVolume.enabled  Bind to existing PV

@@ -155,6 +155,26 @@ The chart supports four deployment combinations controlled by `ontoserver.deploy
 - `clusterName` sets `ontoserver.cluster.name` for auto-discovery, allowing independent scaled clusters on the same network. Defaults to `ontoserver` (the application default) when unset.
 - `StatefulSet` kind always provisions PVCs via `volumeClaimTemplates`. `Deployment` kind requires `persistence.enabledForDeployment: true` to use PVCs.
 
+### Supported configurations
+
+The combination of `kind`, `type`, database, and storage determines whether a setup is viable:
+
+| `kind` | `type` | Database | Storage | Supported? |
+|---|---|---|---|---|
+| `Deployment` | `single` | Sidecar (`db.enabled: true`) | `ReadWriteOnce` | Yes |
+| `Deployment` | `single` | External | Any / none | Yes |
+| `Deployment` | `scaled` | Sidecar | — | **No** — hard rejected by the chart |
+| `Deployment` | `scaled` | External | `ReadWriteOnce` | **No** — all pods share one PVC; only one can mount it |
+| `Deployment` | `scaled` | External | `ReadWriteMany` | Yes — all pods share one RWX PVC |
+| `Deployment` | `scaled` | External | None (no persistence) | Yes |
+| `StatefulSet` | `single` | Sidecar | `ReadWriteOnce` | Yes |
+| `StatefulSet` | `single` | External | Any / none | Yes |
+| `StatefulSet` | `scaled` | Sidecar | — | **No** — hard rejected by the chart |
+| `StatefulSet` | `scaled` | External | `ReadWriteOnce` | Yes — each pod gets its own PVC via `volumeClaimTemplates` |
+| `StatefulSet` | `scaled` | External | `ReadWriteMany` | **No** — Lucene indexes are pod-local; sharing a volume across pods will corrupt them |
+
+The key distinction for scaled deployments: a `Deployment` creates a **single shared PVC** for all pods, so `ReadWriteOnce` disks (EBS, Azure Disk) do not work — only one pod can mount them. A `StatefulSet` creates a **separate PVC per pod** via `volumeClaimTemplates`, making per-pod `ReadWriteOnce` disks the correct choice.
+
 ## Persistence
 
 Two persistence modes are available via `ontoserver.deployment.persistence.mode`:
@@ -448,7 +468,7 @@ See [`examples/k3d-traefik-values.yaml`](examples/k3d-traefik-values.yaml) for t
 | `ontoserver.deployment.readinessProbe.timeoutSeconds`                                       | Readiness probe timeout                                                                                                                                                            | `5`                               |
 | `ontoserver.deployment.persistence.enabledForDeployment`                                    | Enable PVC on Deployment                                                                                                                                                           | `false`                           |
 | `ontoserver.deployment.persistence.mode`                                                    | shared | split - Use one or separate PV for db and lucene files                                                                                                                    | `split`                           |
-| `ontoserver.deployment.persistence.files.accessMode`                                        | PVC access mode. Use ReadWriteMany (e.g. EFS on EKS) for scaled deployments.                                                                                                       | `ReadWriteOnce`                   |
+| `ontoserver.deployment.persistence.files.accessMode`                                        | PVC access mode. For scaled StatefulSet (recommended) use ReadWriteOnce — each pod gets its own PVC. For scaled Deployment only, use ReadWriteMany (e.g. EFS/Azure Files).         | `ReadWriteOnce`                   |
 | `ontoserver.deployment.persistence.files.existingVolume.enabled`                            | Bind to existing PV                                                                                                                                                                | `false`                           |
 | `ontoserver.deployment.persistence.files.existingVolume.name`                               | Name of existing PV                                                                                                                                                                | `""`                              |
 | `ontoserver.deployment.persistence.files.pv.enabled`                                        | Create a PersistentVolume for the files PVC backed by a pre-provisioned disk (requires existingVolume.enabled and existingVolume.name)                                             | `false`                           |
@@ -463,7 +483,7 @@ See [`examples/k3d-traefik-values.yaml`](examples/k3d-traefik-values.yaml) for t
 | `ontoserver.deployment.persistence.files.storageClass.provided.storageParameters.skuName`   | Storage SKU name (AKS/Azure specific)                                                                                                                                              | `Premium_LRS`                     |
 | `ontoserver.deployment.persistence.files.storageClass.provided.storageParameters.kind`      | Storage kind (AKS/Azure specific)                                                                                                                                                  | `Managed`                         |
 | `ontoserver.deployment.persistence.files.storageClass.provided.allowVolumeExpansion`        | Allow volume expansion                                                                                                                                                             | `true`                            |
-| `ontoserver.deployment.persistence.dbfiles.accessMode`                                      | PVC access mode. Use ReadWriteMany (e.g. EFS on EKS) for scaled deployments.                                                                                                       | `ReadWriteOnce`                   |
+| `ontoserver.deployment.persistence.dbfiles.accessMode`                                      | PVC access mode. For scaled StatefulSet (recommended) use ReadWriteOnce — each pod gets its own PVC. For scaled Deployment only, use ReadWriteMany (e.g. EFS/Azure Files).         | `ReadWriteOnce`                   |
 | `ontoserver.deployment.persistence.dbfiles.existingVolume.enabled`                          | Bind to existing PV                                                                                                                                                                | `false`                           |
 | `ontoserver.deployment.persistence.dbfiles.existingVolume.name`                             | Name of existing PV                                                                                                                                                                | `""`                              |
 | `ontoserver.deployment.persistence.dbfiles.pv.enabled`                                      | Create a PersistentVolume for the db-files PVC backed by a pre-provisioned disk (requires existingVolume.enabled and existingVolume.name; only used in split mode with db.enabled) | `false`                           |
