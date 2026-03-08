@@ -13,7 +13,7 @@ Deployment resources for [Ontoserver](https://ontoserver.csiro.au) — a FHIR te
 | [`charts/`](charts/) | Helm charts for Kubernetes deployments |
 | [`docker/`](docker/) | Docker Compose and container images |
 | [`azure/`](azure/) | Azure infrastructure (Terraform, AKS setup) |
-| [`legacy/`](legacy/) | Archived charts — see deprecation notices |
+| [`legacy/`](legacy/) | Archived charts — never publicly released; superseded by `charts/` |
 
 ## Helm Charts (Kubernetes)
 
@@ -22,7 +22,7 @@ Three charts are published from this repository:
 | Chart | Description |
 |-------|-------------|
 | [`ontoserver`](charts/ontoserver/) | Main chart — single/scaled deployments, Gateway API or Ingress, optional Postgres sidecar, Prometheus, OTel, External Secrets |
-| [`ontoserver-extras`](charts/ontoserver-extras/) | Optional add-ons — Varnish cache, OTel Collector, PersistentVolume |
+| [`ontoserver-extras`](charts/ontoserver-extras/) | Optional add-ons — Varnish cache, OTel Collector |
 | [`ontoserver-indexer`](charts/ontoserver-indexer/) | One-shot Job to index SNOMED CT or LOINC and publish to a syndication server and/or write to a PVC |
 
 ### Installing
@@ -104,4 +104,4 @@ Then create a `ClusterIssuer` resource — see [cert-manager docs](https://cert-
 
 ---
 
-Copyright &copy; 2025 Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230. All rights reserved.
+Copyright &copy; 2026 Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230. All rights reserved.

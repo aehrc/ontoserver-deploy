@@ -2,7 +2,7 @@ apiVersion: v2
 name: ontoserver-extras
 description: Optional infrastructure components for Ontoserver (Varnish cache, OTel Collector, PV)
 type: application
-version: 1.0.0
+version: 0.1.0
 appVersion: "ctsa-6"
 home: https://ontoserver.csiro.au
 sources:

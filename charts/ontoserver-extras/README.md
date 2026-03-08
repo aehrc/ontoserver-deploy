@@ -85,9 +85,9 @@ spec:
   - repoURL: https://github.com/your-org/your-argocd-config
     targetRevision: HEAD
     ref: values
-  - repoURL: oci://your-registry/helm
+  - repoURL: oci://ghcr.io/aehrc
     chart: ontoserver
-    targetRevision: 1.0.0
+    targetRevision: 0.1.0
     helm:
       valueFiles:
       - $values/apps/ontoserver/values.yaml
@@ -200,4 +200,4 @@ Table generated with Readme Generator For Helm: [https://github.com/bitnami/read
 Regenerate it with `npx --yes @bitnami/readme-generator-for-helm -v values.yaml -r README.md`
 ---
 
-Copyright &copy; 2025 Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230. All rights reserved.
+Copyright &copy; 2026 Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230. All rights reserved.

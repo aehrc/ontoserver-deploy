@@ -841,4 +841,4 @@ Requires the [External Secrets Operator](https://external-secrets.io/) installed
 
 ---
 
-Copyright © 2025 Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230. All rights reserved.
+Copyright &copy; 2026 Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230. All rights reserved.

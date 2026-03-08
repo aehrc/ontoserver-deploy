@@ -2,7 +2,7 @@ apiVersion: v2
 name: ontoserver
 description: Ontoserver FHIR terminology server helm chart with various deployment configurations
 type: application
-version: 3.0.0
+version: 0.1.0
 appVersion: "ctsa-6"
 home: https://ontoserver.csiro.au
 sources:

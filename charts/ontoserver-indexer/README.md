@@ -1,6 +1,6 @@
 # ontoserver-indexer
 
-A Helm chart that runs a one-shot Kubernetes Job to index a terminology code system and publish the result to an [Ontoserver](https://ontoserver.csiro.au) syndication server and/or write it to a PersistentVolumeClaim.
+A Helm chart that runs a one-shot Kubernetes Job to index a terminology code system and publish the result to an [Atomio](https://ontoserver.csiro.au/site/our-solutions/atomio/) syndication server and/or write it to a PersistentVolumeClaim.
 
 Supported code systems:
 
