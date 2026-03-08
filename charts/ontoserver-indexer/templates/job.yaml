@@ -80,6 +80,22 @@ spec:
                   name: {{ $basicSecretName }}
                   key: password
             {{- end }}
+            {{- range $moduleId, $refsetIds := .Values.languageRefsets.forModule }}
+            - name: language.refset.{{ $moduleId }}
+              value: {{ $refsetIds | quote }}
+            {{- end }}
+            {{- if .Values.resolveSkew }}
+            - name: snomed.editions.resolveSkew
+              value: {{ .Values.resolveSkew | quote }}
+            {{- end }}
+            {{- if .Values.sentry.dsn }}
+            - name: sentry.dsn
+              value: {{ .Values.sentry.dsn | quote }}
+            - name: sentry.environment
+              value: {{ .Values.sentry.environment | quote }}
+            - name: sentry.servername
+              value: {{ .Values.sentry.serverName | quote }}
+            {{- end }}
           resources:
             requests:
               memory: {{ .Values.resources.memoryGb }}G

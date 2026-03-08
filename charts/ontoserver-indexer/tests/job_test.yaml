@@ -482,3 +482,111 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: authentication.basic.endpoint.0
+
+  - it: adds language.refset env vars for each forModule entry
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      languageRefsets.forModule.32506021000036107: "32570271000036106,900000000000509007"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: language.refset.32506021000036107
+            value: "32570271000036106,900000000000509007"
+
+  - it: omits language.refset env vars when forModule empty
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: language.refset.32506021000036107
+
+  - it: adds resolveSkew env var when set
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      resolveSkew: "20231130"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: snomed.editions.resolveSkew
+            value: "20231130"
+
+  - it: omits resolveSkew env var when empty
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: snomed.editions.resolveSkew
+
+  - it: adds sentry env vars when sentry.dsn set
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      sentry.dsn: https://key@sentry.example.com/1
+      sentry.environment: Production
+      sentry.serverName: my-indexer
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: sentry.dsn
+            value: https://key@sentry.example.com/1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: sentry.environment
+            value: Production
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: sentry.servername
+            value: my-indexer
+
+  - it: omits sentry env vars when sentry.dsn empty
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: sentry.dsn
