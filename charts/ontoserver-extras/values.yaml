@@ -17,7 +17,7 @@ varnish:
     collectorEndpoint: ""
   metrics:
     ## @param varnish.metrics.enabled                            Enable Prometheus metrics exporter sidecar
-    enabled: true
+    enabled: false
     ## @param varnish.metrics.interval                           Prometheus scrape interval
     interval: 60s
     ## @param varnish.metrics.scrapeTimeout                      Prometheus scrape timeout (must be less than interval)
