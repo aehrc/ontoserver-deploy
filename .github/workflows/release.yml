@@ -55,8 +55,10 @@ jobs:
         run: |
           helm package charts/ontoserver
           helm package charts/ontoserver-extras
+          helm package charts/ontoserver-indexer
           helm push ontoserver-*.tgz oci://ghcr.io/aehrc
           helm push ontoserver-extras-*.tgz oci://ghcr.io/aehrc
+          helm push ontoserver-indexer-*.tgz oci://ghcr.io/aehrc
 
   release-varnish-exporter:
     name: Build and Push varnish-exporter
