@@ -1,0 +1,46 @@
+{{- if empty .Values.codeSystem.url }}
+  {{- fail "codeSystem.url is required" }}
+{{- end }}
+
+{{- if empty .Values.codeSystem.version }}
+  {{- fail "codeSystem.version is required" }}
+{{- end }}
+
+{{- if empty .Values.rf2.files }}
+  {{- fail "rf2.files must contain at least one URL" }}
+{{- end }}
+
+{{- $validKinds := list "FULL" "SNAPSHOT" "DELTA" }}
+{{- if not (has .Values.rf2.kind $validKinds) }}
+  {{- fail "rf2.kind must be one of: FULL, SNAPSHOT, DELTA" }}
+{{- end }}
+
+{{- if empty .Values.syndication.endpoint }}
+  {{- fail "syndication.endpoint is required" }}
+{{- end }}
+
+{{- if empty .Values.syndication.tokenEndpoint }}
+  {{- fail "syndication.tokenEndpoint is required" }}
+{{- end }}
+
+{{- if empty .Values.syndication.feed }}
+  {{- fail "syndication.feed is required" }}
+{{- end }}
+
+{{- if empty .Values.syndication.entryTitle }}
+  {{- fail "syndication.entryTitle is required" }}
+{{- end }}
+
+{{- $hasOauth2 := or .Values.auth.oauth2.secretRef .Values.auth.oauth2.clientId }}
+{{- $hasBasic  := or .Values.auth.basic.secretRef  .Values.auth.basic.username }}
+{{- if and $hasOauth2 $hasBasic }}
+  {{- fail "auth.oauth2 and auth.basic are mutually exclusive" }}
+{{- end }}
+
+{{- if and .Values.auth.oauth2.secretRef .Values.auth.oauth2.clientId }}
+  {{- fail "auth.oauth2.secretRef and auth.oauth2.clientId are mutually exclusive" }}
+{{- end }}
+
+{{- if and .Values.auth.basic.secretRef .Values.auth.basic.username }}
+  {{- fail "auth.basic.secretRef and auth.basic.username are mutually exclusive" }}
+{{- end }}

@@ -1,0 +1,174 @@
+suite: validate-values tests
+templates:
+  - templates/validate-values.yaml
+
+tests:
+  - it: passes with all required values set
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      rf2.kind: FULL
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when codeSystem.url is empty
+    set:
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - failedTemplate:
+          errorMessage: "codeSystem.url is required"
+
+  - it: fails when codeSystem.version is empty
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - failedTemplate:
+          errorMessage: "codeSystem.version is required"
+
+  - it: fails when rf2.files is empty
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - failedTemplate:
+          errorMessage: "rf2.files must contain at least one URL"
+
+  - it: fails when rf2.kind is invalid
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      rf2.kind: INVALID
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - failedTemplate:
+          errorMessage: "rf2.kind must be one of: FULL, SNAPSHOT, DELTA"
+
+  - it: fails when syndication.endpoint is empty
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - failedTemplate:
+          errorMessage: "syndication.endpoint is required"
+
+  - it: fails when syndication.tokenEndpoint is empty
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - failedTemplate:
+          errorMessage: "syndication.tokenEndpoint is required"
+
+  - it: fails when syndication.feed is empty
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.entryTitle: My Entry
+    asserts:
+      - failedTemplate:
+          errorMessage: "syndication.feed is required"
+
+  - it: fails when syndication.entryTitle is empty
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+    asserts:
+      - failedTemplate:
+          errorMessage: "syndication.entryTitle is required"
+
+  - it: fails when both oauth2 and basic auth configured
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      auth.oauth2.clientId: my-client
+      auth.basic.username: my-user
+    asserts:
+      - failedTemplate:
+          errorMessage: "auth.oauth2 and auth.basic are mutually exclusive"
+
+  - it: fails when oauth2 secretRef and clientId both set
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      auth.oauth2.secretRef: my-secret
+      auth.oauth2.clientId: my-client
+    asserts:
+      - failedTemplate:
+          errorMessage: "auth.oauth2.secretRef and auth.oauth2.clientId are mutually exclusive"
+
+  - it: fails when basic secretRef and username both set
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      auth.basic.secretRef: my-secret
+      auth.basic.username: my-user
+    asserts:
+      - failedTemplate:
+          errorMessage: "auth.basic.secretRef and auth.basic.username are mutually exclusive"
+
+  - it: passes with no auth configured
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - hasDocuments:
+          count: 0
