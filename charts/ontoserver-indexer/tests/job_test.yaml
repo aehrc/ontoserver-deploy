@@ -94,14 +94,38 @@ tests:
           path: spec.template.spec.containers[0].resources.limits.memory
           value: 24G
 
-  - it: sets imagePullSecrets when pullSecret provided
+  - it: sets imagePullSecrets from image.imagePullSecrets list
     set:
       <<: *snomed
-      image.pullSecret: my-pull-secret
+      image.imagePullSecrets[0].name: my-pull-secret
     asserts:
       - equal:
           path: spec.template.spec.imagePullSecrets[0].name
           value: my-pull-secret
+
+  - it: appends chart-created pull secret when credentials provided
+    set:
+      <<: *snomed
+      image.credentials.username: myuser
+      image.credentials.password: mypass
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: RELEASE-NAME-indexer-pull-secret
+
+  - it: merges list and chart-created pull secret when both provided
+    set:
+      <<: *snomed
+      image.imagePullSecrets[0].name: existing-secret
+      image.credentials.username: myuser
+      image.credentials.password: mypass
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: existing-secret
+      - equal:
+          path: spec.template.spec.imagePullSecrets[1].name
+          value: RELEASE-NAME-indexer-pull-secret
 
   - it: sets tolerations when provided
     set:
@@ -123,7 +147,7 @@ tests:
       - isNull:
           path: spec.template.spec.tolerations
 
-  - it: omits imagePullSecrets when pullSecret empty
+  - it: omits imagePullSecrets when none configured
     set:
       <<: *snomed
     asserts:

@@ -17,9 +17,12 @@ spec:
       {{- if .Values.tolerations }}
       tolerations: {{ toJson .Values.tolerations }}
       {{- end }}
-      {{- if .Values.image.pullSecret }}
-      imagePullSecrets:
-        - name: {{ .Values.image.pullSecret }}
+      {{- $pullSecrets := .Values.image.imagePullSecrets | default list }}
+      {{- if and .Values.image.credentials.username .Values.image.credentials.password }}
+        {{- $pullSecrets = append $pullSecrets (dict "name" (printf "%s-indexer-pull-secret" .Release.Name)) }}
+      {{- end }}
+      {{- if $pullSecrets }}
+      imagePullSecrets: {{ toJson $pullSecrets }}
       {{- end }}
       {{- if or .Values.output.pvcName .Values.input.pvcName }}
       volumes:

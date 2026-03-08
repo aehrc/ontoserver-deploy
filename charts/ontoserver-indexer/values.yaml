@@ -6,8 +6,15 @@ image:
   repository: quay.io/aehrc/ontoserver
 ## @param image.tag Container image tag
   tag: ctsa-6
-## @param image.pullSecret Name of an existing imagePullSecret for pulling the container image
-  pullSecret: ""            # name of an existing imagePullSecret
+## @param image.imagePullSecrets [array] List of pre-existing imagePullSecret names to attach to the pod
+  imagePullSecrets: []      # list of {name: ...} objects; merged with the chart-managed secret when credentials are set
+  credentials:
+## @param image.credentials.registry Registry hostname for the chart-managed pull secret
+    registry: quay.io
+## @param image.credentials.username Registry username; required to pull from quay.io/aehrc/ontoserver — chart creates an imagePullSecret automatically
+    username: ""
+## @param image.credentials.password Registry password; set via --set or populate via External Secrets
+    password: ""
 
 
 ## @section Job parameters

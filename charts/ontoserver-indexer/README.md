@@ -13,10 +13,33 @@ This chart wraps the Ontoserver `indexCodeSystemDebug` CLI tool. It retrieves on
 
 The Job terminates after a single run. Helm's `ttlSecondsAfterFinished` removes it automatically. Re-indexing requires a fresh `helm install` (or `helm upgrade --install` with a unique release name).
 
+## Registry Credentials
+
+The default image (`quay.io/aehrc/ontoserver`) requires authentication. Pull credentials must be supplied via one of two methods:
+
+**Inline credentials** — provide `image.credentials.username` and `image.credentials.password`; the chart creates a `kubernetes.io/dockerconfigjson` Secret automatically:
+```yaml
+image:
+  credentials:
+    registry: quay.io   # default
+    username: my-quay-user
+    password: my-quay-password   # use --set or External Secrets
+```
+
+**Pre-existing Secret** — if you have already created an `imagePullSecret`, reference it instead:
+```yaml
+image:
+  imagePullSecrets:
+    - name: my-pull-secret
+```
+
+Both can be combined — the chart-created secret is appended to the list.
+
 ## Prerequisites
 
 - Kubernetes 1.21+
 - Helm 3.2+
+- quay.io credentials (or an existing imagePullSecret) — required to pull `quay.io/aehrc/ontoserver`
 - Either a syndication server with a configured feed, or a PersistentVolumeClaim for local output (or both)
 - Network access from the cluster to any HTTPS source file URLs and to the syndication server (if used)
 
@@ -26,6 +49,8 @@ The Job terminates after a single run. Helm's `ttlSecondsAfterFinished` removes 
 helm install snomed-au-index ./charts/ontoserver-indexer \
   -f charts/ontoserver-indexer/examples/snomed-au.yaml \
   --set auth.oauth2.secretRef=your-secret \
+  --set image.credentials.username=your-quay-username \
+  --set image.credentials.password=your-quay-password \
   --namespace indexing --create-namespace
 ```
 
@@ -176,11 +201,14 @@ kubectl get job <release-name> -n <namespace>
 
 ### Image parameters
 
-| Name               | Description                                                         | Value                      |
-| ------------------ | ------------------------------------------------------------------- | -------------------------- |
-| `image.repository` | Container image repository for the Ontoserver indexer               | `quay.io/aehrc/ontoserver` |
-| `image.tag`        | Container image tag                                                 | `ctsa-6`                   |
-| `image.pullSecret` | Name of an existing imagePullSecret for pulling the container image | `""`                       |
+| Name                         | Description                                                                                                        | Value                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------- |
+| `image.repository`           | Container image repository for the Ontoserver indexer                                                              | `quay.io/aehrc/ontoserver` |
+| `image.tag`                  | Container image tag                                                                                                | `ctsa-6`                   |
+| `image.imagePullSecrets`     | List of pre-existing imagePullSecret names to attach to the pod                                                    | `[]`                       |
+| `image.credentials.registry` | Registry hostname for the chart-managed pull secret                                                                | `quay.io`                  |
+| `image.credentials.username` | Registry username; required to pull from quay.io/aehrc/ontoserver — chart creates an imagePullSecret automatically | `""`                       |
+| `image.credentials.password` | Registry password; set via --set or populate via External Secrets                                                  | `""`                       |
 
 ### Job parameters
 

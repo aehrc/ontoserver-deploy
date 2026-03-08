@@ -4,3 +4,4 @@
 charts/*/charts/
 charts/*/*.tgz
 charts/*/Chart.lock
+test.yaml
