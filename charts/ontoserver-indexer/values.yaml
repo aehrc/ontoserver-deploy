@@ -1,0 +1,52 @@
+image:
+  repository: quay.io/aehrc/ontoserver
+  tag: ctsa-6
+  pullSecret: ""            # name of an existing imagePullSecret
+
+job:
+  name: ""                  # defaults to {{ .Release.Name }}
+  activeDeadlineSeconds: 7200
+  ttlSecondsAfterFinished: 3600
+
+resources:
+  memoryGb: 20              # sets both -Xmx and memory request/limit
+
+codeSystem:
+  url: ""                   # e.g. http://snomed.info/sct/32506021000036107
+  version: ""               # e.g. http://snomed.info/sct/32506021000036107/version/20231130
+
+rf2:
+  kind: FULL                # FULL | SNAPSHOT | DELTA
+  files: []                 # list of RF2 download URLs
+
+syndication:
+  endpoint: ""              # syndication server base URL
+  tokenEndpoint: ""         # OAuth token URL
+  feed: ""                  # feed identifier
+  entryTitle: ""            # entry title in the feed
+  entryFileName: ""         # optional — custom output filename
+  securityLabels: []        # optional — list of permission labels
+
+auth:
+  # OAuth2 client credentials — mutually exclusive with basic
+  oauth2:
+    secretRef: ""           # name of existing Secret (keys: clientId, clientSecret)
+    clientId: ""            # OR provide directly — chart creates a Secret
+    clientSecret: ""
+  # Basic auth — mutually exclusive with oauth2
+  basic:
+    secretRef: ""           # name of existing Secret (keys: username, password)
+    username: ""            # OR provide directly — chart creates a Secret
+    password: ""
+  # All empty = no auth (valid)
+
+languageRefsets:
+  forModule: {}             # map of moduleId -> comma-separated refset IDs
+                            # e.g. "32506021000036107": "32570271000036106,900000000000509007"
+
+resolveSkew: ""             # optional — e.g. "20231130"
+
+sentry:                     # all fields ignored unless sentry.dsn is non-empty
+  dsn: ""
+  environment: "Indexer"
+  serverName: ""

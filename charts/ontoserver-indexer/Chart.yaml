@@ -1,0 +1,20 @@
+apiVersion: v2
+name: ontoserver-indexer
+description: Runs a Kubernetes Job to index a SNOMED CT (or other) code system and publish to a syndication server
+type: application
+version: 1.0.0
+appVersion: "ctsa-6"
+home: https://ontoserver.csiro.au
+sources:
+  - https://github.com/aehrc/ontoserver-deploy
+keywords:
+  - ontoserver
+  - fhir
+  - terminology
+  - snomed
+  - indexer
+maintainers:
+  - name: CSIRO
+    email: ontoserver-support@csiro.au
+annotations:
+  artifacthub.io/license: Apache-2.0
