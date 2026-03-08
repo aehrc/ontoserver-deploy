@@ -1,8 +1,10 @@
 {{/*
-Job name — use job.name if set, otherwise Release.Name
+Job name — use job.name if set, otherwise Release.Name with a random suffix.
+The suffix changes on every render so that helm upgrade --install creates a new
+Job rather than failing due to Job spec immutability.
 */}}
 {{- define "ontoserver-indexer.jobName" -}}
-{{- if .Values.job.name }}{{ .Values.job.name }}{{- else }}{{ .Release.Name }}{{- end }}
+{{- if .Values.job.name }}{{ .Values.job.name }}{{- else }}{{ .Release.Name }}-{{ randAlphaNum 6 | lower }}{{- end }}
 {{- end }}
 
 {{/*

@@ -22,13 +22,13 @@ tests:
       - hasDocuments:
           count: 1
 
-  - it: uses Release.Name as job name by default
+  - it: uses Release.Name with a random suffix as job name by default
     set:
       <<: *snomed
     asserts:
-      - equal:
+      - matchRegex:
           path: metadata.name
-          value: RELEASE-NAME
+          pattern: ^RELEASE-NAME-[a-z0-9]{6}$
 
   - it: uses job.name when set
     set:

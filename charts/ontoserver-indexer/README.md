@@ -11,7 +11,7 @@ Supported code systems:
 
 This chart wraps the Ontoserver `indexCodeSystemDebug` CLI tool. It retrieves one or more source files (via HTTPS or from a mounted volume), builds a Lucene index, and either pushes the packaged index as a syndication feed entry so that Ontoserver instances can pull it on startup or via the syndication API, or writes it directly to a PersistentVolumeClaim, or both.
 
-The Job terminates after a single run. Helm's `ttlSecondsAfterFinished` removes it automatically. Re-indexing requires a fresh `helm install` (or `helm upgrade --install` with a unique release name).
+The Job terminates after a single run. Helm's `ttlSecondsAfterFinished` removes it automatically. The Job name includes a random suffix that changes on every render, so `helm upgrade --install` on the same release name creates a new Job rather than failing due to Job spec immutability. Set `job.name` to a fixed value if you need a predictable name (e.g. for scripted log tailing), but you must then uninstall the release before re-running.
 
 ## Registry Credentials
 
