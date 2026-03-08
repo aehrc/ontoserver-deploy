@@ -172,6 +172,8 @@ When `storageClass.provided.enabled: false`, set `storageClass.name` to a specif
 
 When binding to a pre-provisioned disk (e.g. an existing Azure Disk or EBS volume), enable the chart-managed PV alongside `existingVolume`:
 
+**AKS (Azure Disk):**
+
 ```yaml
 ontoserver:
   deployment:
@@ -183,7 +185,24 @@ ontoserver:
         pv:
           enabled: true
           diskURI: /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Compute/disks/<disk>
-          csiDriver: disk.csi.azure.com   # e.g. ebs.csi.aws.com on EKS
+          csiDriver: disk.csi.azure.com
+          storageSize: 1Ti
+```
+
+**EKS (EBS):**
+
+```yaml
+ontoserver:
+  deployment:
+    persistence:
+      files:
+        existingVolume:
+          enabled: true
+          name: my-files-pv
+        pv:
+          enabled: true
+          diskURI: vol-0abc123def456789
+          csiDriver: ebs.csi.aws.com
           storageSize: 1Ti
 ```
 
@@ -222,6 +241,8 @@ The default `storageProvisioner` and `storageParameters` are Azure-specific. Rep
 > **Important:** Do **not** use a shared `ReadWriteMany` volume (e.g. EFS) across scaled replicas — each instance writes its own Lucene indexes and sharing a volume between pods will corrupt them. Use `StatefulSet` kind so each pod gets its own PVC.
 
 You must also override the Azure-specific `storageParameters` keys to prevent them from leaking into the rendered StorageClass. See `examples/eks-values.yaml` for a complete reference.
+
+To bind to a pre-provisioned EBS volume instead of dynamically provisioning one, use `files.pv` (and `dbfiles.pv` in split mode) — see [Pre-provisioned PersistentVolumes](#pre-provisioned-persistentvolumes).
 
 ### Ingress
 
