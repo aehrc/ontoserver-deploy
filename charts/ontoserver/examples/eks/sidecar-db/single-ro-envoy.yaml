@@ -115,7 +115,6 @@ ontoserver:
   # ── Preload ───────────────────────────────────────────────────────────────
   # config:
   #   atom.preload.feedLocation: "file:///data/preload.xml"
-  #   ontoserver.preload.on.start.enabled: "true"
   # healthCheckOption: -s
 
 # ── Envoy Gateway traffic policies (optional) ─────────────────────────────

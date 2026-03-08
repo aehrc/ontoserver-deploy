@@ -113,7 +113,6 @@ ontoserver:
   #
   # config:
   #   atom.preload.feedLocation: "file:///data/preload.xml"
-  #   ontoserver.preload.on.start.enabled: "true"
   #
   # healthCheckOption: -s   # hold pod unready until preload completes
 
