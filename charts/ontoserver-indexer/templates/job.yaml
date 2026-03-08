@@ -16,6 +16,38 @@ spec:
       containers:
         - name: indexer
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          command: ["/run.sh"]
+          args:
+            - indexCodeSystemDebug
+            - -s
+            - {{ .Values.codeSystem.url | quote }}
+            - -v
+            - {{ .Values.codeSystem.version | quote }}
+            {{- range .Values.rf2.files }}
+            {{- if . }}
+            - -f
+            - {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            - -k
+            - {{ .Values.rf2.kind | lower | quote }}
+            - -synd
+            - {{ .Values.syndication.endpoint | quote }}
+            - -feed
+            - {{ .Values.syndication.feed | quote }}
+            {{- if .Values.syndication.entryFileName }}
+            - -file
+            - {{ .Values.syndication.entryFileName | quote }}
+            {{- end }}
+            - -t
+            - {{ .Values.syndication.entryTitle | quote }}
+            {{- range .Values.syndication.securityLabels }}
+            - -perms
+            - {{ . | quote }}
+            {{- end }}
+          env:
+            - name: JAVA_OPTS
+              value: "-Xmx{{ .Values.resources.memoryGb }}g"
           resources:
             requests:
               memory: {{ .Values.resources.memoryGb }}G

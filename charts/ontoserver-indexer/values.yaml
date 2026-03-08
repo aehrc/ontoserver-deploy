@@ -17,7 +17,7 @@ codeSystem:
 
 rf2:
   kind: FULL                # FULL | SNAPSHOT | DELTA
-  files: []                 # list of RF2 download URLs
+  files: ~                  # list of RF2 download URLs
 
 syndication:
   endpoint: ""              # syndication server base URL

@@ -165,3 +165,172 @@ tests:
     asserts:
       - isNull:
           path: spec.template.spec.imagePullSecrets
+
+  - it: sets JAVA_OPTS env var from resources.memoryGb
+    set:
+      resources.memoryGb: 16
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JAVA_OPTS
+            value: "-Xmx16g"
+
+  - it: sets command to /run.sh and first arg to indexCodeSystemDebug
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command[0]
+          value: /run.sh
+      - equal:
+          path: spec.template.spec.containers[0].args[0]
+          value: indexCodeSystemDebug
+
+  - it: passes codeSystem url and version as args
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-s"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "http://snomed.info/sct/32506021000036107"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-v"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "http://snomed.info/sct/32506021000036107/version/20231130"
+
+  - it: passes rf2 files as repeated -f args
+    values:
+      - fixtures/two-rf2-files.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "https://example.com/file1.zip"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "https://example.com/file2.zip"
+
+  - it: passes rf2.kind lowercased as -k arg
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      rf2.kind: SNAPSHOT
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-k"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "snapshot"
+
+  - it: passes syndication endpoint, feed and entryTitle
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: "SNOMED CT AU November 2023"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-synd"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "https://synd.example.com"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-feed"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "my-feed"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-t"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "SNOMED CT AU November 2023"
+
+  - it: includes -file arg when entryFileName set
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      syndication.entryFileName: snomed-au-20231130.zip
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-file"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "snomed-au-20231130.zip"
+
+  - it: omits -file arg when entryFileName empty
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "-file"
+
+  - it: passes each security label as a separate -perms arg
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      syndication.securityLabels[0]: http://snomed.info/sct/32506021000036107
+      syndication.securityLabels[1]: http://snomed.info/sct/900000000000207008
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-perms"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "http://snomed.info/sct/32506021000036107"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "http://snomed.info/sct/900000000000207008"
