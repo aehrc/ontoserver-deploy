@@ -45,14 +45,18 @@ Both can be combined — the chart-created secret is appended to the list.
 
 ## Installing the Chart
 
+Use `helm upgrade --install` so the same command works for both the first run and every subsequent re-index:
+
 ```bash
-helm install snomed-au-index ./charts/ontoserver-indexer \
+helm upgrade --install snomed-au-index ./charts/ontoserver-indexer \
   -f charts/ontoserver-indexer/examples/snomed-au.yaml \
   --set auth.oauth2.secretRef=your-secret \
   --set image.credentials.username=your-quay-username \
   --set image.credentials.password=your-quay-password \
   --namespace indexing --create-namespace
 ```
+
+Each invocation creates a new Job with a unique random suffix, so re-running the same command will not fail due to an existing Job.
 
 See the [`examples/`](examples/) directory for example value files for SNOMED CT AU and LOINC.
 
