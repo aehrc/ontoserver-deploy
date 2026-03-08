@@ -2,11 +2,16 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ include "ontoserver-indexer.jobName" . }}
+  labels:
+    app: {{ include "ontoserver-indexer.jobName" . }}
 spec:
   backoffLimit: 0
   activeDeadlineSeconds: {{ .Values.job.activeDeadlineSeconds }}
   ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
   template:
+    metadata:
+      labels:
+        app: {{ include "ontoserver-indexer.jobName" . }}
     spec:
       restartPolicy: Never
       {{- if .Values.image.pullSecret }}
@@ -99,5 +104,7 @@ spec:
           resources:
             requests:
               memory: {{ .Values.resources.memoryGb }}G
+              cpu: {{ .Values.resources.cpu }}
             limits:
               memory: {{ .Values.resources.memoryGb }}G
+              cpu: {{ .Values.resources.cpu }}

@@ -10,6 +10,7 @@ job:
 
 resources:
   memoryGb: 20              # gigabytes (integer) — sets both -Xmx JVM flag and Kubernetes memory request/limit
+  cpu: 4                    # CPU request and limit
 
 codeSystem:
   url: ""                   # e.g. http://snomed.info/sct/32506021000036107

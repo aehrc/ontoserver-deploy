@@ -19,8 +19,9 @@
   {{- fail "syndication.endpoint is required" }}
 {{- end }}
 
-{{- if empty .Values.syndication.tokenEndpoint }}
-  {{- fail "syndication.tokenEndpoint is required" }}
+{{- $hasOauth2 := or .Values.auth.oauth2.secretRef .Values.auth.oauth2.clientId }}
+{{- if and $hasOauth2 (empty .Values.syndication.tokenEndpoint) }}
+  {{- fail "syndication.tokenEndpoint is required when oauth2 auth is configured" }}
 {{- end }}
 
 {{- if empty .Values.syndication.feed }}
@@ -43,4 +44,12 @@
 
 {{- if and .Values.auth.basic.secretRef .Values.auth.basic.username }}
   {{- fail "auth.basic.secretRef and auth.basic.username are mutually exclusive" }}
+{{- end }}
+
+{{- if and .Values.auth.oauth2.clientId (empty .Values.auth.oauth2.clientSecret) }}
+  {{- fail "auth.oauth2.clientSecret is required when auth.oauth2.clientId is set" }}
+{{- end }}
+
+{{- if and .Values.auth.basic.username (empty .Values.auth.basic.password) }}
+  {{- fail "auth.basic.password is required when auth.basic.username is set" }}
 {{- end }}

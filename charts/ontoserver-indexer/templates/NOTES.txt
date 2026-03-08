@@ -1,0 +1,7 @@
+Job {{ include "ontoserver-indexer.jobName" . }} submitted.
+
+Monitor progress:
+  kubectl logs -f job/{{ include "ontoserver-indexer.jobName" . }}
+
+Check status:
+  kubectl get job {{ include "ontoserver-indexer.jobName" . }}

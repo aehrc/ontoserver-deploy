@@ -79,7 +79,7 @@ tests:
       - failedTemplate:
           errorMessage: "syndication.endpoint is required"
 
-  - it: fails when syndication.tokenEndpoint is empty
+  - it: fails when oauth2 configured but syndication.tokenEndpoint is empty
     set:
       codeSystem.url: http://snomed.info/sct/32506021000036107
       codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
@@ -87,9 +87,23 @@ tests:
       syndication.endpoint: https://synd.example.com
       syndication.feed: my-feed
       syndication.entryTitle: My Entry
+      auth.oauth2.secretRef: my-secret
     asserts:
       - failedTemplate:
-          errorMessage: "syndication.tokenEndpoint is required"
+          errorMessage: "syndication.tokenEndpoint is required when oauth2 auth is configured"
+
+  - it: passes when syndication.tokenEndpoint empty with basic auth
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      auth.basic.secretRef: my-secret
+    asserts:
+      - hasDocuments:
+          count: 0
 
   - it: fails when syndication.feed is empty
     set:
@@ -172,3 +186,31 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: fails when oauth2 clientId set but clientSecret missing
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      auth.oauth2.clientId: my-client
+    asserts:
+      - failedTemplate:
+          errorMessage: "auth.oauth2.clientSecret is required when auth.oauth2.clientId is set"
+
+  - it: fails when basic username set but password missing
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      auth.basic.username: my-user
+    asserts:
+      - failedTemplate:
+          errorMessage: "auth.basic.password is required when auth.basic.username is set"
