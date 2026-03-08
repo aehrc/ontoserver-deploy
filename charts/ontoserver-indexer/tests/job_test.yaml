@@ -413,3 +413,72 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: authentication.oauth.endpoint.0
+
+  - it: adds Basic auth env vars when basic secretRef provided
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      auth.basic.secretRef: my-basic-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.basic.endpoint.0
+            value: https://synd.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.basic.endpoint.user.0
+            valueFrom:
+              secretKeyRef:
+                name: my-basic-secret
+                key: username
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.basic.endpoint.password.0
+            valueFrom:
+              secretKeyRef:
+                name: my-basic-secret
+                key: password
+
+  - it: adds Basic auth env vars using chart-created secret when username provided inline
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+      auth.basic.username: my-user
+      auth.basic.password: my-pass
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.basic.endpoint.user.0
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-indexer-auth
+                key: username
+
+  - it: omits Basic auth env vars when no auth configured
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.basic.endpoint.0

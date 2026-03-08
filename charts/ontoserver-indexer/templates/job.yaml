@@ -65,6 +65,21 @@ spec:
                   name: {{ $oauth2SecretName }}
                   key: clientSecret
             {{- end }}
+            {{- $basicSecretName := include "ontoserver-indexer.basicSecretName" . }}
+            {{- if $basicSecretName }}
+            - name: authentication.basic.endpoint.0
+              value: {{ .Values.syndication.endpoint | quote }}
+            - name: authentication.basic.endpoint.user.0
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $basicSecretName }}
+                  key: username
+            - name: authentication.basic.endpoint.password.0
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $basicSecretName }}
+                  key: password
+            {{- end }}
           resources:
             requests:
               memory: {{ .Values.resources.memoryGb }}G
