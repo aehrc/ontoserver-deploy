@@ -87,6 +87,138 @@ tests:
           documentIndex: 0
           value: RELEASE-NAME-client-settings
 
+  - it: renders no PV by default
+    templates:
+      - templates/pv.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders files PV when enabled
+    templates:
+      - templates/pv.yaml
+    set:
+      ontoserver.deployment.persistence.files.pv.enabled: true
+      ontoserver.deployment.persistence.files.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+      ontoserver.deployment.persistence.files.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: PersistentVolume
+      - equal:
+          path: metadata.name
+          value: my-files-pv
+      - equal:
+          path: spec.storageClassName
+          value: RELEASE-NAME-ontoserver-files
+      - equal:
+          path: spec.csi.driver
+          value: disk.csi.azure.com
+      - equal:
+          path: spec.csi.volumeHandle
+          value: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+
+  - it: renders files PV with custom storageClassName
+    templates:
+      - templates/pv.yaml
+    set:
+      ontoserver.deployment.persistence.files.pv.enabled: true
+      ontoserver.deployment.persistence.files.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+      ontoserver.deployment.persistence.files.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.files.pv.storageClassName: my-storage-class
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+    asserts:
+      - equal:
+          path: spec.storageClassName
+          value: my-storage-class
+
+  - it: does not render dbfiles PV when files PV enabled but not in split mode with db
+    templates:
+      - templates/pv.yaml
+    set:
+      ontoserver.deployment.persistence.files.pv.enabled: true
+      ontoserver.deployment.persistence.files.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+      ontoserver.deployment.persistence.files.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+      ontoserver.deployment.persistence.dbfiles.pv.enabled: true
+      ontoserver.deployment.persistence.dbfiles.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydbdisk
+      ontoserver.deployment.persistence.dbfiles.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.dbfiles.existingVolume.name: my-dbfiles-pv
+      ontoserver.deployment.persistence.mode: shared
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: renders two PVs in split mode with db enabled
+    templates:
+      - templates/pv.yaml
+    set:
+      ontoserver.deployment.persistence.files.pv.enabled: true
+      ontoserver.deployment.persistence.files.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+      ontoserver.deployment.persistence.files.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+      ontoserver.deployment.persistence.dbfiles.pv.enabled: true
+      ontoserver.deployment.persistence.dbfiles.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydbdisk
+      ontoserver.deployment.persistence.dbfiles.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.dbfiles.existingVolume.name: my-dbfiles-pv
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.db.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: renders files PV as first document in split mode
+    templates:
+      - templates/pv.yaml
+    set:
+      ontoserver.deployment.persistence.files.pv.enabled: true
+      ontoserver.deployment.persistence.files.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+      ontoserver.deployment.persistence.files.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+      ontoserver.deployment.persistence.dbfiles.pv.enabled: true
+      ontoserver.deployment.persistence.dbfiles.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydbdisk
+      ontoserver.deployment.persistence.dbfiles.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.dbfiles.existingVolume.name: my-dbfiles-pv
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.db.enabled: true
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: PersistentVolume
+      - equal:
+          path: metadata.name
+          value: my-files-pv
+      - equal:
+          path: spec.storageClassName
+          value: RELEASE-NAME-ontoserver-files
+
+  - it: renders dbfiles PV as second document in split mode
+    templates:
+      - templates/pv.yaml
+    set:
+      ontoserver.deployment.persistence.files.pv.enabled: true
+      ontoserver.deployment.persistence.files.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+      ontoserver.deployment.persistence.files.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+      ontoserver.deployment.persistence.dbfiles.pv.enabled: true
+      ontoserver.deployment.persistence.dbfiles.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydbdisk
+      ontoserver.deployment.persistence.dbfiles.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.dbfiles.existingVolume.name: my-dbfiles-pv
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.db.enabled: true
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: PersistentVolume
+      - equal:
+          path: metadata.name
+          value: my-dbfiles-pv
+      - equal:
+          path: spec.storageClassName
+          value: RELEASE-NAME-ontoserver-db-files
+
   - it: renders no gateway ServiceMonitor by default
     templates:
       - templates/servicemonitor.yaml

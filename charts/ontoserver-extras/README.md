@@ -10,7 +10,6 @@ All features are disabled by default — installing the chart with no overrides 
 | --------- | ----------- | ---- |
 | **Varnish** | HTTP caching proxy with Prometheus exporter and optional OpenTelemetry tracing sidecars | `varnish.enabled` |
 | **OpenTelemetry Collector** | `OpenTelemetryCollector` CRD for receiving, filtering, and forwarding traces | `collector.enabled` |
-| **PersistentVolume** | PersistentVolume for a pre-provisioned disk, with configurable CSI driver (defaults to `disk.csi.azure.com`) | `pv.enabled` |
 
 ## Prerequisites
 
@@ -18,46 +17,45 @@ All features are disabled by default — installing the chart with no overrides 
 | ------- | ------------------- |
 | `collector.enabled` | [OpenTelemetry Operator](https://opentelemetry.io/docs/kubernetes/operator/) installed |
 | `varnish.enabled` (ServiceMonitor) | [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) CRDs installed |
-| `pv.enabled` | CSI driver matching `pv.csiDriver` available (default: `disk.csi.azure.com` for AKS) |
 
 ## Parameters
 
 ### Varnish
 
-| Name                                               | Description                                                                              | Value                                          |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `varnish.enabled`                                  | Enable Varnish caching proxy                                                             | `false`                                        |
-| `varnish.backendServiceName`                       | Kubernetes service name for the Varnish backend (defaults to RELEASE-ontoserver-service) | `""`                                           |
-| `varnish.opentelemetry.enabled`                    | Enable tracing VCL and sidecar containers (trace-converter + trace-forwarder)            | `false`                                        |
-| `varnish.opentelemetry.collectorEndpoint`          | Zipkin endpoint for trace forwarding (required when opentelemetry enabled)               | `""`                                           |
-| `varnish.metrics.enabled`                          | Enable Prometheus metrics exporter sidecar                                               | `true`                                         |
-| `varnish.metrics.interval`                         | Prometheus scrape interval                                                               | `60s`                                          |
-| `varnish.metrics.scrapeTimeout`                    | Prometheus scrape timeout (must be less than interval)                                   | `55s`                                          |
-| `varnish.image`                                    | Varnish container image                                                                  | `varnish:7.7.1`                                |
-| `varnish.exporterImage`                            | Prometheus exporter image                                                                | `ghcr.io/aehrc/varnish-exporter:7.7-1`         |
-| `varnish.traceForwarderImage`                      | Trace forwarder container image (must have curl and sh)                                  | `curlimages/curl:8.14.1`                       |
-| `varnish.resources.varnish.requests.cpu`           | Varnish CPU request                                                                      | `200m`                                         |
-| `varnish.resources.varnish.requests.memory`        | Varnish memory request                                                                   | `256Mi`                                        |
-| `varnish.resources.varnish.limits.cpu`             | Varnish CPU limit                                                                        | `500m`                                         |
-| `varnish.resources.varnish.limits.memory`          | Varnish memory limit                                                                     | `1024Mi`                                       |
-| `varnish.resources.exporter.requests.cpu`          | Exporter CPU request                                                                     | `50m`                                          |
-| `varnish.resources.exporter.requests.memory`       | Exporter memory request                                                                  | `64Mi`                                         |
-| `varnish.resources.exporter.limits.cpu`            | Exporter CPU limit                                                                       | `100m`                                         |
-| `varnish.resources.exporter.limits.memory`         | Exporter memory limit                                                                    | `128Mi`                                        |
-| `varnish.resources.traceConverter.requests.cpu`    | Trace converter CPU request                                                              | `25m`                                          |
-| `varnish.resources.traceConverter.requests.memory` | Trace converter memory request                                                           | `25Mi`                                         |
-| `varnish.resources.traceConverter.limits.cpu`      | Trace converter CPU limit                                                                | `50m`                                          |
-| `varnish.resources.traceConverter.limits.memory`   | Trace converter memory limit                                                             | `50Mi`                                         |
-| `varnish.resources.traceForwarder.requests.cpu`    | Trace forwarder CPU request                                                              | `25m`                                          |
-| `varnish.resources.traceForwarder.requests.memory` | Trace forwarder memory request                                                           | `32Mi`                                         |
-| `varnish.resources.traceForwarder.limits.cpu`      | Trace forwarder CPU limit                                                                | `50m`                                          |
-| `varnish.resources.traceForwarder.limits.memory`   | Trace forwarder memory limit                                                             | `64Mi`                                         |
-| `varnish.tolerations`                              | Pod tolerations for the Varnish deployment                                               | `[]`                                           |
-| `varnish.cache.time200`                            | Cache TTL for 200 responses                                                              | `10m`                                          |
-| `varnish.cache.time404`                            | Cache TTL for 404 responses                                                              | `1m`                                           |
-| `varnish.cache.timeExpand`                         | Cache TTL for $expand responses (defaults to time200 if empty)                           | `""`                                           |
-| `varnish.cache.passAuthHeaderRequests`             | Pass through (bypass cache) for requests with Authorization header                       | `true`                                         |
-| `varnish.cache.memorySize`                         | Varnish malloc storage pool size (e.g. 800m, 1g)                                         | `800m`                                         |
+| Name                                               | Description                                                                              | Value                                  |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------- |
+| `varnish.enabled`                                  | Enable Varnish caching proxy                                                             | `false`                                |
+| `varnish.backendServiceName`                       | Kubernetes service name for the Varnish backend (defaults to RELEASE-ontoserver-service) | `""`                                   |
+| `varnish.opentelemetry.enabled`                    | Enable tracing VCL and sidecar containers (trace-converter + trace-forwarder)            | `false`                                |
+| `varnish.opentelemetry.collectorEndpoint`          | Zipkin endpoint for trace forwarding (required when opentelemetry enabled)               | `""`                                   |
+| `varnish.metrics.enabled`                          | Enable Prometheus metrics exporter sidecar                                               | `true`                                 |
+| `varnish.metrics.interval`                         | Prometheus scrape interval                                                               | `60s`                                  |
+| `varnish.metrics.scrapeTimeout`                    | Prometheus scrape timeout (must be less than interval)                                   | `55s`                                  |
+| `varnish.image`                                    | Varnish container image                                                                  | `varnish:7.7.1`                        |
+| `varnish.exporterImage`                            | Prometheus exporter image                                                                | `ghcr.io/aehrc/varnish-exporter:7.7-1` |
+| `varnish.traceForwarderImage`                      | Trace forwarder container image (must have curl and sh)                                  | `curlimages/curl:8.14.1`               |
+| `varnish.resources.varnish.requests.cpu`           | Varnish CPU request                                                                      | `200m`                                 |
+| `varnish.resources.varnish.requests.memory`        | Varnish memory request                                                                   | `256Mi`                                |
+| `varnish.resources.varnish.limits.cpu`             | Varnish CPU limit                                                                        | `500m`                                 |
+| `varnish.resources.varnish.limits.memory`          | Varnish memory limit                                                                     | `1024Mi`                               |
+| `varnish.resources.exporter.requests.cpu`          | Exporter CPU request                                                                     | `50m`                                  |
+| `varnish.resources.exporter.requests.memory`       | Exporter memory request                                                                  | `64Mi`                                 |
+| `varnish.resources.exporter.limits.cpu`            | Exporter CPU limit                                                                       | `100m`                                 |
+| `varnish.resources.exporter.limits.memory`         | Exporter memory limit                                                                    | `128Mi`                                |
+| `varnish.resources.traceConverter.requests.cpu`    | Trace converter CPU request                                                              | `25m`                                  |
+| `varnish.resources.traceConverter.requests.memory` | Trace converter memory request                                                           | `25Mi`                                 |
+| `varnish.resources.traceConverter.limits.cpu`      | Trace converter CPU limit                                                                | `50m`                                  |
+| `varnish.resources.traceConverter.limits.memory`   | Trace converter memory limit                                                             | `50Mi`                                 |
+| `varnish.resources.traceForwarder.requests.cpu`    | Trace forwarder CPU request                                                              | `25m`                                  |
+| `varnish.resources.traceForwarder.requests.memory` | Trace forwarder memory request                                                           | `32Mi`                                 |
+| `varnish.resources.traceForwarder.limits.cpu`      | Trace forwarder CPU limit                                                                | `50m`                                  |
+| `varnish.resources.traceForwarder.limits.memory`   | Trace forwarder memory limit                                                             | `64Mi`                                 |
+| `varnish.tolerations`                              | Pod tolerations for the Varnish deployment                                               | `[]`                                   |
+| `varnish.cache.time200`                            | Cache TTL for 200 responses                                                              | `10m`                                  |
+| `varnish.cache.time404`                            | Cache TTL for 404 responses                                                              | `1m`                                   |
+| `varnish.cache.timeExpand`                         | Cache TTL for $expand responses (defaults to time200 if empty)                           | `""`                                   |
+| `varnish.cache.passAuthHeaderRequests`             | Pass through (bypass cache) for requests with Authorization header                       | `true`                                 |
+| `varnish.cache.memorySize`                         | Varnish malloc storage pool size (e.g. 800m, 1g)                                         | `800m`                                 |
 
 ### OpenTelemetry Collector
 
@@ -68,17 +66,6 @@ All features are disabled by default — installing the chart with no overrides 
 | `collector.zipkinEndpoint` | Zipkin exporter endpoint (required when enabled)                                   | `""`    |
 | `collector.tolerations`    | Pod tolerations for the OpenTelemetryCollector                                     | `[]`    |
 | `collector.debug`          | Enable debug exporter with detailed verbosity (not suitable for production)        | `false` |
-
-### PersistentVolume
-
-| Name                  | Description                                                                  | Value                |
-| --------------------- | ---------------------------------------------------------------------------- | -------------------- |
-| `pv.enabled`          | Enable Azure Disk PersistentVolume                                           | `false`              |
-| `pv.volumeName`       | PV name (required when enabled)                                              | `""`                 |
-| `pv.diskURI`          | Full Azure disk resource ID (required when enabled)                          | `""`                 |
-| `pv.storageSize`      | Storage capacity                                                             | `10Gi`               |
-| `pv.storageClassName` | StorageClass name (defaults to RELEASE-ontoserver-files)                     | `""`                 |
-| `pv.csiDriver`        | CSI driver for the PersistentVolume (defaults to disk.csi.azure.com for AKS) | `disk.csi.azure.com` |
 
 ## Usage with ArgoCD Multi-Source
 
@@ -104,7 +91,7 @@ spec:
       - $values/apps/ontoserver/extras-values.yaml
 ```
 
-### Example: extras-values.yaml (Varnish + Collector + PV)
+### Example: extras-values.yaml (Varnish + Collector)
 
 ```yaml
 varnish:
@@ -117,12 +104,6 @@ collector:
   enabled: true
   otlpEndpoint: tempo:4317
   zipkinEndpoint: http://tempo:9411
-
-pv:
-  enabled: true
-  volumeName: r4-pv
-  diskURI: /subscriptions/<sub-id>/resourceGroups/<rg>/providers/Microsoft.Compute/disks/r4
-  storageSize: 1Ti
 ```
 
 ### Example: ontoserver values.yaml (route Gateway through Varnish)
@@ -167,7 +148,6 @@ All Kubernetes resources are prefixed with `{{ .Release.Name }}-`:
 | `varnish-prometheus-service.yaml` | `RELEASE-varnish-prometheus-service` |
 | `varnish-servicemonitor.yaml` | `RELEASE-varnish-metrics` |
 | `otel-collector.yaml` | `RELEASE-otel-collector` |
-| `pv.yaml` | Value of `pv.volumeName` |
 
 Table generated with Readme Generator For Helm: [https://github.com/bitnami/readme-generator-for-helm](https://github.com/bitnami/readme-generator-for-helm)
 Regenerate it with `npx --yes @bitnami/readme-generator-for-helm -v values.yaml -r README.md`

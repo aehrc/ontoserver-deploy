@@ -1,0 +1,33 @@
+{{- if .Values.ontoserver.deployment.persistence.files.pv.enabled }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ required "ontoserver.deployment.persistence.files.existingVolume.name is required when files.pv.enabled" .Values.ontoserver.deployment.persistence.files.existingVolume.name }}
+spec:
+  capacity:
+    storage: {{ .Values.ontoserver.deployment.persistence.files.pv.storageSize }}
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.ontoserver.deployment.persistence.files.pv.storageClassName | default (printf "%s-ontoserver-files" .Release.Name) }}
+  csi:
+    driver: {{ required "ontoserver.deployment.persistence.files.pv.csiDriver is required when files.pv.enabled" .Values.ontoserver.deployment.persistence.files.pv.csiDriver }}
+    volumeHandle: {{ required "ontoserver.deployment.persistence.files.pv.diskURI is required when files.pv.enabled" .Values.ontoserver.deployment.persistence.files.pv.diskURI }}
+{{- end }}
+{{- if and (eq .Values.ontoserver.deployment.persistence.mode "split") .Values.ontoserver.deployment.db.enabled .Values.ontoserver.deployment.persistence.dbfiles.pv.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ required "ontoserver.deployment.persistence.dbfiles.existingVolume.name is required when dbfiles.pv.enabled" .Values.ontoserver.deployment.persistence.dbfiles.existingVolume.name }}
+spec:
+  capacity:
+    storage: {{ .Values.ontoserver.deployment.persistence.dbfiles.pv.storageSize }}
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.ontoserver.deployment.persistence.dbfiles.pv.storageClassName | default (printf "%s-ontoserver-db-files" .Release.Name) }}
+  csi:
+    driver: {{ required "ontoserver.deployment.persistence.dbfiles.pv.csiDriver is required when dbfiles.pv.enabled" .Values.ontoserver.deployment.persistence.dbfiles.pv.csiDriver }}
+    volumeHandle: {{ required "ontoserver.deployment.persistence.dbfiles.pv.diskURI is required when dbfiles.pv.enabled" .Values.ontoserver.deployment.persistence.dbfiles.pv.diskURI }}
+{{- end }}

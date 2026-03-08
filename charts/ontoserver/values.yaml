@@ -74,6 +74,17 @@ ontoserver:
           enabled: false
           ## @param ontoserver.deployment.persistence.files.existingVolume.name     Name of existing PV
           name: ""
+        pv:
+          ## @param ontoserver.deployment.persistence.files.pv.enabled       Create an Azure Disk PersistentVolume for the files PVC (requires existingVolume.enabled and existingVolume.name)
+          enabled: false
+          ## @param ontoserver.deployment.persistence.files.pv.diskURI       Full Azure disk resource ID (required when enabled)
+          diskURI: ""
+          ## @param ontoserver.deployment.persistence.files.pv.csiDriver     CSI driver (required when enabled, e.g. disk.csi.azure.com or ebs.csi.aws.com)
+          csiDriver: ""
+          ## @param ontoserver.deployment.persistence.files.pv.storageSize   Storage capacity
+          storageSize: 10Gi
+          ## @param ontoserver.deployment.persistence.files.pv.storageClassName  StorageClass name (defaults to RELEASE-ontoserver-files)
+          storageClassName: ""
         storageClass:
           ## @param ontoserver.deployment.persistence.files.storageClass.name       StorageClass name to use when provided.enabled is false; leave empty to use the cluster default StorageClass
           name: default
@@ -100,6 +111,17 @@ ontoserver:
           enabled: false
           ## @param ontoserver.deployment.persistence.dbfiles.existingVolume.name     Name of existing PV
           name: ""
+        pv:
+          ## @param ontoserver.deployment.persistence.dbfiles.pv.enabled       Create an Azure Disk PersistentVolume for the db-files PVC (requires existingVolume.enabled and existingVolume.name; only used in split mode with db.enabled)
+          enabled: false
+          ## @param ontoserver.deployment.persistence.dbfiles.pv.diskURI       Full Azure disk resource ID (required when enabled)
+          diskURI: ""
+          ## @param ontoserver.deployment.persistence.dbfiles.pv.csiDriver     CSI driver (required when enabled, e.g. disk.csi.azure.com or ebs.csi.aws.com)
+          csiDriver: ""
+          ## @param ontoserver.deployment.persistence.dbfiles.pv.storageSize   Storage capacity
+          storageSize: 10Gi
+          ## @param ontoserver.deployment.persistence.dbfiles.pv.storageClassName  StorageClass name (defaults to RELEASE-ontoserver-db-files)
+          storageClassName: ""
         storageClass:
           ## @param ontoserver.deployment.persistence.dbfiles.storageClass.name       StorageClass name to use when provided.enabled is false; leave empty to use the cluster default StorageClass
           name: default

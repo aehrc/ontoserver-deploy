@@ -94,17 +94,3 @@ collector:
   ## @param collector.debug  Enable debug exporter with detailed verbosity (not suitable for production)
   debug: false
 
-## @section PersistentVolume
-pv:
-  ## @param pv.enabled                                          Enable Azure Disk PersistentVolume
-  enabled: false
-  ## @param pv.volumeName                                       PV name (required when enabled)
-  volumeName: ""
-  ## @param pv.diskURI                                          Full Azure disk resource ID (required when enabled)
-  diskURI: ""
-  ## @param pv.storageSize                                      Storage capacity
-  storageSize: 10Gi
-  ## @param pv.storageClassName                                 StorageClass name (defaults to RELEASE-ontoserver-files)
-  storageClassName: ""
-  ## @param pv.csiDriver  CSI driver for the PersistentVolume (defaults to disk.csi.azure.com for AKS)
-  csiDriver: "disk.csi.azure.com"
