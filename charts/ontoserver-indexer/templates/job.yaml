@@ -32,8 +32,10 @@ spec:
             - -f
             - {{ . | quote }}
             {{- end }}
+            {{- if ne .Values.codeSystem.url "http://loinc.org" }}
             - -k
             - {{ .Values.rf2.kind | lower | quote }}
+            {{- end }}
             - -synd
             - {{ .Values.syndication.endpoint | quote }}
             - -feed

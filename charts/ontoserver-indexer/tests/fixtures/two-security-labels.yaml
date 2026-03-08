@@ -10,5 +10,5 @@ syndication:
   feed: my-feed
   entryTitle: My Entry
   securityLabels:
-    - http://snomed.info/sct/32506021000036107
-    - http://snomed.info/sct/900000000000207008
+    - restricted.read
+    - community.read

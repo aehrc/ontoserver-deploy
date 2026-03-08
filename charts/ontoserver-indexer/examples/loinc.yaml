@@ -1,35 +1,39 @@
-# examples/snomed-au.yaml
-# Index SNOMED CT AU and publish to a syndication feed.
+# examples/loinc.yaml
+# Index LOINC and publish to a syndication feed.
 #
 # Usage:
-#   helm install snomed-au-index ./charts/ontoserver-indexer \
-#     -f charts/ontoserver-indexer/examples/snomed-au.yaml \
+#   helm install loinc-index ./charts/ontoserver-indexer \
+#     -f charts/ontoserver-indexer/examples/loinc.yaml \
 #     --set auth.oauth2.secretRef=your-secret
+#
+# Note: LOINC requires registration at https://loinc.org/downloads/
+# to obtain the distribution ZIP.
 
 image:
   repository: quay.io/aehrc/ontoserver
   tag: ctsa-6
 
 job:
-  activeDeadlineSeconds: 2700   # 45 minutes — full AU release can take time
+  activeDeadlineSeconds: 3600   # 1 hour
 
 resources:
-  memoryGb: 20
+  memoryGb: 8
 
 codeSystem:
-  url: http://snomed.info/sct/32506021000036107
-  version: http://snomed.info/sct/32506021000036107/version/20231130
+  url: http://loinc.org
+  version: "2.76"   # version number only (not a URL like SNOMED CT)
 
 rf2:
-  kind: FULL
+  # rf2.kind is not used for LOINC and will be ignored
   files:
-    - https://your-storage/SnomedCT_Australian_1000036_20231130.zip
+    - https://your-storage/Loinc_2.76.zip   # LOINC distribution ZIP
 
 syndication:
   endpoint: https://your-syndication-server
   tokenEndpoint: https://your-auth-server/oauth/token
-  feed: ncts-syndication
-  entryTitle: "SNOMED CT AU November 2023 release"
+  feed: loinc-syndication
+  entryTitle: "LOINC 2.76"
+  entryFileName: loinc-2.76.zip
   # securityLabels:
   #   - restricted.read   # restrict read access to users with grouping/restricted.read scope
   #   - restricted.write  # restrict write access to users with grouping/restricted.write scope
@@ -39,16 +43,12 @@ syndication:
 
 # Provide credentials via an existing Secret with keys: clientId, clientSecret
 # Create it with:
-#   kubectl create secret generic snomed-indexer-oauth \
+#   kubectl create secret generic loinc-indexer-oauth \
 #     --from-literal=clientId=YOUR_CLIENT_ID \
 #     --from-literal=clientSecret=YOUR_CLIENT_SECRET
 auth:
   oauth2:
-    secretRef: snomed-indexer-oauth
-
-languageRefsets:
-  forModule:
-    "32506021000036107": "32570271000036106,900000000000509007"
+    secretRef: loinc-indexer-oauth
 
 # sentry:
 #   dsn: ""

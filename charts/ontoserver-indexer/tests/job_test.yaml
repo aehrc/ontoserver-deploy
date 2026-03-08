@@ -2,16 +2,20 @@ suite: job template tests
 templates:
   - templates/job.yaml
 
+# Shared SNOMED values used across most tests
+x-snomed: &snomed
+  codeSystem.url: http://snomed.info/sct/32506021000036107
+  codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+  rf2.files[0]: https://example.com/snomed.zip
+  syndication.endpoint: https://synd.example.com
+  syndication.tokenEndpoint: https://auth.example.com/token
+  syndication.feed: my-feed
+  syndication.entryTitle: My Entry
+
 tests:
   - it: renders a Job
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - isKind:
           of: Job
@@ -20,13 +24,7 @@ tests:
 
   - it: uses Release.Name as job name by default
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - equal:
           path: metadata.name
@@ -34,14 +32,8 @@ tests:
 
   - it: uses job.name when set
     set:
+      <<: *snomed
       job.name: my-custom-job
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
     asserts:
       - equal:
           path: metadata.name
@@ -49,14 +41,8 @@ tests:
 
   - it: sets activeDeadlineSeconds
     set:
+      <<: *snomed
       job.activeDeadlineSeconds: 9000
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
     asserts:
       - equal:
           path: spec.activeDeadlineSeconds
@@ -64,13 +50,7 @@ tests:
 
   - it: sets ttlSecondsAfterFinished
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - equal:
           path: spec.ttlSecondsAfterFinished
@@ -78,13 +58,7 @@ tests:
 
   - it: sets backoffLimit to 0
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - equal:
           path: spec.backoffLimit
@@ -92,13 +66,7 @@ tests:
 
   - it: sets restartPolicy to Never
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - equal:
           path: spec.template.spec.restartPolicy
@@ -106,15 +74,9 @@ tests:
 
   - it: sets container image from values
     set:
+      <<: *snomed
       image.repository: quay.io/aehrc/ontoserver
       image.tag: ctsa-6
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
@@ -122,14 +84,8 @@ tests:
 
   - it: sets memory request and limit from resources.memoryGb
     set:
+      <<: *snomed
       resources.memoryGb: 24
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
     asserts:
       - equal:
           path: spec.template.spec.containers[0].resources.requests.memory
@@ -140,14 +96,8 @@ tests:
 
   - it: sets imagePullSecrets when pullSecret provided
     set:
+      <<: *snomed
       image.pullSecret: my-pull-secret
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
     asserts:
       - equal:
           path: spec.template.spec.imagePullSecrets[0].name
@@ -155,27 +105,15 @@ tests:
 
   - it: omits imagePullSecrets when pullSecret empty
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - isNull:
           path: spec.template.spec.imagePullSecrets
 
   - it: sets JAVA_OPTS env var from resources.memoryGb
     set:
+      <<: *snomed
       resources.memoryGb: 16
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
@@ -185,13 +123,7 @@ tests:
 
   - it: sets command to /run.sh and first arg to indexCodeSystemDebug
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - equal:
           path: spec.template.spec.containers[0].command[0]
@@ -202,13 +134,7 @@ tests:
 
   - it: passes codeSystem url and version as args
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
@@ -234,16 +160,10 @@ tests:
           path: spec.template.spec.containers[0].args
           content: "https://example.com/file2.zip"
 
-  - it: passes rf2.kind lowercased as -k arg
+  - it: passes rf2.kind lowercased as -k arg for SNOMED
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
+      <<: *snomed
       rf2.kind: SNAPSHOT
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
@@ -252,14 +172,23 @@ tests:
           path: spec.template.spec.containers[0].args
           content: "snapshot"
 
-  - it: passes syndication endpoint, feed and entryTitle
+  - it: omits -k arg for LOINC
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
+      codeSystem.url: http://loinc.org
+      codeSystem.version: "2.76"
+      rf2.files[0]: https://example.com/Loinc_2.76.zip
       syndication.endpoint: https://synd.example.com
       syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
+      syndication.feed: loinc
+      syndication.entryTitle: LOINC 2.76
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "-k"
+
+  - it: passes syndication endpoint, feed and entryTitle
+    set:
+      <<: *snomed
       syndication.entryTitle: "SNOMED CT AU November 2023"
     asserts:
       - contains:
@@ -283,13 +212,7 @@ tests:
 
   - it: includes -file arg when entryFileName set
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
       syndication.entryFileName: snomed-au-20231130.zip
     asserts:
       - contains:
@@ -301,13 +224,7 @@ tests:
 
   - it: omits -file arg when entryFileName empty
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].args
@@ -322,20 +239,14 @@ tests:
           content: "-perms"
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "http://snomed.info/sct/32506021000036107"
+          content: "restricted.read"
       - contains:
           path: spec.template.spec.containers[0].args
-          content: "http://snomed.info/sct/900000000000207008"
+          content: "community.read"
 
   - it: adds OAuth2 env vars when oauth2 secretRef provided
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
       auth.oauth2.secretRef: my-oauth-secret
     asserts:
       - contains:
@@ -372,13 +283,7 @@ tests:
 
   - it: adds OAuth2 env vars using chart-created secret when clientId provided inline
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
       auth.oauth2.clientId: my-client
       auth.oauth2.clientSecret: my-secret
     asserts:
@@ -393,13 +298,7 @@ tests:
 
   - it: omits OAuth2 env vars when no auth configured
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].env
@@ -408,13 +307,7 @@ tests:
 
   - it: adds Basic auth env vars when basic secretRef provided
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
       auth.basic.secretRef: my-basic-secret
     asserts:
       - contains:
@@ -441,13 +334,7 @@ tests:
 
   - it: adds Basic auth env vars using chart-created secret when username provided inline
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
       auth.basic.username: my-user
       auth.basic.password: my-pass
     asserts:
@@ -462,13 +349,7 @@ tests:
 
   - it: omits Basic auth env vars when no auth configured
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].env
@@ -477,13 +358,7 @@ tests:
 
   - it: adds language.refset env vars for each forModule entry
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
       languageRefsets.forModule.32506021000036107: "32570271000036106,900000000000509007"
     asserts:
       - contains:
@@ -494,13 +369,7 @@ tests:
 
   - it: omits language.refset env vars when forModule empty
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].env
@@ -509,13 +378,7 @@ tests:
 
   - it: adds resolveSkew env var when set
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
       resolveSkew: "20231130"
     asserts:
       - contains:
@@ -526,13 +389,7 @@ tests:
 
   - it: omits resolveSkew env var when empty
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].env
@@ -541,13 +398,7 @@ tests:
 
   - it: adds sentry env vars when sentry.dsn set
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
       sentry.dsn: https://key@sentry.example.com/1
       sentry.environment: Production
       sentry.serverName: my-indexer
@@ -570,13 +421,7 @@ tests:
 
   - it: omits sentry env vars when sentry.dsn empty
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].env

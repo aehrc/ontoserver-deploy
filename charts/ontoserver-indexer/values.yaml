@@ -17,15 +17,15 @@ codeSystem:
   version: ""               # e.g. http://snomed.info/sct/32506021000036107/version/20231130
 
 rf2:
-  kind: FULL                # FULL | SNAPSHOT | DELTA
-  files: ~                  # list of RF2 download URLs
+  kind: FULL                # FULL | SNAPSHOT — ignored for LOINC (http://loinc.org)
+  files: ~                  # list of source file URLs (RF2 ZIPs for SNOMED CT; LOINC distribution ZIP for LOINC)
 
 syndication:
   endpoint: ""              # syndication server base URL
   tokenEndpoint: ""         # OAuth token URL
   feed: ""                  # feed identifier
   entryTitle: ""            # entry title in the feed
-  entryFileName: ""         # optional — custom output filename
+  entryFileName: ""         # optional — custom output filename (defaults to index-[version].zip)
   securityLabels: []        # optional — list of permission labels
 
 auth:

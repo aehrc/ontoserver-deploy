@@ -2,41 +2,64 @@ suite: validate-values tests
 templates:
   - templates/validate-values.yaml
 
+# Shared SNOMED values used across most tests
+x-snomed: &snomed
+  codeSystem.url: http://snomed.info/sct/32506021000036107
+  codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+  rf2.files[0]: https://example.com/snomed.zip
+  rf2.kind: FULL
+  syndication.endpoint: https://synd.example.com
+  syndication.tokenEndpoint: https://auth.example.com/token
+  syndication.feed: my-feed
+  syndication.entryTitle: My Entry
+
 tests:
-  - it: passes with all required values set
+  - it: passes with all required SNOMED values set
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      rf2.kind: FULL
+      <<: *snomed
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: passes with all required LOINC values set
+    set:
+      codeSystem.url: http://loinc.org
+      codeSystem.version: "2.76"
+      rf2.files[0]: https://example.com/Loinc_2.76.zip
       syndication.endpoint: https://synd.example.com
       syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      syndication.feed: loinc
+      syndication.entryTitle: LOINC 2.76
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: rf2.kind validation is skipped for LOINC
+    set:
+      codeSystem.url: http://loinc.org
+      codeSystem.version: "2.76"
+      rf2.files[0]: https://example.com/Loinc_2.76.zip
+      rf2.kind: INVALID
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: loinc
+      syndication.entryTitle: LOINC 2.76
     asserts:
       - hasDocuments:
           count: 0
 
   - it: fails when codeSystem.url is empty
     set:
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
+      codeSystem.url: ""
     asserts:
       - failedTemplate:
           errorMessage: "codeSystem.url is required"
 
   - it: fails when codeSystem.version is empty
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
+      codeSystem.version: ""
     asserts:
       - failedTemplate:
           errorMessage: "codeSystem.version is required"
@@ -45,6 +68,7 @@ tests:
     set:
       codeSystem.url: http://snomed.info/sct/32506021000036107
       codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.kind: FULL
       syndication.endpoint: https://synd.example.com
       syndication.tokenEndpoint: https://auth.example.com/token
       syndication.feed: my-feed
@@ -53,40 +77,34 @@ tests:
       - failedTemplate:
           errorMessage: "rf2.files must contain at least one URL"
 
-  - it: fails when rf2.kind is invalid
+  - it: fails when rf2.kind is invalid for SNOMED
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
+      <<: *snomed
       rf2.kind: INVALID
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
     asserts:
       - failedTemplate:
-          errorMessage: "rf2.kind must be one of: FULL, SNAPSHOT, DELTA"
+          errorMessage: "rf2.kind must be one of: FULL, SNAPSHOT"
+
+  - it: fails when rf2.kind is DELTA for SNOMED
+    set:
+      <<: *snomed
+      rf2.kind: DELTA
+    asserts:
+      - failedTemplate:
+          errorMessage: "rf2.kind must be one of: FULL, SNAPSHOT"
 
   - it: fails when syndication.endpoint is empty
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
+      syndication.endpoint: ""
     asserts:
       - failedTemplate:
           errorMessage: "syndication.endpoint is required"
 
   - it: fails when oauth2 configured but syndication.tokenEndpoint is empty
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
+      syndication.tokenEndpoint: ""
       auth.oauth2.secretRef: my-secret
     asserts:
       - failedTemplate:
@@ -94,12 +112,8 @@ tests:
 
   - it: passes when syndication.tokenEndpoint empty with basic auth
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
+      syndication.tokenEndpoint: ""
       auth.basic.secretRef: my-secret
     asserts:
       - hasDocuments:
@@ -107,37 +121,23 @@ tests:
 
   - it: fails when syndication.feed is empty
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.entryTitle: My Entry
+      <<: *snomed
+      syndication.feed: ""
     asserts:
       - failedTemplate:
           errorMessage: "syndication.feed is required"
 
   - it: fails when syndication.entryTitle is empty
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
+      <<: *snomed
+      syndication.entryTitle: ""
     asserts:
       - failedTemplate:
           errorMessage: "syndication.entryTitle is required"
 
   - it: fails when both oauth2 and basic auth configured
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
       auth.oauth2.clientId: my-client
       auth.basic.username: my-user
     asserts:
@@ -146,13 +146,7 @@ tests:
 
   - it: fails when oauth2 secretRef and clientId both set
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
       auth.oauth2.secretRef: my-secret
       auth.oauth2.clientId: my-client
     asserts:
@@ -161,13 +155,7 @@ tests:
 
   - it: fails when basic secretRef and username both set
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
       auth.basic.secretRef: my-secret
       auth.basic.username: my-user
     asserts:
@@ -176,26 +164,14 @@ tests:
 
   - it: passes with no auth configured
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
     asserts:
       - hasDocuments:
           count: 0
 
   - it: fails when oauth2 clientId set but clientSecret missing
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
       auth.oauth2.clientId: my-client
     asserts:
       - failedTemplate:
@@ -203,13 +179,7 @@ tests:
 
   - it: fails when basic username set but password missing
     set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
+      <<: *snomed
       auth.basic.username: my-user
     asserts:
       - failedTemplate:
