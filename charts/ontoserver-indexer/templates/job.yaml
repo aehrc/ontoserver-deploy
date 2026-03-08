@@ -24,10 +24,8 @@ spec:
             - -v
             - {{ .Values.codeSystem.version | quote }}
             {{- range .Values.rf2.files }}
-            {{- if . }}
             - -f
             - {{ . | quote }}
-            {{- end }}
             {{- end }}
             - -k
             - {{ .Values.rf2.kind | lower | quote }}
