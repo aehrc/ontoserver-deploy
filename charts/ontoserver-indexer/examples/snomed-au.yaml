@@ -30,8 +30,12 @@ syndication:
   tokenEndpoint: https://your-auth-server/oauth/token
   feed: ncts-syndication
   entryTitle: "SNOMED CT AU November 2023 release"
-  securityLabels:
-    - http://snomed.info/sct/32506021000036107
+  # securityLabels:
+  #   - restricted.read   # restrict read access to users with grouping/restricted.read scope
+  #   - restricted.write  # restrict write access to users with grouping/restricted.write scope
+  # Labels use codes from http://ontoserver.csiro.au/CodeSystem/ontoserver-permissions
+  # Requires ontoserver.security.enabled=fine
+  # See: https://ontoserver.csiro.au/docs/6.24.1/security-model.html
 
 # Provide credentials via an existing Secret with keys: clientId, clientSecret
 # Create it with:
