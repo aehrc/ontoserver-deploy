@@ -48,13 +48,13 @@ See each chart's README for full configuration reference:
 
 ### ArgoCD Examples
 
-Ready-to-use ArgoCD Application manifests are in [`examples/argocd/`](examples/argocd/):
+Example ArgoCD manifests are in [`examples/argocd/`](examples/argocd/):
 
 | File | How to use | Description |
 |------|------------|-------------|
-| [`dev-readonly.yaml`](examples/argocd/dev-readonly.yaml) | App-of-Apps inner app | Read-only dev server — sidecar PostgreSQL, ephemeral storage, Varnish. Expects a `quay-pull-secret` in the destination namespace (see below). No networking config — add your own gateway/ingress. |
-| [`app-of-apps.yaml`](examples/argocd/app-of-apps.yaml) | App-of-Apps outer wrapper | Deploys `dev-readonly.yaml` from Git. Add a second source pointing to a path in your private repo that creates the `quay-pull-secret`. |
-| [`dev-readonly-envoy-appset.yaml`](examples/argocd/dev-readonly-envoy-appset.yaml) | ApplicationSet | Two-instance setup: read/write StatefulSet (content development) + scaled read-only StatefulSet (production serving). Envoy Gateway, cert-manager TLS, external PostgreSQL, per-pod attached disks, Varnish with `$closure` routing. Hostname, namespace, and database URL are parameterised per instance. |
+| [`dev-readonly.yaml`](examples/argocd/dev-readonly.yaml) | App-of-Apps inner app | Ready to use. Read-only dev server — sidecar PostgreSQL, ephemeral storage, Varnish. Expects a `quay-pull-secret` in the destination namespace (see below). No networking config — add your own gateway/ingress. |
+| [`app-of-apps.yaml`](examples/argocd/app-of-apps.yaml) | App-of-Apps outer wrapper | Requires customisation. Deploys `dev-readonly.yaml` from Git. Add a second source pointing to a path in your private repo that creates the `quay-pull-secret`. |
+| [`dev-readonly-envoy-appset.yaml`](examples/argocd/dev-readonly-envoy-appset.yaml) | ApplicationSet | Requires customisation. Two-instance setup: read/write StatefulSet (content development) + scaled read-only StatefulSet (production serving). Envoy Gateway, cert-manager TLS, external PostgreSQL, per-pod attached disks, Varnish with `$closure` routing. Hostname, namespace, and database URL are parameterised per instance. |
 
 #### Image pull credentials for ArgoCD
 
