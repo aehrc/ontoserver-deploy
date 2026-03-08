@@ -18,6 +18,7 @@ tests:
   - it: renders a ServiceMonitor when varnish and metrics enabled
     set:
       varnish.enabled: true
+      varnish.metrics.enabled: true
     asserts:
       - isKind:
           of: ServiceMonitor
@@ -27,6 +28,7 @@ tests:
   - it: names the ServiceMonitor correctly
     set:
       varnish.enabled: true
+      varnish.metrics.enabled: true
     asserts:
       - equal:
           path: metadata.name
@@ -35,6 +37,7 @@ tests:
   - it: uses metrics interval from values
     set:
       varnish.enabled: true
+      varnish.metrics.enabled: true
       varnish.metrics.interval: 30s
     asserts:
       - equal:
@@ -44,6 +47,7 @@ tests:
   - it: uses metrics scrapeTimeout from values
     set:
       varnish.enabled: true
+      varnish.metrics.enabled: true
       varnish.metrics.scrapeTimeout: 25s
     asserts:
       - equal:
@@ -53,6 +57,7 @@ tests:
   - it: sets metrics endpoint port
     set:
       varnish.enabled: true
+      varnish.metrics.enabled: true
     asserts:
       - equal:
           path: spec.endpoints[0].port

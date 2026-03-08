@@ -18,6 +18,7 @@ tests:
   - it: renders prometheus-service when varnish and metrics enabled
     set:
       varnish.enabled: true
+      varnish.metrics.enabled: true
     asserts:
       - isKind:
           of: Service
@@ -27,6 +28,7 @@ tests:
   - it: names prometheus service correctly
     set:
       varnish.enabled: true
+      varnish.metrics.enabled: true
     asserts:
       - equal:
           path: metadata.name
@@ -35,6 +37,7 @@ tests:
   - it: exposes port 9131
     set:
       varnish.enabled: true
+      varnish.metrics.enabled: true
     asserts:
       - equal:
           path: spec.ports[0].port
@@ -43,6 +46,7 @@ tests:
   - it: sets component label for metrics
     set:
       varnish.enabled: true
+      varnish.metrics.enabled: true
     asserts:
       - equal:
           path: metadata.labels["app.kubernetes.io/component"]

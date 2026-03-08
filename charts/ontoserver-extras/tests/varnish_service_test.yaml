@@ -20,6 +20,7 @@ tests:
   - it: renders prometheus-service when varnish and metrics enabled
     set:
       varnish.enabled: true
+      varnish.metrics.enabled: true
     template: templates/varnish-prometheus-service.yaml
     asserts:
       - hasDocuments:
@@ -28,6 +29,7 @@ tests:
   - it: renders servicemonitor when varnish and metrics enabled
     set:
       varnish.enabled: true
+      varnish.metrics.enabled: true
     template: templates/varnish-servicemonitor.yaml
     asserts:
       - hasDocuments:

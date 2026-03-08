@@ -42,9 +42,10 @@ tests:
           path: spec.template.spec.containers[0].command
           content: "malloc,1g"
 
-  - it: includes metrics exporter container by default when varnish enabled
+  - it: includes metrics exporter container when metrics enabled
     set:
       varnish.enabled: true
+      varnish.metrics.enabled: true
     asserts:
       - equal:
           path: spec.template.spec.containers[1].name
@@ -53,6 +54,7 @@ tests:
   - it: uses exporter image from values
     set:
       varnish.enabled: true
+      varnish.metrics.enabled: true
       varnish.exporterImage: ghcr.io/aehrc/varnish-exporter:test
     asserts:
       - equal:
@@ -75,10 +77,10 @@ tests:
       varnish.opentelemetry.collectorEndpoint: "http://collector/api/v2/spans"
     asserts:
       - equal:
-          path: spec.template.spec.containers[2].name
+          path: spec.template.spec.containers[1].name
           value: varnish-trace-converter
       - equal:
-          path: spec.template.spec.containers[3].name
+          path: spec.template.spec.containers[2].name
           value: trace-forwarder
 
   - it: adds init container when otel enabled
@@ -97,7 +99,7 @@ tests:
     asserts:
       - lengthEqual:
           path: spec.template.spec.containers
-          count: 2
+          count: 1
 
   - it: sets trace-pipe volume when otel enabled
     set:
@@ -171,8 +173,8 @@ tests:
       varnish.opentelemetry.collectorEndpoint: "http://zipkin:9411/api/v2/spans"
     asserts:
       - equal:
-          path: spec.template.spec.containers[3].env[0].name
+          path: spec.template.spec.containers[2].env[0].name
           value: COLLECTOR_URL
       - equal:
-          path: spec.template.spec.containers[3].env[0].value
+          path: spec.template.spec.containers[2].env[0].value
           value: "http://zipkin:9411/api/v2/spans"
