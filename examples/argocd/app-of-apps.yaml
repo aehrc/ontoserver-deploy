@@ -1,0 +1,44 @@
+# App-of-Apps wrapper for ontoserver-dev
+#
+# Apply this once to bootstrap ArgoCD management:
+#
+#   kubectl apply -f app-of-apps.yaml -n argocd
+#
+# Structure
+# ─────────
+# This Application deploys the ontoserver-dev Application resource
+# (dev-readonly.yaml) into the argocd namespace.  ArgoCD reconciles
+# that inner Application, which deploys ontoserver and Varnish into
+# ontoserver-dev.
+#
+# The second source points to a path in YOUR private repository that
+# creates the quay-pull-secret (type kubernetes.io/dockerconfigjson)
+# in the ontoserver-dev namespace.  Use whatever secret management
+# tooling your cluster provides — ExternalSecret, SealedSecret, etc.
+# Replace the repoURL and path below with your actual values.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ontoserver-apps
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  sources:
+    - repoURL: https://github.com/aehrc/ontoserver-deploy
+      targetRevision: HEAD
+      path: examples/argocd
+      directory:
+        include: 'dev-readonly.yaml'
+    - repoURL: https://github.com/yourorg/your-cluster-config  # ← your private repo
+      targetRevision: HEAD
+      path: credentials/ontoserver-dev                         # ← path to quay-pull-secret
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

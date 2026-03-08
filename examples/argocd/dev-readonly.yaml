@@ -2,25 +2,30 @@
 #
 # Topology: Deployment (single) · isReadOnly · sidecar PostgreSQL · ephemeral storage · Varnish cache
 #
-# Suitable for a development or evaluation instance on any Kubernetes cluster
-# (AKS, EKS, GKE, on-prem). Not suitable for production — storage is ephemeral
-# so the Lucene index is rebuilt from syndication feeds on every pod restart.
+# Not suitable for production — storage is ephemeral so the Lucene index is
+# rebuilt from syndication feeds on every pod restart.
 #
-# Prerequisites on the cluster:
-#   - Envoy Gateway installed and a GatewayClass named "envoy-gateway-class"
-#     https://gateway.envoyproxy.io/docs/install/install-helm/
-#   - (Optional) cert-manager for automatic TLS certificates
-#     https://cert-manager.io/docs/installation/
+# Networking is intentionally omitted — hostnames and ingress/gateway config
+# are site-specific. Add your gateway or ingress block under ontoserver before
+# applying. See charts/ontoserver/README.md for Gateway API and Ingress options.
 #
-# Customise before applying:
-#   1. Replace <YOUR-HOSTNAME> with your actual DNS name (e.g. ontoserver-dev.example.com)
-#   2. Set quay.io credentials — either inline (not recommended for production)
-#      or via a pre-created pull secret and ontoserver.deployment.imagePullSecrets
-#   3. Uncomment the syndication subscription block and point it at your feed
-#   4. Uncomment the TLS / cert-manager block if you want HTTPS
+# Image pull credentials
+#   This Application expects a Kubernetes secret named quay-pull-secret of type
+#   kubernetes.io/dockerconfigjson to exist in the ontoserver-dev namespace.
+#   Create it via your own mechanism (ExternalSecret, SealedSecret, Vault, …)
+#   and supply it as a second source in your App-of-Apps — see app-of-apps.yaml.
 #
-# Apply to your ArgoCD instance:
-#   kubectl apply -f dev-readonly.yaml -n argocd
+# Can be referenced directly from an ArgoCD App-of-Apps:
+#
+#   apiVersion: argoproj.io/v1alpha1
+#   kind: Application
+#   spec:
+#     source:
+#       repoURL: https://github.com/aehrc/ontoserver-deploy
+#       path: examples/argocd
+#       targetRevision: HEAD
+#       directory:
+#         include: 'dev-readonly.yaml'
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -35,7 +40,6 @@ spec:
     server: https://kubernetes.default.svc
     namespace: ontoserver-dev
   sources:
-    # ── ontoserver ─────────────────────────────────────────────────────────────
     - repoURL: https://github.com/aehrc/ontoserver-deploy
       targetRevision: HEAD
       path: charts/ontoserver
@@ -47,16 +51,10 @@ spec:
               type: single
               isReadOnly: true
               replicas: 1
+              imagePullSecrets:
+                - name: quay-pull-secret   # must exist in ontoserver-dev — see app-of-apps.yaml
               db:
-                enabled: true       # sidecar PostgreSQL — no external database needed
-
-            imageCredentials:
-              username: your-quay-username
-              password: your-quay-password
-
-            serverName: <YOUR-HOSTNAME>
-            hostNames:
-              - <YOUR-HOSTNAME>
+                enabled: true       # sidecar PostgreSQL
 
             timeZone: Australia/Brisbane
             language: en_AU
@@ -79,32 +77,8 @@ spec:
                   cpu: "500m"
                   memory: "512Mi"
 
-            # -l: hold the pod unready while the startup preload is running.
-            # Traffic is allowed as soon as the preload finishes.
             healthCheckOption: -l
 
-            gateway:
-              enabled: true
-              className: envoy-gateway-class
-              requestTimeout: 120s
-              # Route all requests through the Varnish service deployed below.
-              # The service name is always <ArgoCD-app-name>-varnish-service.
-              backendServiceNameOverride: ontoserver-dev-varnish-service
-
-            # Uncomment to enable HTTPS via cert-manager:
-            # tls:
-            #   enabled: true
-            #   certRef: ontoserver-dev-tls
-            # certmanager:
-            #   enabled: true
-            #   email: your-email@example.com
-
-            # Configure what terminology to load on startup.
-            # Add subscriptions to your syndication server here:
-            # config:
-            #   ontoserver.syndication.plus.subscriptions.0.uri: https://your-syndication-server/fhir/SubscriptionDefinition/...
-
-    # ── ontoserver-extras (Varnish) ────────────────────────────────────────────
     - repoURL: https://github.com/aehrc/ontoserver-deploy
       targetRevision: HEAD
       path: charts/ontoserver-extras
@@ -112,8 +86,6 @@ spec:
         valuesObject:
           varnish:
             enabled: true
-            # 30 s grace period: serve stale content if ontoserver is temporarily
-            # unavailable (e.g. during a pod restart).
             graceSeconds: 30
             cache:
               time200: 10m

@@ -463,9 +463,10 @@ See [`examples/k3d-traefik-values.yaml`](examples/k3d-traefik-values.yaml) for t
 
 Ready-to-use ArgoCD Application manifests are in [`examples/argocd/`](../../examples/argocd/) at the root of this repository. Reference them directly from your ArgoCD instance or use them as a starting point.
 
-| File | Description |
-|------|-------------|
-| [`dev-readonly.yaml`](../../examples/argocd/dev-readonly.yaml) | Read-only dev/evaluation server — sidecar PostgreSQL, ephemeral storage, Varnish, Envoy Gateway |
+| File | How to use | Description |
+|------|------------|-------------|
+| [`dev-readonly.yaml`](../../examples/argocd/dev-readonly.yaml) | App-of-Apps | Read-only dev server — sidecar PostgreSQL, ephemeral storage, Varnish. No networking — reference directly from an App-of-Apps and add your own gateway/ingress. |
+| [`dev-readonly-envoy-appset.yaml`](../../examples/argocd/dev-readonly-envoy-appset.yaml) | ApplicationSet | Same topology with Envoy Gateway. Hostname and namespace are parameterised — supports multiple instances from a single manifest. |
 
 The ArgoCD examples use multi-source Applications with both the `ontoserver` and `ontoserver-extras` charts as sources, wired together so that enabling Varnish automatically routes the Ingress through it. See the [extras chart README](../../charts/ontoserver-extras/README.md#deploying-alongside-the-ontoserver-chart) for the wiring details.
 

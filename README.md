@@ -44,9 +44,25 @@ See each chart's README for full configuration reference:
 
 Ready-to-use ArgoCD Application manifests are in [`examples/argocd/`](examples/argocd/):
 
-| File | Description |
-|------|-------------|
-| [`dev-readonly.yaml`](examples/argocd/dev-readonly.yaml) | Read-only dev/evaluation server — sidecar PostgreSQL, ephemeral storage, Varnish, Envoy Gateway |
+| File | How to use | Description |
+|------|------------|-------------|
+| [`dev-readonly.yaml`](examples/argocd/dev-readonly.yaml) | App-of-Apps inner app | Read-only dev server — sidecar PostgreSQL, ephemeral storage, Varnish. Expects a `quay-pull-secret` in the destination namespace (see below). No networking config — add your own gateway/ingress. |
+| [`app-of-apps.yaml`](examples/argocd/app-of-apps.yaml) | App-of-Apps outer wrapper | Deploys `dev-readonly.yaml` from Git. Add a second source pointing to a path in your private repo that creates the `quay-pull-secret`. |
+| [`dev-readonly-envoy-appset.yaml`](examples/argocd/dev-readonly-envoy-appset.yaml) | ApplicationSet | Two-instance setup: read/write StatefulSet (content development) + scaled read-only StatefulSet (production serving). Envoy Gateway, cert-manager TLS, external PostgreSQL, per-pod attached disks, Varnish with `$closure` routing. Hostname, namespace, and database URL are parameterised per instance. |
+
+#### Image pull credentials for ArgoCD
+
+The `dev-readonly.yaml` and `dev-readonly-envoy-appset.yaml` examples use
+`deployment.imagePullSecrets` to reference a pre-existing `kubernetes.io/dockerconfigjson`
+Secret named `quay-pull-secret`.  Credentials must **not** be stored inline in the
+Application manifest.  Create the secret in the destination namespace using whichever
+mechanism your cluster provides:
+
+- **ExternalSecret** — use [External Secrets Operator](https://external-secrets.io/) to sync from your secrets manager (see `charts/ontoserver/README.md` for an example ExternalSecret)
+- **SealedSecret** — encrypt with [Sealed Secrets](https://sealed-secrets.netlify.app/) and commit to your private cluster-config repo
+- **Manual** — `kubectl create secret docker-registry quay-pull-secret --docker-server=quay.io --docker-username=… --docker-password=… -n <namespace>`
+
+In an App-of-Apps, supply the credentials as a second `source` in your outer Application pointing to a path in your own (private) repository, as shown in [`app-of-apps.yaml`](examples/argocd/app-of-apps.yaml).
 
 ### Prerequisites
 

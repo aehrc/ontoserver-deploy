@@ -1,0 +1,164 @@
+# Ontoserver — ApplicationSet for content development + production read-only
+#
+# Creates two Applications from a single manifest:
+#
+#   ontoserver-rw   — Read/write StatefulSet for content development.
+#                     Single instance, external PostgreSQL, attached disk,
+#                     not publicly exposed.
+#
+#   ontoserver-prod — Read-only StatefulSet cluster for production serving.
+#                     Scaled (2+ replicas), external PostgreSQL, per-pod
+#                     attached disks, Varnish cache, $closure routing to pod-0.
+#
+# Topology reference: charts/ontoserver/README.md — Production recommendations
+#
+# Prerequisites on the cluster:
+#   - Envoy Gateway:  https://gateway.envoyproxy.io/docs/install/install-helm/
+#   - cert-manager:   https://cert-manager.io/docs/installation/  (if TLS enabled)
+#
+# Before applying:
+#   1. Set hostname values in generators.list.elements
+#   2. Set database URLs (or replace config block with External Secrets)
+#   3. Set quay.io credentials (or use imagePullSecrets from a pre-created secret)
+#   4. Adjust storage sizes and resource requests to match your node pool
+#
+# Apply to your ArgoCD instance:
+#   kubectl apply -f dev-readonly-envoy-appset.yaml -n argocd
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: ontoserver
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          # ── Read/write — content development ─────────────────────────────────
+          - appName: ontoserver-rw
+            namespace: ontoserver-rw
+            hostname: ontoserver-rw.example.com
+            deploymentType: single
+            isReadOnly: "false"
+            replicas: "1"
+            healthCheckOption: -f
+            clusterName: ""
+            closureBackend: ""
+            dbUrl: jdbc:postgresql://db.example.com:5432/ontoserver_rw
+            dbUsername: ontoserver
+            storageSize: 512Gi
+
+          # ── Read-only — production serving ───────────────────────────────────
+          - appName: ontoserver-prod
+            namespace: ontoserver-prod
+            hostname: ontoserver.example.com
+            deploymentType: scaled
+            isReadOnly: "true"
+            replicas: "2"
+            healthCheckOption: -s
+            clusterName: ontoserver-prod
+            # $closure routes to pod-0 via headless service DNS
+            closureBackend: ontoserver-prod-statefulset-0.ontoserver-prod-ontoserver-headless
+            dbUrl: jdbc:postgresql://db.example.com:5432/ontoserver_prod
+            dbUsername: ontoserver
+            storageSize: 1Ti
+
+  template:
+    metadata:
+      name: "{{appName}}"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{namespace}}"
+      sources:
+        # ── ontoserver ─────────────────────────────────────────────────────────
+        - repoURL: https://github.com/aehrc/ontoserver-deploy
+          targetRevision: HEAD
+          path: charts/ontoserver
+          helm:
+            valuesObject:
+              ontoserver:
+                deployment:
+                  kind: StatefulSet
+                  type: "{{deploymentType}}"
+                  isReadOnly: "{{isReadOnly}}"
+                  replicas: "{{replicas}}"
+                  clusterName: "{{clusterName}}"
+                  db:
+                    enabled: false    # external PostgreSQL for both environments
+                  persistence:
+                    files:
+                      accessMode: ReadWriteOnce
+                      storageSize: "{{storageSize}}"
+
+                imageCredentials:
+                  username: your-quay-username
+                  password: your-quay-password
+
+                serverName: "{{hostname}}"
+                hostNames:
+                  - "{{hostname}}"
+
+                timeZone: Australia/Brisbane
+                language: en_AU
+
+                resources:
+                  ontoserver:
+                    requests:
+                      cpu: "1000m"
+                      memory: "4Gi"
+                    limits:
+                      cpu: "4000m"
+                      memory: "12Gi"
+                    initialHeapSize: "1000m"
+                    maxHeapSize: "10000m"
+
+                healthCheckOption: "{{healthCheckOption}}"
+
+                gateway:
+                  enabled: true
+                  className: envoy-gateway-class
+                  requestTimeout: 300s
+                  backendServiceNameOverride: "{{appName}}-varnish-service"
+
+                tls:
+                  enabled: true
+                  certRef: "{{appName}}-tls"
+                certmanager:
+                  enabled: true
+                  email: your-email@example.com
+
+                config:
+                  spring.datasource.url: "{{dbUrl}}"
+                  spring.datasource.username: "{{dbUsername}}"
+                  # spring.datasource.password set via External Secrets or --set
+
+                # Configure syndication subscriptions here:
+                # config:
+                #   ontoserver.syndication.plus.subscriptions.0.uri: https://your-syndication-server/fhir/SubscriptionDefinition/...
+
+        # ── ontoserver-extras (Varnish) ────────────────────────────────────────
+        - repoURL: https://github.com/aehrc/ontoserver-deploy
+          targetRevision: HEAD
+          path: charts/ontoserver-extras
+          helm:
+            valuesObject:
+              varnish:
+                enabled: true
+                graceSeconds: 30
+                # For the scaled prod instance, route $closure to pod-0.
+                # Empty string disables dedicated $closure routing (used for rw).
+                closureBackend: "{{closureBackend}}"
+                cache:
+                  time200: 10m
+                  time404: 1m
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
