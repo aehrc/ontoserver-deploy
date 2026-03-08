@@ -4,6 +4,7 @@ This chart provides flexible deployment options for [Ontoserver](https://ontoser
 
 > **Prerequisites:** Depending on which features you enable, the following cluster-level components may be required — install them separately if not already present:
 >
+> - **Kubernetes 1.29+** — required when `ontoserver.deployment.db.enabled: true` (the default). The Postgres sidecar uses the [native sidecar init container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) pattern (`restartPolicy: Always`), which is stable from K8s 1.29.
 > - **[Envoy Gateway](https://gateway.envoyproxy.io/)** — required when `ontoserver.gateway.enabled: true` (Gateway API networking, and any Envoy traffic/security policies)
 > - **[F5 Nginx Ingress Controller](https://docs.nginx.com/nginx-ingress-controller/)** — required when `ontoserver.ingress.enabled: true` and you are **not** using the bundled `nginx-ingress` subchart (`nginx-ingress.enabled: false`)
 > - **[External Secrets Operator](https://external-secrets.io/)** — required when `ontoserver.externalSecrets.enabled: true`
@@ -569,6 +570,19 @@ See [`examples/k3d-traefik-values.yaml`](examples/k3d-traefik-values.yaml) for t
 
 Table generated with Readme Generator For Helm: [https://github.com/bitnami/readme-generator-for-helm](https://github.com/bitnami/readme-generator-for-helm)
 
+
+## Postgres sidecar
+
+When `ontoserver.deployment.db.enabled: true` (the default), a Postgres container is injected as a [native sidecar init container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) (`restartPolicy: Always`). This requires **Kubernetes 1.29+**.
+
+The native sidecar pattern provides a hard ordering guarantee: Kubernetes will not start the Ontoserver container until the Postgres sidecar has passed its readiness probe (`pg_isready`). This eliminates the race condition where Ontoserver would fail on startup because Postgres was not yet accepting connections — previously a one-time restart on cold pod starts.
+
+**Startup probe behaviour:**
+Ontoserver's `startupProbe` (using `healthcheck.sh`) runs after Postgres is ready, polling until Ontoserver itself is up. With a `failureThreshold` of 150 and `periodSeconds` of 2, the probe allows up to 5 minutes for Ontoserver to start — enough headroom for slow environments such as AKS. Once the startup probe passes, the `readinessProbe` kicks in immediately (default `initialDelaySeconds: 0`).
+
+**Constraints:**
+- `scaled` deployments cannot use the Postgres sidecar — an external database is required.
+- `StatefulSet` kind supports the Postgres sidecar for `single` deployments only.
 
 ## Configuring an external database
 
