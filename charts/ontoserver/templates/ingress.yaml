@@ -34,6 +34,17 @@ spec:
     - host: {{ . | quote }}
       http:
         paths:
+          {{- if and (eq $.Values.ontoserver.deployment.kind "StatefulSet") (eq $.Values.ontoserver.deployment.type "scaled") }}
+          # Route $closure to a dedicated pod — this FHIR operation is stateful and requires
+          # all requests to always hit the same Ontoserver instance.
+          - path: /fhir/ConceptMap/$closure
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $releaseName }}-ontoserver-pod0-service
+                port:
+                  number: 80
+          {{- end }}
           - path: /
             pathType: Prefix
             backend:

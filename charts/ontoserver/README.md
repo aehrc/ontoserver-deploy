@@ -67,7 +67,7 @@ The recommended production topology separates content development from publicati
 
 **Development / local** — ephemeral storage with the sidecar PostgreSQL avoids cloud disk provisioning. The index is rebuilt from syndication feeds on each start, which is acceptable at small scale.
 
-> **`$closure` note:** The [`$closure` FHIR operation](https://www.hl7.org/fhir/conceptmap-operation-closure.html) is stateful. On a scaled read-only cluster it requires either sticky sessions (client-side routing) or a dedicated stateful instance alongside the cluster — the scaled cluster provides no built-in sticky session support.
+> **`$closure` routing:** The [`$closure` FHIR operation](https://www.hl7.org/fhir/conceptmap-operation-closure.html) is stateful — all requests for a given closure table must reach the same instance. For scaled StatefulSet deployments, the chart automatically creates a dedicated `RELEASE-ontoserver-pod0-service` that selects only pod-0, and routes `/fhir/ConceptMap/$closure` to it in both the Gateway HTTPRoute and Ingress — before the catchall `/` rule. This keeps `$closure` functional on a scaled cluster without requiring client-side sticky sessions. The routing is active whenever `deployment.kind: StatefulSet` and `deployment.type: scaled`, regardless of other settings.
 >
 > **Feeds must stay available:** New instances (after a pod is rescheduled or the cluster is scaled up) rebuild their local index from the syndication feeds that originally loaded the content. If those feeds become unavailable, new instances cannot complete startup and will not become ready.
 

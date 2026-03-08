@@ -78,3 +78,127 @@ tests:
       - equal:
           path: spec.type
           value: ClusterIP
+
+  - it: renders pod0 Service for scaled StatefulSet
+    templates:
+      - templates/service.yaml
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: false
+    values:
+      - fixtures/external-db-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 4
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-pod0-service
+        documentIndex: 3
+      - isSubset:
+          path: spec.selector
+          content:
+            "statefulset.kubernetes.io/pod-name": RELEASE-NAME-statefulset-0
+        documentIndex: 3
+
+  - it: does not render pod0 Service for single StatefulSet
+    templates:
+      - templates/service.yaml
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: single
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: does not render pod0 Service for Deployment
+    templates:
+      - templates/service.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: Gateway HTTPRoute adds closure rule for scaled StatefulSet
+    templates:
+      - templates/gateway.yaml
+    set:
+      ontoserver.gateway.enabled: true
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: false
+      ontoserver.hostNames:
+        - myserver.example.com
+      ontoserver.serverName: myserver.example.com
+    values:
+      - fixtures/external-db-values.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /fhir/ConceptMap/$closure
+        documentIndex: 1
+      - equal:
+          path: spec.rules[0].backendRefs[0].name
+          value: RELEASE-NAME-ontoserver-pod0-service
+        documentIndex: 1
+      - equal:
+          path: spec.rules[1].matches[0].path.value
+          value: /
+        documentIndex: 1
+
+  - it: Gateway HTTPRoute has no closure rule for single StatefulSet
+    templates:
+      - templates/gateway.yaml
+    set:
+      ontoserver.gateway.enabled: true
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: single
+      ontoserver.hostNames:
+        - myserver.example.com
+      ontoserver.serverName: myserver.example.com
+    asserts:
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /
+        documentIndex: 1
+
+  - it: Ingress adds closure path for scaled StatefulSet
+    templates:
+      - templates/ingress.yaml
+    set:
+      ontoserver.ingress.enabled: true
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: false
+      ontoserver.hostNames:
+        - myserver.example.com
+      ontoserver.serverName: myserver.example.com
+    values:
+      - fixtures/external-db-values.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /fhir/ConceptMap/$closure
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-ontoserver-pod0-service
+      - equal:
+          path: spec.rules[0].http.paths[1].path
+          value: /
+
+  - it: Ingress has no closure path for single StatefulSet
+    templates:
+      - templates/ingress.yaml
+    set:
+      ontoserver.ingress.enabled: true
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: single
+      ontoserver.hostNames:
+        - myserver.example.com
+      ontoserver.serverName: myserver.example.com
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /

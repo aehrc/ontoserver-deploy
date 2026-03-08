@@ -39,3 +39,19 @@ spec:
   selector:
     app: {{ .Release.Name }}-ontoserver
 {{- end }}
+{{- if and (eq .Values.ontoserver.deployment.kind "StatefulSet") (eq .Values.ontoserver.deployment.type "scaled") }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-ontoserver-pod0-service
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  selector:
+    app: {{ .Release.Name }}-ontoserver
+    statefulset.kubernetes.io/pod-name: {{ .Release.Name }}-statefulset-0
+{{- end }}

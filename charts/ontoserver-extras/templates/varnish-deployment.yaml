@@ -7,7 +7,7 @@ metadata:
     {{- include "ontoserver-extras.labels" . | nindent 4 }}
     {{- include "ontoserver-extras.varnish.selectorLabels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.varnish.replicas }}
   selector:
     matchLabels:
       {{- include "ontoserver-extras.varnish.selectorLabels" . | nindent 6 }}

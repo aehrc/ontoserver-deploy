@@ -67,6 +67,20 @@ spec:
       name: {{ $.Release.Name }}-gw
   {{- end }}
   rules:
+    {{- if and (eq .Values.ontoserver.deployment.kind "StatefulSet") (eq .Values.ontoserver.deployment.type "scaled") }}
+    # Route $closure to a dedicated pod — this FHIR operation is stateful and requires
+    # all requests to always hit the same Ontoserver instance.
+    - backendRefs:
+        - group: ''
+          kind: Service
+          name: {{ .Release.Name }}-ontoserver-pod0-service
+          port: 80
+          weight: 1
+      matches:
+        - path:
+            type: PathPrefix
+            value: /fhir/ConceptMap/$closure
+    {{- end }}
     - backendRefs:
         - group: ''
           kind: Service

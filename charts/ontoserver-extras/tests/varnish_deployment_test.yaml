@@ -121,6 +121,23 @@ tests:
             name: trace-pipe
             emptyDir: {}
 
+  - it: defaults to 1 replica
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  - it: uses replicas from values
+    set:
+      varnish.enabled: true
+      varnish.replicas: 2
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+
   - it: sets tolerations when provided
     set:
       varnish.enabled: true

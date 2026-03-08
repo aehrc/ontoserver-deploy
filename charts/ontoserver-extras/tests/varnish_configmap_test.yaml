@@ -76,6 +76,32 @@ tests:
           path: data["default.vcl"]
           pattern: 'beresp\.ttl = 2m'
 
+  - it: includes grace period by default
+    set:
+      varnish.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'beresp\.grace = 30s'
+
+  - it: uses custom grace period from values
+    set:
+      varnish.enabled: true
+      varnish.graceSeconds: 60
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'beresp\.grace = 60s'
+
+  - it: omits grace period when graceSeconds is 0
+    set:
+      varnish.enabled: true
+      varnish.graceSeconds: 0
+    asserts:
+      - notMatchRegex:
+          path: data["default.vcl"]
+          pattern: 'beresp\.grace'
+
   - it: includes opentelemetry VCL blocks when otel enabled
     set:
       varnish.enabled: true
@@ -93,3 +119,38 @@ tests:
       - notMatchRegex:
           path: data["default.vcl"]
           pattern: 'OTEL_SPAN'
+
+  - it: omits closure backend and routing when closureBackend not set
+    set:
+      varnish.enabled: true
+    asserts:
+      - notMatchRegex:
+          path: data["default.vcl"]
+          pattern: 'backend closure'
+      - notMatchRegex:
+          path: data["default.vcl"]
+          pattern: '\$closure'
+
+  - it: adds closure backend block when closureBackend is set
+    set:
+      varnish.enabled: true
+      varnish.closureBackend: "my-release-statefulset-0.my-release-ontoserver-headless"
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'backend closure'
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: '\.host = "my-release-statefulset-0\.my-release-ontoserver-headless"'
+
+  - it: routes closure requests to closure backend and passes through
+    set:
+      varnish.enabled: true
+      varnish.closureBackend: "my-release-statefulset-0.my-release-ontoserver-headless"
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'req\.backend_hint = closure'
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'ConceptMap/\\\$closure'

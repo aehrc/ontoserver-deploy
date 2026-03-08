@@ -22,6 +22,11 @@
           "default": "",
           "description": "Override the Kubernetes service name Varnish proxies to. Defaults to RELEASE-ontoserver-service (the ontoserver chart's service). Only needed when the extras chart and ontoserver chart have different release names."
         },
+        "closureBackend": {
+          "type": "string",
+          "default": "",
+          "description": "Kubernetes hostname for the $closure operation backend. The $closure FHIR operation is stateful — set to a stable pod hostname (e.g. RELEASE-statefulset-0.RELEASE-ontoserver-headless) for scaled deployments. Empty string disables dedicated $closure routing."
+        },
         "metrics": {
           "type": "object",
           "description": "Prometheus metrics exporter sidecar",
@@ -73,6 +78,18 @@
               }
             }
           }
+        },
+        "replicas": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 0,
+          "description": "Number of Varnish pod replicas"
+        },
+        "graceSeconds": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 0,
+          "description": "Seconds to serve stale cached content when the backend is unavailable"
         },
         "image": {
           "type": "string",

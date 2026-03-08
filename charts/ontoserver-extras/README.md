@@ -22,40 +22,43 @@ All features are disabled by default — installing the chart with no overrides 
 
 ### Varnish
 
-| Name                                               | Description                                                                              | Value                                  |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------- |
-| `varnish.enabled`                                  | Enable Varnish caching proxy                                                             | `false`                                |
-| `varnish.backendServiceName`                       | Kubernetes service name for the Varnish backend (defaults to RELEASE-ontoserver-service) | `""`                                   |
-| `varnish.opentelemetry.enabled`                    | Enable tracing VCL and sidecar containers (trace-converter + trace-forwarder)            | `false`                                |
-| `varnish.opentelemetry.collectorEndpoint`          | Zipkin endpoint for trace forwarding (required when opentelemetry enabled)               | `""`                                   |
-| `varnish.metrics.enabled`                          | Enable Prometheus metrics exporter sidecar                                               | `true`                                 |
-| `varnish.metrics.interval`                         | Prometheus scrape interval                                                               | `60s`                                  |
-| `varnish.metrics.scrapeTimeout`                    | Prometheus scrape timeout (must be less than interval)                                   | `55s`                                  |
-| `varnish.image`                                    | Varnish container image                                                                  | `varnish:7.7.1`                        |
-| `varnish.exporterImage`                            | Prometheus exporter image                                                                | `ghcr.io/aehrc/varnish-exporter:7.7-1` |
-| `varnish.traceForwarderImage`                      | Trace forwarder container image (must have curl and sh)                                  | `curlimages/curl:8.14.1`               |
-| `varnish.resources.varnish.requests.cpu`           | Varnish CPU request                                                                      | `200m`                                 |
-| `varnish.resources.varnish.requests.memory`        | Varnish memory request                                                                   | `256Mi`                                |
-| `varnish.resources.varnish.limits.cpu`             | Varnish CPU limit                                                                        | `500m`                                 |
-| `varnish.resources.varnish.limits.memory`          | Varnish memory limit                                                                     | `1024Mi`                               |
-| `varnish.resources.exporter.requests.cpu`          | Exporter CPU request                                                                     | `50m`                                  |
-| `varnish.resources.exporter.requests.memory`       | Exporter memory request                                                                  | `64Mi`                                 |
-| `varnish.resources.exporter.limits.cpu`            | Exporter CPU limit                                                                       | `100m`                                 |
-| `varnish.resources.exporter.limits.memory`         | Exporter memory limit                                                                    | `128Mi`                                |
-| `varnish.resources.traceConverter.requests.cpu`    | Trace converter CPU request                                                              | `25m`                                  |
-| `varnish.resources.traceConverter.requests.memory` | Trace converter memory request                                                           | `25Mi`                                 |
-| `varnish.resources.traceConverter.limits.cpu`      | Trace converter CPU limit                                                                | `50m`                                  |
-| `varnish.resources.traceConverter.limits.memory`   | Trace converter memory limit                                                             | `50Mi`                                 |
-| `varnish.resources.traceForwarder.requests.cpu`    | Trace forwarder CPU request                                                              | `25m`                                  |
-| `varnish.resources.traceForwarder.requests.memory` | Trace forwarder memory request                                                           | `32Mi`                                 |
-| `varnish.resources.traceForwarder.limits.cpu`      | Trace forwarder CPU limit                                                                | `50m`                                  |
-| `varnish.resources.traceForwarder.limits.memory`   | Trace forwarder memory limit                                                             | `64Mi`                                 |
-| `varnish.tolerations`                              | Pod tolerations for the Varnish deployment                                               | `[]`                                   |
-| `varnish.cache.time200`                            | Cache TTL for 200 responses                                                              | `10m`                                  |
-| `varnish.cache.time404`                            | Cache TTL for 404 responses                                                              | `1m`                                   |
-| `varnish.cache.timeExpand`                         | Cache TTL for $expand responses (defaults to time200 if empty)                           | `""`                                   |
-| `varnish.cache.passAuthHeaderRequests`             | Pass through (bypass cache) for requests with Authorization header                       | `true`                                 |
-| `varnish.cache.memorySize`                         | Varnish malloc storage pool size (e.g. 800m, 1g)                                         | `800m`                                 |
+| Name                                               | Description                                                                                                                                                                                                                                                                                                                  | Value                                  |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `varnish.enabled`                                  | Enable Varnish caching proxy                                                                                                                                                                                                                                                                                                 | `false`                                |
+| `varnish.backendServiceName`                       | Kubernetes service name for the Varnish backend (defaults to RELEASE-ontoserver-service)                                                                                                                                                                                                                                     | `""`                                   |
+| `varnish.closureBackend`                           | Kubernetes hostname for the $closure operation backend. The $closure FHIR operation is stateful — it requires all requests to hit the same instance. Set to a stable pod hostname (e.g. RELEASE-statefulset-0.RELEASE-ontoserver-headless) when using a scaled deployment. Empty string disables dedicated $closure routing. | `""`                                   |
+| `varnish.replicas`                                 | Number of Varnish pod replicas. For a scaled Ontoserver deployment consider 2+ to avoid a single point of failure. Note: multiple replicas each maintain their own independent cache.                                                                                                                                        | `1`                                    |
+| `varnish.graceSeconds`                             | Seconds to serve stale cached content when the backend is unavailable (e.g. during a rolling update). Set to 0 to disable grace mode.                                                                                                                                                                                        | `30`                                   |
+| `varnish.opentelemetry.enabled`                    | Enable tracing VCL and sidecar containers (trace-converter + trace-forwarder)                                                                                                                                                                                                                                                | `false`                                |
+| `varnish.opentelemetry.collectorEndpoint`          | Zipkin endpoint for trace forwarding (required when opentelemetry enabled)                                                                                                                                                                                                                                                   | `""`                                   |
+| `varnish.metrics.enabled`                          | Enable Prometheus metrics exporter sidecar                                                                                                                                                                                                                                                                                   | `true`                                 |
+| `varnish.metrics.interval`                         | Prometheus scrape interval                                                                                                                                                                                                                                                                                                   | `60s`                                  |
+| `varnish.metrics.scrapeTimeout`                    | Prometheus scrape timeout (must be less than interval)                                                                                                                                                                                                                                                                       | `55s`                                  |
+| `varnish.image`                                    | Varnish container image                                                                                                                                                                                                                                                                                                      | `varnish:7.7.1`                        |
+| `varnish.exporterImage`                            | Prometheus exporter image                                                                                                                                                                                                                                                                                                    | `ghcr.io/aehrc/varnish-exporter:7.7-1` |
+| `varnish.traceForwarderImage`                      | Trace forwarder container image (must have curl and sh)                                                                                                                                                                                                                                                                      | `curlimages/curl:8.14.1`               |
+| `varnish.resources.varnish.requests.cpu`           | Varnish CPU request                                                                                                                                                                                                                                                                                                          | `200m`                                 |
+| `varnish.resources.varnish.requests.memory`        | Varnish memory request                                                                                                                                                                                                                                                                                                       | `256Mi`                                |
+| `varnish.resources.varnish.limits.cpu`             | Varnish CPU limit                                                                                                                                                                                                                                                                                                            | `500m`                                 |
+| `varnish.resources.varnish.limits.memory`          | Varnish memory limit                                                                                                                                                                                                                                                                                                         | `1024Mi`                               |
+| `varnish.resources.exporter.requests.cpu`          | Exporter CPU request                                                                                                                                                                                                                                                                                                         | `50m`                                  |
+| `varnish.resources.exporter.requests.memory`       | Exporter memory request                                                                                                                                                                                                                                                                                                      | `64Mi`                                 |
+| `varnish.resources.exporter.limits.cpu`            | Exporter CPU limit                                                                                                                                                                                                                                                                                                           | `100m`                                 |
+| `varnish.resources.exporter.limits.memory`         | Exporter memory limit                                                                                                                                                                                                                                                                                                        | `128Mi`                                |
+| `varnish.resources.traceConverter.requests.cpu`    | Trace converter CPU request                                                                                                                                                                                                                                                                                                  | `25m`                                  |
+| `varnish.resources.traceConverter.requests.memory` | Trace converter memory request                                                                                                                                                                                                                                                                                               | `25Mi`                                 |
+| `varnish.resources.traceConverter.limits.cpu`      | Trace converter CPU limit                                                                                                                                                                                                                                                                                                    | `50m`                                  |
+| `varnish.resources.traceConverter.limits.memory`   | Trace converter memory limit                                                                                                                                                                                                                                                                                                 | `50Mi`                                 |
+| `varnish.resources.traceForwarder.requests.cpu`    | Trace forwarder CPU request                                                                                                                                                                                                                                                                                                  | `25m`                                  |
+| `varnish.resources.traceForwarder.requests.memory` | Trace forwarder memory request                                                                                                                                                                                                                                                                                               | `32Mi`                                 |
+| `varnish.resources.traceForwarder.limits.cpu`      | Trace forwarder CPU limit                                                                                                                                                                                                                                                                                                    | `50m`                                  |
+| `varnish.resources.traceForwarder.limits.memory`   | Trace forwarder memory limit                                                                                                                                                                                                                                                                                                 | `64Mi`                                 |
+| `varnish.tolerations`                              | Pod tolerations for the Varnish deployment                                                                                                                                                                                                                                                                                   | `[]`                                   |
+| `varnish.cache.time200`                            | Cache TTL for 200 responses                                                                                                                                                                                                                                                                                                  | `10m`                                  |
+| `varnish.cache.time404`                            | Cache TTL for 404 responses                                                                                                                                                                                                                                                                                                  | `1m`                                   |
+| `varnish.cache.timeExpand`                         | Cache TTL for $expand responses (defaults to time200 if empty)                                                                                                                                                                                                                                                               | `""`                                   |
+| `varnish.cache.passAuthHeaderRequests`             | Pass through (bypass cache) for requests with Authorization header                                                                                                                                                                                                                                                           | `true`                                 |
+| `varnish.cache.memorySize`                         | Varnish malloc storage pool size (e.g. 800m, 1g)                                                                                                                                                                                                                                                                             | `800m`                                 |
 
 ### OpenTelemetry Collector
 
@@ -67,11 +70,16 @@ All features are disabled by default — installing the chart with no overrides 
 | `collector.tolerations`    | Pod tolerations for the OpenTelemetryCollector                                     | `[]`    |
 | `collector.debug`          | Enable debug exporter with detailed verbosity (not suitable for production)        | `false` |
 
-## Usage with ArgoCD Multi-Source
+## Deploying alongside the ontoserver chart
 
-This chart is intended to be deployed as a second source alongside `ontoserver` in an ArgoCD Application. Use `gateway.backendServiceNameOverride` in the ontoserver chart to route traffic through Varnish.
+The `ontoserver` chart is intentionally unaware of Varnish — it routes traffic directly to `RELEASE-ontoserver-service` by default. To insert Varnish into the request path, the ontoserver chart's `gateway.backendServiceNameOverride` (or equivalent Ingress backend) must point to the Varnish service after it is running.
+
+### ArgoCD multi-source (recommended)
+
+When both charts are sources in the same ArgoCD Application, both are reconciled together. Set `backendServiceNameOverride` in your ontoserver values file and ArgoCD will keep both in sync — no manual intervention needed after the initial setup.
 
 ```yaml
+# ArgoCD Application
 spec:
   sources:
   - repoURL: https://github.com/your-org/your-argocd-config
@@ -85,15 +93,14 @@ spec:
       - $values/apps/ontoserver/values.yaml
   - repoURL: https://github.com/aehrc/ontoserver-deploy
     targetRevision: HEAD
-    path: ontoserver-extras
+    path: charts/ontoserver-extras
     helm:
       valueFiles:
       - $values/apps/ontoserver/extras-values.yaml
 ```
 
-### Example: extras-values.yaml (Varnish + Collector)
-
 ```yaml
+# extras-values.yaml
 varnish:
   enabled: true
   opentelemetry:
@@ -106,13 +113,31 @@ collector:
   zipkinEndpoint: http://tempo:9411
 ```
 
-### Example: ontoserver values.yaml (route Gateway through Varnish)
-
 ```yaml
+# ontoserver values.yaml — route Gateway/Ingress through Varnish
 ontoserver:
   gateway:
     backendServiceNameOverride: ontoserver-r4-varnish-service
 ```
+
+### Plain Helm install
+
+When installing with plain `helm` (not ArgoCD), the two charts must be wired up in the correct order — the Varnish service must exist before the ontoserver chart is updated to route to it:
+
+```bash
+# 1. Install the main ontoserver chart first (routes directly to ontoserver)
+helm install ontoserver-r4 ./charts/ontoserver -f values.yaml
+
+# 2. Install the extras chart (deploys Varnish and its service)
+helm install ontoserver-r4-extras ./charts/ontoserver-extras -f extras-values.yaml
+
+# 3. Now upgrade the main chart to route traffic through Varnish
+helm upgrade ontoserver-r4 ./charts/ontoserver -f values.yaml \
+  --set ontoserver.gateway.backendServiceNameOverride=ontoserver-r4-extras-varnish-service
+```
+
+> [!NOTE]
+> Between steps 1 and 3, traffic reaches Ontoserver directly (bypassing Varnish). Step 3 is safe to run immediately after step 2 — the Varnish service is created by `helm install` before any pods are ready.
 
 ## Varnish Caching Modes
 
@@ -135,6 +160,28 @@ Everything from plain mode plus:
 - Two sidecar containers:
   - **varnish-trace-converter** — tails `varnishlog` for `VCL_Log` entries
   - **trace-forwarder** — parses OTEL_SPAN lines and POSTs Zipkin v2 spans to the collector
+
+### Scaled Ontoserver deployments
+
+When Varnish fronts a scaled StatefulSet Ontoserver cluster, two additional settings are relevant:
+
+**`varnish.replicas`** — Number of Varnish pod replicas (default `1`). Consider `2+` to avoid a single point of failure. Each Varnish replica maintains its own independent cache — there is no cache synchronisation between replicas.
+
+**`varnish.graceSeconds`** — Seconds to serve stale cached content when the backend is temporarily unavailable (default `30s`). This covers rolling updates of the Ontoserver StatefulSet: while a pod is being replaced, Varnish continues serving its last-known response rather than returning a 503. Set to `0` to disable grace mode.
+
+**`varnish.closureBackend`** — The [`$closure` FHIR operation](https://www.hl7.org/fhir/conceptmap-operation-closure.html) is stateful and must always reach the same Ontoserver instance. When set, Varnish routes all `POST /fhir/ConceptMap/$closure` requests to this specific backend hostname, bypassing the cache and the normal load-balanced backend. Set to the stable DNS name of pod-0 via the headless service (e.g. `RELEASE-statefulset-0.RELEASE-ontoserver-headless`). Empty string (the default) disables dedicated `$closure` routing.
+
+> [!IMPORTANT]
+> When Varnish is the entry point for a scaled StatefulSet deployment (i.e. `ontoserver.gateway.backendServiceNameOverride` or `ontoserver.ingress` routes traffic to the Varnish service), you **must** set `varnish.closureBackend`. Without it, `$closure` requests are load-balanced across all pods and will fail intermittently because each pod maintains its own independent closure table state.
+>
+> Set it to the stable pod-0 DNS name:
+> ```yaml
+> varnish:
+>   closureBackend: "RELEASE-statefulset-0.RELEASE-ontoserver-headless"
+> ```
+> Replace `RELEASE` with your Helm release name (the same release name used for the `ontoserver` chart).
+>
+> If you are **not** routing through Varnish (Gateway/Ingress points directly at Ontoserver), this is not needed — the `ontoserver` chart already handles `$closure` routing at the network level.
 
 ## Resource Naming
 

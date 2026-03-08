@@ -19,7 +19,26 @@ data:
         .between_bytes_timeout = 60s;
     }
 
+    {{- if .Values.varnish.closureBackend }}
+    # Dedicated backend for $closure — stateful operation requiring sticky routing to one instance
+    backend closure {
+        .host = "{{ .Values.varnish.closureBackend }}";
+        .port = "80";
+        .connect_timeout = 60s;
+        .first_byte_timeout = 300s;
+        .between_bytes_timeout = 60s;
+    }
+    {{- end }}
+
     sub vcl_recv {
+        {{- if .Values.varnish.closureBackend }}
+        # Route $closure to a dedicated backend — $closure maintains per-session state
+        # and must always hit the same Ontoserver instance.
+        if (req.url ~ "^/fhir/ConceptMap/\$closure") {
+            set req.backend_hint = closure;
+            return (pass);
+        }
+        {{- end }}
         {{- if .Values.varnish.opentelemetry.enabled }}
         set req.http.X-Start-Time-Sec = std.time2real(now, 0.0);
 
@@ -140,6 +159,12 @@ data:
     {{- end }}
 
     sub vcl_backend_response {
+        {{- if gt (int .Values.varnish.graceSeconds) 0 }}
+        # Serve stale content for graceSeconds if the backend is unavailable
+        # (e.g. during a rolling update of the Ontoserver StatefulSet)
+        set beresp.grace = {{ .Values.varnish.graceSeconds }}s;
+        {{- end }}
+
         if (beresp.status == 200) {
             # Ignore any Cache-Control/Pragma no-cache directives from the origin
             # (mirrors Azure CDN "Ignore Origin No-Cache = 200" rule)

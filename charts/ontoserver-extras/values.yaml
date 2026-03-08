@@ -4,6 +4,12 @@ varnish:
   enabled: false
   ## @param varnish.backendServiceName                        Kubernetes service name for the Varnish backend (defaults to RELEASE-ontoserver-service)
   backendServiceName: ""
+  ## @param varnish.closureBackend                            Kubernetes hostname for the $closure operation backend. The $closure FHIR operation is stateful — it requires all requests to hit the same instance. Set to a stable pod hostname (e.g. RELEASE-statefulset-0.RELEASE-ontoserver-headless) when using a scaled deployment. Empty string disables dedicated $closure routing.
+  closureBackend: ""
+  ## @param varnish.replicas                                   Number of Varnish pod replicas. For a scaled Ontoserver deployment consider 2+ to avoid a single point of failure. Note: multiple replicas each maintain their own independent cache.
+  replicas: 1
+  ## @param varnish.graceSeconds                               Seconds to serve stale cached content when the backend is unavailable (e.g. during a rolling update). Set to 0 to disable grace mode.
+  graceSeconds: 30
   opentelemetry:
     ## @param varnish.opentelemetry.enabled                     Enable tracing VCL and sidecar containers (trace-converter + trace-forwarder)
     enabled: false
