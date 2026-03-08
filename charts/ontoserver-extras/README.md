@@ -85,15 +85,15 @@ spec:
   - repoURL: https://github.com/your-org/your-argocd-config
     targetRevision: HEAD
     ref: values
-  - repoURL: oci://ghcr.io/aehrc
+  - repoURL: https://aehrc.github.io/ontoserver-deploy
     chart: ontoserver
     targetRevision: 0.1.0
     helm:
       valueFiles:
       - $values/apps/ontoserver/values.yaml
-  - repoURL: https://github.com/aehrc/ontoserver-deploy
-    targetRevision: HEAD
-    path: charts/ontoserver-extras
+  - repoURL: https://aehrc.github.io/ontoserver-deploy
+    chart: ontoserver-extras
+    targetRevision: 0.1.0
     helm:
       valueFiles:
       - $values/apps/ontoserver/extras-values.yaml

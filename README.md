@@ -50,6 +50,17 @@ See each chart's README for full configuration reference:
 
 Example ArgoCD manifests are in [`examples/argocd/`](examples/argocd/):
 
+> **Production note:** The examples source charts directly from this Git repository for simplicity. For production deployments, replace the Git source with a released chart version from the Helm repository — this gives you pinned, immutable versions and faster ArgoCD sync:
+> ```yaml
+> - repoURL: https://aehrc.github.io/ontoserver-deploy
+>   chart: ontoserver
+>   targetRevision: 0.1.0
+> # or OCI
+> - repoURL: oci://ghcr.io/aehrc
+>   chart: ontoserver
+>   targetRevision: 0.1.0
+> ```
+
 | File | How to use | Description |
 |------|------------|-------------|
 | [`dev-readonly.yaml`](examples/argocd/dev-readonly.yaml) | App-of-Apps inner app | Ready to use. Read-only dev server — sidecar PostgreSQL, ephemeral storage, Varnish. Expects a `quay-pull-secret` in the destination namespace (see below). No networking config — add your own gateway/ingress. |
