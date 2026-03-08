@@ -314,16 +314,8 @@ tests:
           content: "-file"
 
   - it: passes each security label as a separate -perms arg
-    set:
-      codeSystem.url: http://snomed.info/sct/32506021000036107
-      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-      rf2.files[0]: https://example.com/snomed.zip
-      syndication.endpoint: https://synd.example.com
-      syndication.tokenEndpoint: https://auth.example.com/token
-      syndication.feed: my-feed
-      syndication.entryTitle: My Entry
-      syndication.securityLabels[0]: http://snomed.info/sct/32506021000036107
-      syndication.securityLabels[1]: http://snomed.info/sct/900000000000207008
+    values:
+      - fixtures/two-security-labels.yaml
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
