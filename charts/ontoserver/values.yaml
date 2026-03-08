@@ -242,6 +242,8 @@ ontoserver:
     annotations: {}
     ## @param ontoserver.ingress.className                 IngressClass name
     className: ontoserver-nginx
+    ## @param ontoserver.ingress.backendServiceNameOverride  Override Ingress backend service name (e.g. to route through the Varnish service from ontoserver-extras)
+    backendServiceNameOverride: ""
   ## @section Observability
   managementService:
     ## @param ontoserver.managementService.enabled          Enable management service (exposes Spring Boot actuator on port 18080)

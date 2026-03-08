@@ -188,6 +188,20 @@ tests:
           path: spec.rules[0].http.paths[1].path
           value: /
 
+  - it: Ingress uses backendServiceNameOverride when set
+    templates:
+      - templates/ingress.yaml
+    set:
+      ontoserver.ingress.enabled: true
+      ontoserver.hostNames:
+        - localhost
+      ontoserver.serverName: localhost
+      ontoserver.ingress.backendServiceNameOverride: ontoserver-dev-varnish-service
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: ontoserver-dev-varnish-service
+
   - it: Ingress has no closure path for single StatefulSet
     templates:
       - templates/ingress.yaml

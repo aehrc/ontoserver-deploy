@@ -40,6 +40,14 @@ See each chart's README for full configuration reference:
 - [`charts/ontoserver-extras/README.md`](charts/ontoserver-extras/README.md)
 - [`charts/ontoserver-indexer/README.md`](charts/ontoserver-indexer/README.md) — SNOMED CT and LOINC indexing examples
 
+### ArgoCD Examples
+
+Ready-to-use ArgoCD Application manifests are in [`examples/argocd/`](examples/argocd/):
+
+| File | Description |
+|------|-------------|
+| [`dev-readonly.yaml`](examples/argocd/dev-readonly.yaml) | Read-only dev/evaluation server — sidecar PostgreSQL, ephemeral storage, Varnish, Envoy Gateway |
+
 ### Prerequisites
 
 Depending on features enabled, you may need these cluster components:

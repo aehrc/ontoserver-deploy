@@ -459,6 +459,16 @@ kubectl rollout status deployment/my-ontoserver-ontoserver
 
 See [`examples/k3d-traefik-values.yaml`](examples/k3d-traefik-values.yaml) for the complete quick-start values file and [`examples/local-values.yaml`](examples/local-values.yaml) for a general local cluster reference.
 
+### ArgoCD
+
+Ready-to-use ArgoCD Application manifests are in [`examples/argocd/`](../../examples/argocd/) at the root of this repository. Reference them directly from your ArgoCD instance or use them as a starting point.
+
+| File | Description |
+|------|-------------|
+| [`dev-readonly.yaml`](../../examples/argocd/dev-readonly.yaml) | Read-only dev/evaluation server — sidecar PostgreSQL, ephemeral storage, Varnish, Envoy Gateway |
+
+The ArgoCD examples use multi-source Applications with both the `ontoserver` and `ontoserver-extras` charts as sources, wired together so that enabling Varnish automatically routes the Ingress through it. See the [extras chart README](../../charts/ontoserver-extras/README.md#deploying-alongside-the-ontoserver-chart) for the wiring details.
+
 > **Note:** The GitHub Actions CI integration tests use a similar k3d setup (single agent, no load balancer, Traefik disabled) to run `helm install` followed by `helm test`. See [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) for details.
 
 ## Parameters
@@ -584,6 +594,7 @@ See [`examples/k3d-traefik-values.yaml`](examples/k3d-traefik-values.yaml) for t
 | `ontoserver.ingress.enabled`                    | Enable Ingress                                                                                                                                                                                                                                                     | `false`               |
 | `ontoserver.ingress.annotations`                | Ingress annotations                                                                                                                                                                                                                                                | `{}`                  |
 | `ontoserver.ingress.className`                  | IngressClass name                                                                                                                                                                                                                                                  | `ontoserver-nginx`    |
+| `ontoserver.ingress.backendServiceNameOverride` | Override Ingress backend service name (e.g. to route through the Varnish service from ontoserver-extras)                                                                                                                                                           | `""`                  |
 
 ### Observability
 
@@ -748,7 +759,12 @@ By default neither is enabled — the chart deploys Ontoserver with no external 
 * **Gateway API** (`ontoserver.gateway.enabled: true`) *(recommended)*: requires Gateway API CRDs and a compatible GatewayClass (e.g. [Envoy Gateway](https://gateway.envoyproxy.io/), [Traefik](https://doc.traefik.io/traefik/routing/providers/kubernetes-gateway/), [Cilium](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/), or any conformant implementation). Creates `Gateway`, `HTTPRoute`, and optionally a cert-manager `Issuer` resource. The default `className` is `envoy-gateway-class` — set `ontoserver.gateway.className` to match your GatewayClass. The default listener port is `443`; some implementations use a different port (e.g. Traefik defaults to `8443` — set `ontoserver.gateway.listenerPortSecure: 8443`). TLS termination is optional: set `ontoserver.tls.enabled: true` with a certificate reference, or enable cert-manager for automatic provisioning.
 * **Ingress** (`ontoserver.ingress.enabled: true`): creates a standard `networking.k8s.io/v1` Ingress. Use the bundled F5 nginx-ingress subchart (`nginx-ingress.enabled: true`), the cluster's default controller (e.g. Traefik on k3d/k3s), or any other Ingress controller by setting `ontoserver.ingress.className` appropriately.
 
-Gateway API and Ingress are mutually exclusive. Set `ontoserver.gateway.backendServiceNameOverride` to route traffic through an intermediate proxy (e.g. a Varnish cache) instead of the Ontoserver service directly.
+Gateway API and Ingress are mutually exclusive. Both support a `backendServiceNameOverride` to route traffic through an intermediate proxy such as the Varnish cache from `ontoserver-extras`:
+
+- Gateway: `ontoserver.gateway.backendServiceNameOverride: <release>-varnish-service`
+- Ingress: `ontoserver.ingress.backendServiceNameOverride: <release>-varnish-service`
+
+See the [extras chart README](../../charts/ontoserver-extras/README.md) for the full wiring instructions, including the recommended ArgoCD multi-source approach.
 
 **Common GatewayClass configuration reference:**
 

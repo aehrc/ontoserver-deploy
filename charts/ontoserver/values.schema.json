@@ -269,9 +269,10 @@
         "ingress": {
           "type": "object",
           "properties": {
-            "enabled":     { "type": "boolean" },
-            "annotations": { "type": "object" },
-            "className":   { "type": "string" }
+            "enabled":                    { "type": "boolean" },
+            "annotations":                { "type": "object" },
+            "className":                  { "type": "string" },
+            "backendServiceNameOverride":  { "type": "string" }
           }
         },
         "managementService": {

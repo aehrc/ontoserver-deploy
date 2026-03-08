@@ -1,0 +1,127 @@
+# Read-only development server
+#
+# Topology: Deployment (single) · isReadOnly · sidecar PostgreSQL · ephemeral storage · Varnish cache
+#
+# Suitable for a development or evaluation instance on any Kubernetes cluster
+# (AKS, EKS, GKE, on-prem). Not suitable for production — storage is ephemeral
+# so the Lucene index is rebuilt from syndication feeds on every pod restart.
+#
+# Prerequisites on the cluster:
+#   - Envoy Gateway installed and a GatewayClass named "envoy-gateway-class"
+#     https://gateway.envoyproxy.io/docs/install/install-helm/
+#   - (Optional) cert-manager for automatic TLS certificates
+#     https://cert-manager.io/docs/installation/
+#
+# Customise before applying:
+#   1. Replace <YOUR-HOSTNAME> with your actual DNS name (e.g. ontoserver-dev.example.com)
+#   2. Set quay.io credentials — either inline (not recommended for production)
+#      or via a pre-created pull secret and ontoserver.deployment.imagePullSecrets
+#   3. Uncomment the syndication subscription block and point it at your feed
+#   4. Uncomment the TLS / cert-manager block if you want HTTPS
+#
+# Apply to your ArgoCD instance:
+#   kubectl apply -f dev-readonly.yaml -n argocd
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ontoserver-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ontoserver-dev
+  sources:
+    # ── ontoserver ─────────────────────────────────────────────────────────────
+    - repoURL: https://github.com/aehrc/ontoserver-deploy
+      targetRevision: HEAD
+      path: charts/ontoserver
+      helm:
+        valuesObject:
+          ontoserver:
+            deployment:
+              kind: Deployment
+              type: single
+              isReadOnly: true
+              replicas: 1
+              db:
+                enabled: true       # sidecar PostgreSQL — no external database needed
+
+            imageCredentials:
+              username: your-quay-username
+              password: your-quay-password
+
+            serverName: <YOUR-HOSTNAME>
+            hostNames:
+              - <YOUR-HOSTNAME>
+
+            timeZone: Australia/Brisbane
+            language: en_AU
+
+            resources:
+              ontoserver:
+                requests:
+                  cpu: "500m"
+                  memory: "2Gi"
+                limits:
+                  cpu: "2000m"
+                  memory: "4Gi"
+                initialHeapSize: "512m"
+                maxHeapSize: "3000m"
+              db:
+                requests:
+                  cpu: "100m"
+                  memory: "256Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "512Mi"
+
+            # -l: hold the pod unready while the startup preload is running.
+            # Traffic is allowed as soon as the preload finishes.
+            healthCheckOption: -l
+
+            gateway:
+              enabled: true
+              className: envoy-gateway-class
+              requestTimeout: 120s
+              # Route all requests through the Varnish service deployed below.
+              # The service name is always <ArgoCD-app-name>-varnish-service.
+              backendServiceNameOverride: ontoserver-dev-varnish-service
+
+            # Uncomment to enable HTTPS via cert-manager:
+            # tls:
+            #   enabled: true
+            #   certRef: ontoserver-dev-tls
+            # certmanager:
+            #   enabled: true
+            #   email: your-email@example.com
+
+            # Configure what terminology to load on startup.
+            # Add subscriptions to your syndication server here:
+            # config:
+            #   ontoserver.syndication.plus.subscriptions.0.uri: https://your-syndication-server/fhir/SubscriptionDefinition/...
+
+    # ── ontoserver-extras (Varnish) ────────────────────────────────────────────
+    - repoURL: https://github.com/aehrc/ontoserver-deploy
+      targetRevision: HEAD
+      path: charts/ontoserver-extras
+      helm:
+        valuesObject:
+          varnish:
+            enabled: true
+            # 30 s grace period: serve stale content if ontoserver is temporarily
+            # unavailable (e.g. during a pod restart).
+            graceSeconds: 30
+            cache:
+              time200: 10m
+              time404: 1m
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
