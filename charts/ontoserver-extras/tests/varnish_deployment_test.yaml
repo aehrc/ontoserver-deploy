@@ -1,0 +1,161 @@
+suite: Varnish Deployment tests
+templates:
+  - templates/varnish-deployment.yaml
+tests:
+  - it: renders nothing when varnish disabled (default)
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a Deployment when varnish enabled
+    set:
+      varnish.enabled: true
+    asserts:
+      - isKind:
+          of: Deployment
+      - hasDocuments:
+          count: 1
+
+  - it: names the Deployment correctly
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-varnish
+
+  - it: uses varnish image from values
+    set:
+      varnish.enabled: true
+      varnish.image: varnish:7.0.0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: varnish:7.0.0
+
+  - it: includes cache memory size in varnish command
+    set:
+      varnish.enabled: true
+      varnish.cache.memorySize: "1g"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: "malloc,1g"
+
+  - it: includes metrics exporter container by default when varnish enabled
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: varnish-exporter
+
+  - it: uses exporter image from values
+    set:
+      varnish.enabled: true
+      varnish.exporterImage: ghcr.io/aehrc/varnish-exporter:test
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: ghcr.io/aehrc/varnish-exporter:test
+
+  - it: omits metrics exporter when metrics disabled
+    set:
+      varnish.enabled: true
+      varnish.metrics.enabled: false
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+
+  - it: adds opentelemetry sidecar containers when otel enabled
+    set:
+      varnish.enabled: true
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: "http://collector/api/v2/spans"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[2].name
+          value: varnish-trace-converter
+      - equal:
+          path: spec.template.spec.containers[3].name
+          value: trace-forwarder
+
+  - it: adds init container when otel enabled
+    set:
+      varnish.enabled: true
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: "http://collector/api/v2/spans"
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: init-trace-pipe
+
+  - it: omits opentelemetry containers when otel disabled
+    set:
+      varnish.enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 2
+
+  - it: sets trace-pipe volume when otel enabled
+    set:
+      varnish.enabled: true
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: "http://collector/api/v2/spans"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: trace-pipe
+            emptyDir: {}
+
+  - it: omits trace-pipe volume when otel disabled
+    set:
+      varnish.enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: trace-pipe
+            emptyDir: {}
+
+  - it: sets tolerations when provided
+    set:
+      varnish.enabled: true
+      varnish.tolerations:
+        - key: "dedicated"
+          operator: "Equal"
+          value: "varnish"
+          effect: "NoSchedule"
+    asserts:
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: "dedicated"
+
+  - it: sets varnish resource requests and limits
+    set:
+      varnish.enabled: true
+      varnish.resources.varnish.requests.cpu: "300m"
+      varnish.resources.varnish.limits.memory: "2048Mi"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: "300m"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: "2048Mi"
+
+  - it: sets COLLECTOR_URL env var on trace-forwarder from collectorEndpoint
+    set:
+      varnish.enabled: true
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[3].env[0].name
+          value: COLLECTOR_URL
+      - equal:
+          path: spec.template.spec.containers[3].env[0].value
+          value: "http://zipkin:9411/api/v2/spans"

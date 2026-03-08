@@ -1,0 +1,61 @@
+suite: Varnish Service combined tests
+templates:
+  - templates/varnish-service.yaml
+  - templates/varnish-prometheus-service.yaml
+  - templates/varnish-servicemonitor.yaml
+tests:
+  - it: renders no resources when varnish disabled (default)
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders varnish-service when varnish enabled
+    set:
+      varnish.enabled: true
+    template: templates/varnish-service.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: renders prometheus-service when varnish and metrics enabled
+    set:
+      varnish.enabled: true
+    template: templates/varnish-prometheus-service.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: renders servicemonitor when varnish and metrics enabled
+    set:
+      varnish.enabled: true
+    template: templates/varnish-servicemonitor.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: renders only varnish-service when metrics disabled
+    set:
+      varnish.enabled: true
+      varnish.metrics.enabled: false
+    template: templates/varnish-service.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: renders no prometheus-service when metrics disabled
+    set:
+      varnish.enabled: true
+      varnish.metrics.enabled: false
+    template: templates/varnish-prometheus-service.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders no servicemonitor when metrics disabled
+    set:
+      varnish.enabled: true
+      varnish.metrics.enabled: false
+    template: templates/varnish-servicemonitor.yaml
+    asserts:
+      - hasDocuments:
+          count: 0

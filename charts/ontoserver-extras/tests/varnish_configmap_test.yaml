@@ -1,0 +1,95 @@
+suite: Varnish ConfigMap tests
+templates:
+  - templates/varnish-configmap.yaml
+tests:
+  - it: renders nothing when varnish disabled (default)
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a ConfigMap when varnish enabled
+    set:
+      varnish.enabled: true
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - hasDocuments:
+          count: 1
+
+  - it: names the ConfigMap correctly
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-varnish-configmap
+
+  - it: uses default backend service name derived from release name
+    set:
+      varnish.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: '\.host = "RELEASE-NAME-ontoserver-service"'
+
+  - it: uses custom backendServiceName when provided
+    set:
+      varnish.enabled: true
+      varnish.backendServiceName: my-custom-backend
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: '\.host = "my-custom-backend"'
+
+  - it: includes Authorization passthrough by default
+    set:
+      varnish.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'req\.http\.Authorization'
+
+  - it: omits Authorization passthrough when passAuthHeaderRequests false
+    set:
+      varnish.enabled: true
+      varnish.cache.passAuthHeaderRequests: false
+    asserts:
+      - notMatchRegex:
+          path: data["default.vcl"]
+          pattern: 'req\.http\.Authorization'
+
+  - it: includes cache TTL for 200 responses
+    set:
+      varnish.enabled: true
+      varnish.cache.time200: 5m
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'beresp\.ttl = 5m'
+
+  - it: includes cache TTL for 404 responses
+    set:
+      varnish.enabled: true
+      varnish.cache.time404: 2m
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'beresp\.ttl = 2m'
+
+  - it: includes opentelemetry VCL blocks when otel enabled
+    set:
+      varnish.enabled: true
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: "http://collector/api/v2/spans"
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'OTEL_SPAN'
+
+  - it: omits opentelemetry VCL blocks when otel disabled
+    set:
+      varnish.enabled: true
+    asserts:
+      - notMatchRegex:
+          path: data["default.vcl"]
+          pattern: 'OTEL_SPAN'

@@ -1,0 +1,44 @@
+suite: Varnish Service details tests
+templates:
+  - templates/varnish-service.yaml
+tests:
+  - it: renders nothing when varnish disabled (default)
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a Service when varnish enabled
+    set:
+      varnish.enabled: true
+    asserts:
+      - isKind:
+          of: Service
+      - hasDocuments:
+          count: 1
+
+  - it: names varnish service correctly
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-varnish-service
+
+  - it: exposes port 80 targeting 8080
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 8080
+
+  - it: is type ClusterIP
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: spec.type
+          value: ClusterIP

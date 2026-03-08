@@ -1,0 +1,49 @@
+suite: Varnish metrics tests
+templates:
+  - templates/varnish-prometheus-service.yaml
+tests:
+  - it: renders nothing when varnish disabled
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders nothing when varnish enabled but metrics disabled
+    set:
+      varnish.enabled: true
+      varnish.metrics.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders prometheus-service when varnish and metrics enabled
+    set:
+      varnish.enabled: true
+    asserts:
+      - isKind:
+          of: Service
+      - hasDocuments:
+          count: 1
+
+  - it: names prometheus service correctly
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-varnish-prometheus-service
+
+  - it: exposes port 9131
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 9131
+
+  - it: sets component label for metrics
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: metrics

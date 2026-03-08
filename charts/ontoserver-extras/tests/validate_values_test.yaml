@@ -1,0 +1,48 @@
+suite: validate-values tests
+templates:
+  - templates/validate-values.yaml
+tests:
+  - it: passes with default values
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when collector enabled without any exporter endpoint
+    set:
+      collector.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "collector requires at least one of collector.otlpEndpoint or collector.zipkinEndpoint"
+
+  - it: passes when collector enabled with otlpEndpoint
+    set:
+      collector.enabled: true
+      collector.otlpEndpoint: "http://otel-collector:4317"
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: passes when collector enabled with zipkinEndpoint
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when varnish.opentelemetry.enabled without varnish.enabled
+    set:
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: "http://collector/api/v2/spans"
+    asserts:
+      - failedTemplate:
+          errorMessage: "varnish.opentelemetry.enabled requires varnish.enabled"
+
+  - it: passes when varnish.opentelemetry.enabled with all required values
+    set:
+      varnish.enabled: true
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: "http://collector/api/v2/spans"
+    asserts:
+      - hasDocuments:
+          count: 0
