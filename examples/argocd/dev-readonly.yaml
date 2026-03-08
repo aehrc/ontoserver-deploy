@@ -41,7 +41,7 @@ spec:
     namespace: ontoserver-dev
   sources:
     - repoURL: https://github.com/aehrc/ontoserver-deploy
-      targetRevision: HEAD
+      targetRevision: update-charts
       path: charts/ontoserver
       helm:
         valuesObject:
@@ -80,7 +80,7 @@ spec:
             healthCheckOption: -l
 
     - repoURL: https://github.com/aehrc/ontoserver-deploy
-      targetRevision: HEAD
+      targetRevision: update-charts
       path: charts/ontoserver-extras
       helm:
         valuesObject:
