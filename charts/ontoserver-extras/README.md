@@ -209,6 +209,7 @@ All Kubernetes resources are prefixed with `{{ .Release.Name }}-`:
 
 Table generated with Readme Generator For Helm: [https://github.com/bitnami/readme-generator-for-helm](https://github.com/bitnami/readme-generator-for-helm)
 Regenerate it with `npx --yes @bitnami/readme-generator-for-helm -v values.yaml -r README.md`
----
+
+***
 
 Copyright &copy; 2026 Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230. All rights reserved.
