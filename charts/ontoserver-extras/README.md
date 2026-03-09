@@ -128,14 +128,14 @@ When installing with plain `helm` (not ArgoCD), the two charts must be wired up 
 
 ```bash
 # 1. Install the main ontoserver chart first (routes directly to ontoserver)
-helm install ontoserver-r4 ./charts/ontoserver -f values.yaml
+helm install ontoserver-dev ./charts/ontoserver -f values.yaml
 
 # 2. Install the extras chart (deploys Varnish and its service)
-helm install ontoserver-r4-extras ./charts/ontoserver-extras -f extras-values.yaml
+helm install ontoserver-dev-extras ./charts/ontoserver-extras -f extras-values.yaml
 
 # 3. Now upgrade the main chart to route traffic through the extras release's Varnish service
-helm upgrade ontoserver-r4 ./charts/ontoserver -f values.yaml \
-  --set ontoserver.gateway.backendServiceNameOverride=ontoserver-r4-extras-varnish-service
+helm upgrade ontoserver-dev ./charts/ontoserver -f values.yaml \
+  --set ontoserver.gateway.backendServiceNameOverride=ontoserver-dev-extras-varnish-service
 ```
 
 > [!NOTE]
