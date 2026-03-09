@@ -120,6 +120,11 @@ collector:
 ontoserver:
   gateway:
     backendServiceNameOverride: <argo-release-name>-varnish-service
+  opentelemetry:
+    instrumentation:
+      enabled: true
+      exporter:
+        endpoint: http://<argo-release-name>-otel-collector:9411
 ```
 
 ### Plain Helm install
@@ -135,7 +140,9 @@ helm install ontoserver-dev-extras ./charts/ontoserver-extras -f extras-values.y
 
 # 3. Now upgrade the main chart to route traffic through the extras release's Varnish service
 helm upgrade ontoserver-dev ./charts/ontoserver -f values.yaml \
-  --set ontoserver.gateway.backendServiceNameOverride=ontoserver-dev-extras-varnish-service
+  --set ontoserver.gateway.backendServiceNameOverride=ontoserver-dev-extras-varnish-service \
+  --set ontoserver.opentelemetry.instrumentation.enabled=true \
+  --set ontoserver.opentelemetry.instrumentation.exporter.endpoint=http://ontoserver-dev-extras-otel-collector:9411
 ```
 
 > [!NOTE]
