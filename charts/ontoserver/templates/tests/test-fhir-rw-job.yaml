@@ -145,9 +145,10 @@ metadata:
   name: {{ .Release.Name }}-ontoserver-test-fhir-rw
   annotations:
     "helm.sh/hook": test
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-delete-policy": before-hook-creation
 spec:
   backoffLimit: 0
+  ttlSecondsAfterFinished: {{ .Values.ontoserver.tests.ttlSecondsAfterFinished }}
   template:
     spec:
       restartPolicy: Never

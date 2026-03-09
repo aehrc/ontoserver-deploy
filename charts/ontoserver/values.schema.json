@@ -292,6 +292,12 @@
             }
           }
         },
+        "tests": {
+          "type": "object",
+          "properties": {
+            "ttlSecondsAfterFinished": { "type": "integer", "minimum": 0 }
+          }
+        },
         "opentelemetry": {
           "type": "object",
           "properties": {

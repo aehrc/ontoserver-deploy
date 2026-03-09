@@ -180,7 +180,11 @@ Integration tests run against a live deployment using `helm test`. They require 
 
 The **metadata test** (always runs) checks the FHIR CapabilityStatement and, if `ontoserver.managementService.enabled=true`, the Spring Boot Actuator health endpoint.
 
+The **FHIR read-only test** (runs when `ontoserver.deployment.isReadOnly=true`) verifies that write requests are rejected and that basic read access remains available.
+
 The **FHIR read-write test** (only runs when `ontoserver.deployment.isReadOnly=false`) loads a CodeSystem, ValueSet, and ConceptMap, then exercises `$lookup`, `$validate-code`, `$expand`, and `$translate` operations.
+
+By default, completed Helm test Jobs are retained for 30 minutes via `ontoserver.tests.ttlSecondsAfterFinished: 1800`, which leaves time to inspect pod logs before Kubernetes cleans them up. Set the value to `0` to delete them immediately after completion when the cluster TTL-after-finished controller processes them.
 
 ```bash
 # Install in read-write mode to enable all integration tests
@@ -198,8 +202,10 @@ helm test my-ontoserver
 > **Note:** `helm test --logs` does not work with Job-based test hooks in Helm 3.17+. To collect test output, use kubectl label selectors after the run:
 > ```bash
 > kubectl logs -l job-name=my-ontoserver-ontoserver-test-metadata
+> kubectl logs -l job-name=my-ontoserver-ontoserver-test-fhir-ro
 > kubectl logs -l job-name=my-ontoserver-ontoserver-test-fhir-rw
 > ```
+> These Jobs are retained for `ontoserver.tests.ttlSecondsAfterFinished` seconds after completion. The default is 1800 seconds (30 minutes).
 
 ## Persistence
 

@@ -1,0 +1,112 @@
+suite: Test hook template tests
+tests:
+  - it: renders metadata test hook by default
+    templates:
+      - templates/tests/test-metadata-job.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-test-metadata-script
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-test-metadata
+        documentIndex: 1
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+        documentIndex: 1
+      - equal:
+          path: spec.ttlSecondsAfterFinished
+          value: 1800
+        documentIndex: 1
+
+  - it: renders read-only test hook by default
+    templates:
+      - templates/tests/test-fhir-ro-job.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-test-ro-script
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-test-fhir-ro
+        documentIndex: 1
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+        documentIndex: 1
+      - equal:
+          path: spec.ttlSecondsAfterFinished
+          value: 1800
+        documentIndex: 1
+
+  - it: does not render read-write test hook by default
+    templates:
+      - templates/tests/test-fhir-rw-job.yaml
+      - templates/tests/test-fixtures-configmap.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders read-write fixtures when isReadOnly is false
+    templates:
+      - templates/tests/test-fixtures-configmap.yaml
+    set:
+      ontoserver.deployment.isReadOnly: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-test-fixtures
+
+  - it: renders read-write test hook when isReadOnly is false
+    templates:
+      - templates/tests/test-fhir-rw-job.yaml
+    set:
+      ontoserver.deployment.isReadOnly: false
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-test-rw-script
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-test-fhir-rw
+        documentIndex: 1
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+        documentIndex: 1
+      - equal:
+          path: spec.ttlSecondsAfterFinished
+          value: 1800
+        documentIndex: 1
+
+  - it: does not render read-only test hook when isReadOnly is false
+    templates:
+      - templates/tests/test-fhir-ro-job.yaml
+    set:
+      ontoserver.deployment.isReadOnly: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders custom TTL for metadata test hook
+    templates:
+      - templates/tests/test-metadata-job.yaml
+    set:
+      ontoserver.tests.ttlSecondsAfterFinished: 600
+    asserts:
+      - equal:
+          path: spec.ttlSecondsAfterFinished
+          value: 600
+        documentIndex: 1

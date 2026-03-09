@@ -252,6 +252,9 @@ ontoserver:
     serviceMonitor:
       ## @param ontoserver.metrics.serviceMonitor.enabled   Enable Prometheus ServiceMonitor (requires managementService.enabled and Prometheus Operator CRDs)
       enabled: false
+  tests:
+    ## @param ontoserver.tests.ttlSecondsAfterFinished   Time to retain Helm test Jobs after completion so logs remain available
+    ttlSecondsAfterFinished: 1800
   opentelemetry:
     instrumentation:
       ## @param ontoserver.opentelemetry.instrumentation.enabled           Enable OpenTelemetry Java auto-instrumentation (requires OpenTelemetry Operator)
