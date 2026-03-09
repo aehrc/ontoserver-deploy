@@ -7,7 +7,7 @@ on:
 
 jobs:
   unit-tests:
-    name: Unit Tests
+    name: Lint and Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,6 +19,15 @@ jobs:
 
       - name: Install helm-unittest plugin
         run: helm plugin install https://github.com/helm-unittest/helm-unittest
+
+      - name: Build chart dependencies
+        run: helm dependency build ./charts/ontoserver
+
+      - name: Run Helm lint
+        run: |
+          helm lint --strict ./charts/ontoserver
+          helm lint --strict ./charts/ontoserver-extras
+          helm lint --strict ./charts/ontoserver-indexer
 
       - name: Run unit tests
         run: |

@@ -5,6 +5,7 @@ type: application
 version: 0.1.0
 appVersion: "ctsa-6"
 home: https://ontoserver.csiro.au
+icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/main/icons/ontoserver-extras.png
 sources:
   - https://github.com/aehrc/ontoserver-deploy
 keywords:
