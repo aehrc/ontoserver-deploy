@@ -755,12 +755,12 @@ ontoserver:
 
 ## Gateway API vs Ingress
 
-> **Gateway API is the recommended networking mode.** It is the configuration used by the chart developers and unlocks the full set of Envoy Gateway traffic policies (rate limiting, request buffering, CIDR deny rules). Unless you have a specific reason to use Ingress, prefer Gateway API.
+> **Gateway API is the recommended networking mode.** Active development of the standard Kubernetes Ingress API is suspended by the K8s community in favor of the newer Gateway API. Gateway API is the configuration used by the chart developers and unlocks the full set of Envoy Gateway traffic policies (rate limiting, request buffering, CIDR deny rules). Unless you have a specific reason to use Ingress (e.g. legacy cluster constraints), we strongly steer you toward Envoy Gateway and the Gateway API.
 
 By default neither is enabled — the chart deploys Ontoserver with no external access, suitable for internal use or testing. Enable one to expose the server:
 
 * **Gateway API** (`ontoserver.gateway.enabled: true`) *(recommended)*: requires Gateway API CRDs and a compatible GatewayClass (e.g. [Envoy Gateway](https://gateway.envoyproxy.io/), [Traefik](https://doc.traefik.io/traefik/routing/providers/kubernetes-gateway/), [Cilium](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/), or any conformant implementation). Creates `Gateway`, `HTTPRoute`, and optionally a cert-manager `Issuer` resource. The default `className` is `envoy-gateway-class` — set `ontoserver.gateway.className` to match your GatewayClass. The default listener port is `443`; some implementations use a different port (e.g. Traefik defaults to `8443` — set `ontoserver.gateway.listenerPortSecure: 8443`). TLS termination is optional: set `ontoserver.tls.enabled: true` with a certificate reference, or enable cert-manager for automatic provisioning.
-* **Ingress** (`ontoserver.ingress.enabled: true`): creates a standard `networking.k8s.io/v1` Ingress. Use the bundled F5 nginx-ingress subchart (`nginx-ingress.enabled: true`), the cluster's default controller (e.g. Traefik on k3d/k3s), or any other Ingress controller by setting `ontoserver.ingress.className` appropriately.
+* **Ingress** (`ontoserver.ingress.enabled: true`) *(deprecated)*: creates a standard `networking.k8s.io/v1` Ingress. Use the bundled F5 nginx-ingress subchart (`nginx-ingress.enabled: true`), the cluster's default controller (e.g. Traefik on k3d/k3s), or any other Ingress controller by setting `ontoserver.ingress.className` appropriately.
 
 Gateway API and Ingress are mutually exclusive. Both support a `backendServiceNameOverride` to route traffic through an intermediate proxy such as the Varnish cache from `ontoserver-extras`:
 
