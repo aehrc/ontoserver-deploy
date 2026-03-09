@@ -194,11 +194,22 @@ tolerations:
 
 ## Monitoring
 
-After installing, the NOTES output prints the namespace-qualified commands to follow the Job:
+After installing, the NOTES output prints the namespace-qualified commands to follow the submitted Job.
 
+By default the chart gives each Job a random suffix, so the actual Job name is not just the Helm release name. Use the exact name printed in `helm install` / `helm upgrade --install` output, or set `job.name` if you need a predictable Job name for scripting.
+
+Example with an explicit fixed Job name:
+
+```yaml
+job:
+  name: snomed-au-index
 ```
-kubectl logs -f job/<release-name> -n <namespace>
-kubectl get job <release-name> -n <namespace>
+
+Then the monitoring commands are stable:
+
+```bash
+kubectl logs -f job/snomed-au-index -n <namespace>
+kubectl get job snomed-au-index -n <namespace>
 ```
 
 ## Parameters

@@ -7,7 +7,7 @@ This chart provides flexible deployment options for [Ontoserver](https://ontoser
 > - **Kubernetes 1.29+** — required when `ontoserver.deployment.db.enabled: true` (the default). The Postgres sidecar uses the [native sidecar init container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) pattern (`restartPolicy: Always`), which is stable from K8s 1.29.
 > - **[Envoy Gateway](https://gateway.envoyproxy.io/)** — required when `ontoserver.gateway.enabled: true` (Gateway API networking, and any Envoy traffic/security policies)
 > - **[F5 Nginx Ingress Controller](https://docs.nginx.com/nginx-ingress-controller/)** — required when `ontoserver.ingress.enabled: true` and you are **not** using the bundled `nginx-ingress` subchart (`nginx-ingress.enabled: false`)
-> - **[External Secrets Operator](https://external-secrets.io/)** — required when `ontoserver.externalSecrets.enabled: true`
+> - **[External Secrets Operator](https://external-secrets.io/)** — required when `ontoserver.externalSecret.enabled: true`
 
 ## Deployment Modes
 

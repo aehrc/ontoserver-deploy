@@ -105,7 +105,7 @@ varnish:
   enabled: true
   opentelemetry:
     enabled: true
-    collectorEndpoint: http://ontoserver-r4-collector:9411
+    collectorEndpoint: http://ontoserver-r4-otel-collector:9411
 
 collector:
   enabled: true
