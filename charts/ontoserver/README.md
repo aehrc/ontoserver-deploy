@@ -212,7 +212,7 @@ helm test my-ontoserver
 Two persistence modes are available via `ontoserver.deployment.persistence.mode`:
 
 - **`split`** (default) — separate PVCs for application files (`/var/onto`) and database files (`/var/lib/postgresql/data`).
-- **`shared`** — a single PVC for both, with the database stored under a `db/` subPath.
+- **`shared`** - a single PVC for both, with the database stored under a db/ subPath; shared mode uses the files.* persistence settings, while dbfiles.* is ignored.
 
 For `Deployment` kind, persistence is disabled by default and opt-in via `persistence.enabledForDeployment: true`. For `StatefulSet`, PVCs are always created via `volumeClaimTemplates`.
 
