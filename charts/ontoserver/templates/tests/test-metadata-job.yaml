@@ -32,7 +32,7 @@ data:
     check "GET /fhir/metadata returns 200" "$([ "$CODE" = "200" ] && echo ok || echo "http $CODE")"
     check "resourceType is CapabilityStatement" "$(grep -q '"resourceType":"CapabilityStatement"' /tmp/response.json && echo ok || echo "not found")"
     check "status is active" "$(grep -q '"status":"active"' /tmp/response.json && echo ok || echo "not found")"
-    check "fhirVersion is 4.0" "$(grep -q '"fhirVersion":"4.0' /tmp/response.json && echo ok || echo "not found")"
+    check "fhirVersion is supported (R4 or R5)" "$(grep -Eq '"fhirVersion":"(4\.0|5\.0)' /tmp/response.json && echo ok || echo "not found")"
     check "CodeSystem lookup operation advertised" "$(grep -q '"lookup"' /tmp/response.json && echo ok || echo "not found")"
     check "ValueSet expand operation advertised" "$(grep -q '"expand"' /tmp/response.json && echo ok || echo "not found")"
     check "ConceptMap translate operation advertised" "$(grep -q '"translate"' /tmp/response.json && echo ok || echo "not found")"

@@ -22,6 +22,14 @@ tests:
           path: spec.ttlSecondsAfterFinished
           value: 1800
         documentIndex: 1
+      - notMatchRegex:
+          path: data["test.sh"]
+          pattern: 'check "fhirVersion is 4\.0"'
+        documentIndex: 0
+      - matchRegex:
+          path: data["test.sh"]
+          pattern: 'grep -Eq ''"fhirVersion":"\(4\\\.0\|5\\\.0\)'''
+        documentIndex: 0
 
   - it: renders read-only test hook by default
     templates:
