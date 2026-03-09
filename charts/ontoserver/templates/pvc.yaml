@@ -11,7 +11,7 @@ spec:
   {{- end }}
   resources:
     requests:
-      storage: "{{ required "ontoserver.resources.ontoserver.requests.storage is required" .Values.ontoserver.resources.ontoserver.requests.storage }}"
+      storage: "{{ required "ontoserver.deployment.persistence.files.storageSize is required" .Values.ontoserver.deployment.persistence.files.storageSize }}"
   {{- if .Values.ontoserver.deployment.persistence.files.storageClass.provided.enabled }}
   storageClassName: {{ .Release.Name }}-ontoserver-files
   {{- else if .Values.ontoserver.deployment.persistence.files.storageClass.name }}
@@ -33,7 +33,7 @@ spec:
   {{- end }}
   resources:
     requests:
-      storage: "{{ required "ontoserver.resources.db.requests.storage is required" .Values.ontoserver.resources.db.requests.storage }}"
+      storage: "{{ required "ontoserver.deployment.persistence.dbfiles.storageSize is required" .Values.ontoserver.deployment.persistence.dbfiles.storageSize }}"
   {{- if .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.enabled }}
   storageClassName: {{ .Release.Name }}-ontoserver-db-files
   {{- else if .Values.ontoserver.deployment.persistence.dbfiles.storageClass.name }}

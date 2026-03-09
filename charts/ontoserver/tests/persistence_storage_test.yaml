@@ -1,0 +1,56 @@
+suite: Persistence storage sizing tests
+tests:
+  - it: renders deployment PVC size from persistence files storageSize
+    templates:
+      - templates/pvc.yaml
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.persistence.files.storageSize: 25Gi
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.resources.requests.storage
+          value: 25Gi
+        documentIndex: 0
+
+  - it: renders statefulset volume claim size from persistence files storageSize
+    templates:
+      - templates/statefulset.yaml
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.persistence.files.storageSize: 30Gi
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.resources.requests.storage
+          value: 30Gi
+
+  - it: renders files PV capacity from persistence files storageSize
+    templates:
+      - templates/pv.yaml
+    set:
+      ontoserver.deployment.persistence.files.pv.enabled: true
+      ontoserver.deployment.persistence.files.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+      ontoserver.deployment.persistence.files.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+      ontoserver.deployment.persistence.files.storageSize: 40Gi
+    asserts:
+      - equal:
+          path: spec.capacity.storage
+          value: 40Gi
+
+  - it: renders split db PVC size from persistence dbfiles storageSize
+    templates:
+      - templates/pvc.yaml
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.db.enabled: true
+      ontoserver.deployment.persistence.dbfiles.storageSize: 15Gi
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.resources.requests.storage
+          value: 15Gi
+        documentIndex: 1

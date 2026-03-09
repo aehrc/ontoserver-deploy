@@ -69,6 +69,8 @@ ontoserver:
       files:
         ## @param ontoserver.deployment.persistence.files.accessMode  PVC access mode. Use ReadWriteOnce for single instances and StatefulSet scaled deployments (each pod gets its own PVC via volumeClaimTemplates). Shared volumes across pods are not supported — Lucene indexes are pod-local.
         accessMode: ReadWriteOnce
+        ## @param ontoserver.deployment.persistence.files.storageSize  Requested storage size for the Ontoserver files volume
+        storageSize: 10Gi
         existingVolume:
           ## @param ontoserver.deployment.persistence.files.existingVolume.enabled  Bind to existing PV (Deployment only; not supported for StatefulSet)
           enabled: false
@@ -81,8 +83,6 @@ ontoserver:
           diskURI: ""
           ## @param ontoserver.deployment.persistence.files.pv.csiDriver     CSI driver (required when enabled, e.g. disk.csi.azure.com or ebs.csi.aws.com)
           csiDriver: ""
-          ## @param ontoserver.deployment.persistence.files.pv.storageSize   Storage capacity
-          storageSize: 10Gi
           ## @param ontoserver.deployment.persistence.files.pv.storageClassName  StorageClass name (defaults to RELEASE-ontoserver-files)
           storageClassName: ""
         storageClass:
@@ -106,6 +106,8 @@ ontoserver:
       dbfiles:
         ## @param ontoserver.deployment.persistence.dbfiles.accessMode  PVC access mode. Use ReadWriteOnce; only relevant for single-instance deployments with sidecar db (scaled deployments require external PostgreSQL and do not use dbfiles).
         accessMode: ReadWriteOnce
+        ## @param ontoserver.deployment.persistence.dbfiles.storageSize  Requested storage size for the database files volume
+        storageSize: 10Gi
         existingVolume:
           ## @param ontoserver.deployment.persistence.dbfiles.existingVolume.enabled  Bind to existing PV (Deployment only; not supported for StatefulSet)
           enabled: false
@@ -118,8 +120,6 @@ ontoserver:
           diskURI: ""
           ## @param ontoserver.deployment.persistence.dbfiles.pv.csiDriver     CSI driver (required when enabled, e.g. disk.csi.azure.com or ebs.csi.aws.com)
           csiDriver: ""
-          ## @param ontoserver.deployment.persistence.dbfiles.pv.storageSize   Storage capacity
-          storageSize: 10Gi
           ## @param ontoserver.deployment.persistence.dbfiles.pv.storageClassName  StorageClass name (defaults to RELEASE-ontoserver-db-files)
           storageClassName: ""
         storageClass:
@@ -178,7 +178,6 @@ ontoserver:
     ontoserver:
       ## @param ontoserver.resources.ontoserver.requests.cpu      CPU request
       ## @param ontoserver.resources.ontoserver.requests.memory   Memory request
-      ## @param ontoserver.resources.ontoserver.requests.storage  Storage request
       ## @param ontoserver.resources.ontoserver.limits.cpu        CPU limit
       ## @param ontoserver.resources.ontoserver.limits.memory     Memory limit
       ## @param ontoserver.resources.ontoserver.initialHeapSize   Java initial heap
@@ -186,7 +185,6 @@ ontoserver:
       requests:
         cpu: 2
         memory: 4G
-        storage: 10G
       limits:
         cpu: 2
         memory: 4G
@@ -195,13 +193,11 @@ ontoserver:
     db:
       ## @param ontoserver.resources.db.requests.cpu       DB CPU request
       ## @param ontoserver.resources.db.requests.memory    DB memory request
-      ## @param ontoserver.resources.db.requests.storage   Storage request
       ## @param ontoserver.resources.db.limits.cpu         DB CPU limit
       ## @param ontoserver.resources.db.limits.memory      DB memory limit
       requests:
         cpu: 1
         memory: 1G
-        storage: 10G
       limits:
         cpu: 1
         memory: 1G

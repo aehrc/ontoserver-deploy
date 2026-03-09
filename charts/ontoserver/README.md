@@ -514,12 +514,12 @@ The ArgoCD examples use multi-source Applications with both the `ontoserver` and
 | `ontoserver.deployment.persistence.enabledForDeployment`                                    | Enable PVC on Deployment                                                                                                                                                                                                      | `false`                           |
 | `ontoserver.deployment.persistence.mode`                                                    | shared | split - Use one or separate PV for db and lucene files                                                                                                                                                               | `split`                           |
 | `ontoserver.deployment.persistence.files.accessMode`                                        | PVC access mode. Use ReadWriteOnce for single instances and StatefulSet scaled deployments (each pod gets its own PVC via volumeClaimTemplates). Shared volumes across pods are not supported — Lucene indexes are pod-local. | `ReadWriteOnce`                   |
+| `ontoserver.deployment.persistence.files.storageSize`                                       | Requested storage size for the Ontoserver files volume                                                                                                                                                                        | `10Gi`                            |
 | `ontoserver.deployment.persistence.files.existingVolume.enabled`                            | Bind to existing PV (Deployment only; not supported for StatefulSet)                                                                                                                                                          | `false`                           |
 | `ontoserver.deployment.persistence.files.existingVolume.name`                               | Name of existing PV                                                                                                                                                                                                           | `""`                              |
 | `ontoserver.deployment.persistence.files.pv.enabled`                                        | Create a PersistentVolume for the files PVC backed by a pre-provisioned disk (requires existingVolume.enabled and existingVolume.name)                                                                                        | `false`                           |
 | `ontoserver.deployment.persistence.files.pv.diskURI`                                        | CSI volumeHandle — cloud-specific disk identifier (required when enabled, e.g. Azure disk resource ID or EBS volume ID)                                                                                                       | `""`                              |
 | `ontoserver.deployment.persistence.files.pv.csiDriver`                                      | CSI driver (required when enabled, e.g. disk.csi.azure.com or ebs.csi.aws.com)                                                                                                                                                | `""`                              |
-| `ontoserver.deployment.persistence.files.pv.storageSize`                                    | Storage capacity                                                                                                                                                                                                              | `10Gi`                            |
 | `ontoserver.deployment.persistence.files.pv.storageClassName`                               | StorageClass name (defaults to RELEASE-ontoserver-files)                                                                                                                                                                      | `""`                              |
 | `ontoserver.deployment.persistence.files.storageClass.name`                                 | StorageClass name to use when provided.enabled is false; leave empty to use the cluster default StorageClass                                                                                                                  | `default`                         |
 | `ontoserver.deployment.persistence.files.storageClass.provided.enabled`                     | Use provided storageClass                                                                                                                                                                                                     | `true`                            |
@@ -529,12 +529,12 @@ The ArgoCD examples use multi-source Applications with both the `ontoserver` and
 | `ontoserver.deployment.persistence.files.storageClass.provided.storageParameters.kind`      | Storage kind (AKS/Azure specific)                                                                                                                                                                                             | `Managed`                         |
 | `ontoserver.deployment.persistence.files.storageClass.provided.allowVolumeExpansion`        | Allow volume expansion                                                                                                                                                                                                        | `true`                            |
 | `ontoserver.deployment.persistence.dbfiles.accessMode`                                      | PVC access mode. Use ReadWriteOnce; only relevant for single-instance deployments with sidecar db (scaled deployments require external PostgreSQL and do not use dbfiles).                                                    | `ReadWriteOnce`                   |
+| `ontoserver.deployment.persistence.dbfiles.storageSize`                                     | Requested storage size for the database files volume                                                                                                                                                                          | `10Gi`                            |
 | `ontoserver.deployment.persistence.dbfiles.existingVolume.enabled`                          | Bind to existing PV (Deployment only; not supported for StatefulSet)                                                                                                                                                          | `false`                           |
 | `ontoserver.deployment.persistence.dbfiles.existingVolume.name`                             | Name of existing PV                                                                                                                                                                                                           | `""`                              |
 | `ontoserver.deployment.persistence.dbfiles.pv.enabled`                                      | Create a PersistentVolume for the db-files PVC backed by a pre-provisioned disk (requires existingVolume.enabled and existingVolume.name; only used in split mode with db.enabled)                                            | `false`                           |
 | `ontoserver.deployment.persistence.dbfiles.pv.diskURI`                                      | CSI volumeHandle — cloud-specific disk identifier (required when enabled, e.g. Azure disk resource ID or EBS volume ID)                                                                                                       | `""`                              |
 | `ontoserver.deployment.persistence.dbfiles.pv.csiDriver`                                    | CSI driver (required when enabled, e.g. disk.csi.azure.com or ebs.csi.aws.com)                                                                                                                                                | `""`                              |
-| `ontoserver.deployment.persistence.dbfiles.pv.storageSize`                                  | Storage capacity                                                                                                                                                                                                              | `10Gi`                            |
 | `ontoserver.deployment.persistence.dbfiles.pv.storageClassName`                             | StorageClass name (defaults to RELEASE-ontoserver-db-files)                                                                                                                                                                   | `""`                              |
 | `ontoserver.deployment.persistence.dbfiles.storageClass.name`                               | StorageClass name to use when provided.enabled is false; leave empty to use the cluster default StorageClass                                                                                                                  | `default`                         |
 | `ontoserver.deployment.persistence.dbfiles.storageClass.provided.enabled`                   | Use provided storageClass                                                                                                                                                                                                     | `true`                            |
@@ -568,20 +568,18 @@ The ArgoCD examples use multi-source Applications with both the `ontoserver` and
 
 ### Resources
 
-| Name                                               | Description       | Value   |
-| -------------------------------------------------- | ----------------- | ------- |
-| `ontoserver.resources.ontoserver.requests.cpu`     | CPU request       | `2`     |
-| `ontoserver.resources.ontoserver.requests.memory`  | Memory request    | `4G`    |
-| `ontoserver.resources.ontoserver.requests.storage` | Storage request   | `10G`   |
-| `ontoserver.resources.ontoserver.limits.cpu`       | CPU limit         | `2`     |
-| `ontoserver.resources.ontoserver.limits.memory`    | Memory limit      | `4G`    |
-| `ontoserver.resources.ontoserver.initialHeapSize`  | Java initial heap | `2800m` |
-| `ontoserver.resources.ontoserver.maxHeapSize`      | Java max heap     | `2800m` |
-| `ontoserver.resources.db.requests.cpu`             | DB CPU request    | `1`     |
-| `ontoserver.resources.db.requests.memory`          | DB memory request | `1G`    |
-| `ontoserver.resources.db.requests.storage`         | Storage request   | `10G`   |
-| `ontoserver.resources.db.limits.cpu`               | DB CPU limit      | `1`     |
-| `ontoserver.resources.db.limits.memory`            | DB memory limit   | `1G`    |
+| Name                                              | Description       | Value   |
+| ------------------------------------------------- | ----------------- | ------- |
+| `ontoserver.resources.ontoserver.requests.cpu`    | CPU request       | `2`     |
+| `ontoserver.resources.ontoserver.requests.memory` | Memory request    | `4G`    |
+| `ontoserver.resources.ontoserver.limits.cpu`      | CPU limit         | `2`     |
+| `ontoserver.resources.ontoserver.limits.memory`   | Memory limit      | `4G`    |
+| `ontoserver.resources.ontoserver.initialHeapSize` | Java initial heap | `2800m` |
+| `ontoserver.resources.ontoserver.maxHeapSize`     | Java max heap     | `2800m` |
+| `ontoserver.resources.db.requests.cpu`            | DB CPU request    | `1`     |
+| `ontoserver.resources.db.requests.memory`         | DB memory request | `1G`    |
+| `ontoserver.resources.db.limits.cpu`              | DB CPU limit      | `1`     |
+| `ontoserver.resources.db.limits.memory`           | DB memory limit   | `1G`    |
 
 ### TLS and Networking
 
@@ -611,6 +609,7 @@ The ArgoCD examples use multi-source Applications with both the `ontoserver` and
 | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- | -------------------------------------- |
 | `ontoserver.managementService.enabled`                       | Enable management service (exposes Spring Boot actuator on port 18080)                             | `false`                                |
 | `ontoserver.metrics.serviceMonitor.enabled`                  | Enable Prometheus ServiceMonitor (requires managementService.enabled and Prometheus Operator CRDs) | `false`                                |
+| `ontoserver.tests.ttlSecondsAfterFinished`                   | Time to retain Helm test Jobs after completion so logs remain available                            | `1800`                                 |
 | `ontoserver.opentelemetry.instrumentation.enabled`           | Enable OpenTelemetry Java auto-instrumentation (requires OpenTelemetry Operator)                   | `false`                                |
 | `ontoserver.opentelemetry.instrumentation.image`             | Auto-instrumentation agent image                                                                   | `otel/autoinstrumentation-java:latest` |
 | `ontoserver.opentelemetry.instrumentation.serviceName`       | OTel service name (defaults to releaseName/releaseName-ontoserver)                                 | `""`                                   |

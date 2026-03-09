@@ -22,18 +22,21 @@
 #   - AWS Load Balancer Controller installed
 #
 # Usage:
-#   helm install my-ontoserver ./charts/ontoserver -f eks/scaled-rw-envoy-experimental.yaml
+#   helm install my-ontoserver ./charts/ontoserver -f eks/scaled-rw-envoy-experimental.yaml \
+#     --set ontoserver.imageCredentials.username=<quay-username> \
+#     --set ontoserver.imageCredentials.password=<quay-password>
 
 ontoserver:
-  imageCredentials:
-    username: ""   # quay.io username
-    password: ""   # quay.io password
-
   serverName: ontoserver.example.com
   hostNames:
     - ontoserver.example.com
 
   deployment:
+    # Image pull auth:
+    # - preferred for production: create a docker-registry Secret and reference it here
+    # - alternative: pass ontoserver.imageCredentials.username/password via --set at install time
+    imagePullSecrets:
+      - name: ontoserver-quay-pull-secret
     kind: StatefulSet
     type: scaled
     image: quay.io/aehrc/ontoserver:ctsa-6
@@ -50,6 +53,7 @@ ontoserver:
       # EBS (gp3) — ReadWriteOnce per pod via StatefulSet volumeClaimTemplates.
       files:
         accessMode: ReadWriteOnce
+        storageSize: 50G
         storageClass:
           provided:
             enabled: true
@@ -80,7 +84,6 @@ ontoserver:
       requests:
         cpu: 2
         memory: 4G
-        storage: 50G
       limits:
         cpu: 4
         memory: 8G

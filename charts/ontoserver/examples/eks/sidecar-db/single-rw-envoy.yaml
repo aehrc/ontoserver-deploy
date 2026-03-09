@@ -17,18 +17,21 @@
 #   - cert-manager installed (optional, for TLS)
 #
 # Usage:
-#   helm install my-ontoserver ./charts/ontoserver -f eks/sidecar-db/single-rw-envoy.yaml
+#   helm install my-ontoserver ./charts/ontoserver -f eks/sidecar-db/single-rw-envoy.yaml \
+#     --set ontoserver.imageCredentials.username=<quay-username> \
+#     --set ontoserver.imageCredentials.password=<quay-password>
 
 ontoserver:
-  imageCredentials:
-    username: ""   # quay.io username
-    password: ""   # quay.io password
-
   serverName: ontoserver.example.com
   hostNames:
     - ontoserver.example.com
 
   deployment:
+    # Image pull auth:
+    # - preferred for production: create a docker-registry Secret and reference it here
+    # - alternative: pass ontoserver.imageCredentials.username/password via --set at install time
+    imagePullSecrets:
+      - name: ontoserver-quay-pull-secret
     kind: Deployment
     type: single
     image: quay.io/aehrc/ontoserver:ctsa-6
@@ -44,6 +47,7 @@ ontoserver:
       mode: split
       files:
         accessMode: ReadWriteOnce
+        storageSize: 20G
         storageClass:
           provided:
             enabled: true
@@ -57,6 +61,7 @@ ontoserver:
               encrypted: "true"
       dbfiles:
         accessMode: ReadWriteOnce
+        storageSize: 10G
         storageClass:
           provided:
             enabled: true
@@ -95,7 +100,6 @@ ontoserver:
       requests:
         cpu: 2
         memory: 4G
-        storage: 20G
       limits:
         cpu: 2
         memory: 4G
@@ -105,7 +109,6 @@ ontoserver:
       requests:
         cpu: 1
         memory: 1G
-        storage: 10G
       limits:
         cpu: 1
         memory: 1G

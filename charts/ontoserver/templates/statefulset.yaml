@@ -230,7 +230,7 @@ spec:
         {{- else }}
         resources:
           requests:
-            storage: {{ required "ontoserver.resources.ontoserver.requests.storage is required for Scaled deployments" .Values.ontoserver.resources.ontoserver.requests.storage }}
+            storage: {{ required "ontoserver.deployment.persistence.files.storageSize is required for Scaled deployments" .Values.ontoserver.deployment.persistence.files.storageSize }}
         accessModes:
           - "{{ .Values.ontoserver.deployment.persistence.files.accessMode }}"
         {{- if .Values.ontoserver.deployment.persistence.files.storageClass.provided.enabled }}
@@ -248,7 +248,7 @@ spec:
         {{- else }}
         resources:
           requests:
-            storage: {{ required "ontoserver.resources.db.requests.storage is required for Scaled deployments" .Values.ontoserver.resources.db.requests.storage }}
+            storage: {{ required "ontoserver.deployment.persistence.dbfiles.storageSize is required for Scaled deployments" .Values.ontoserver.deployment.persistence.dbfiles.storageSize }}
         accessModes:
           - "{{ .Values.ontoserver.deployment.persistence.dbfiles.accessMode }}"
         {{- if .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.enabled }}

@@ -72,6 +72,7 @@
                       "type": "string",
                       "enum": ["ReadWriteOnce", "ReadWriteMany", "ReadOnlyMany", "ReadWriteOncePod"]
                     },
+                    "storageSize": { "type": "string" },
                     "existingVolume": {
                       "type": "object",
                       "properties": {
@@ -85,7 +86,6 @@
                         "enabled":          { "type": "boolean" },
                         "diskURI":          { "type": "string" },
                         "csiDriver":        { "type": "string" },
-                        "storageSize":      { "type": "string" },
                         "storageClassName": { "type": "string" }
                       }
                     },
@@ -114,6 +114,7 @@
                       "type": "string",
                       "enum": ["ReadWriteOnce", "ReadWriteMany", "ReadOnlyMany", "ReadWriteOncePod"]
                     },
+                    "storageSize": { "type": "string" },
                     "existingVolume": {
                       "type": "object",
                       "properties": {
@@ -127,7 +128,6 @@
                         "enabled":          { "type": "boolean" },
                         "diskURI":          { "type": "string" },
                         "csiDriver":        { "type": "string" },
-                        "storageSize":      { "type": "string" },
                         "storageClassName": { "type": "string" }
                       }
                     },
@@ -196,8 +196,7 @@
                   "type": "object",
                   "properties": {
                     "cpu":     { "type": ["string","number"] },
-                    "memory":  { "type": "string" },
-                    "storage": { "type": "string" }
+                    "memory":  { "type": "string" }
                   }
                 },
                 "limits": {
@@ -218,8 +217,7 @@
                   "type": "object",
                   "properties": {
                     "cpu":    { "type": ["string","number"] },
-                    "memory": { "type": "string" },
-                    "storage": { "type": "string" }
+                    "memory": { "type": "string" }
 
                   }
                 },

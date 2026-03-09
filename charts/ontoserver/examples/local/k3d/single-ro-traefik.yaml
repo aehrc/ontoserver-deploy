@@ -15,7 +15,9 @@
 #
 # 2. Install the chart:
 #
-#      helm install my-ontoserver ./charts/ontoserver -f local/k3d/single-ro-traefik.yaml
+#      helm install my-ontoserver ./charts/ontoserver -f local/k3d/single-ro-traefik.yaml \
+#        --set ontoserver.imageCredentials.username=<quay-username> \
+#        --set ontoserver.imageCredentials.password=<quay-password>
 #
 # 3. Wait for the pod to become ready:
 #
@@ -29,16 +31,17 @@
 #   - For Gateway API on k3d see single-ro-envoy-gateway.yaml.
 
 ontoserver:
-  imageCredentials:
-    username: ""   # quay.io username
-    password: ""   # quay.io password
-
   serverName: localhost
   serverPort: "8080"   # matches the k3d port mapping above
   hostNames:
     - localhost
 
   deployment:
+    # Image pull auth:
+    # - preferred for production: create a docker-registry Secret and reference it here
+    # - alternative: pass ontoserver.imageCredentials.username/password via --set at install time
+    imagePullSecrets:
+      - name: ontoserver-quay-pull-secret
     kind: Deployment
     type: single
     image: quay.io/aehrc/ontoserver:ctsa-6
@@ -55,12 +58,14 @@ ontoserver:
       # local-path is the default StorageClass in k3d/k3s clusters.
       files:
         accessMode: ReadWriteOnce
+        storageSize: 10G
         storageClass:
           provided:
             enabled: false
           name: ""
       dbfiles:
         accessMode: ReadWriteOnce
+        storageSize: 5G
         storageClass:
           provided:
             enabled: false
@@ -79,7 +84,6 @@ ontoserver:
       requests:
         cpu: 1
         memory: 3G
-        storage: 10G
       limits:
         cpu: 2
         memory: 4G
@@ -89,7 +93,6 @@ ontoserver:
       requests:
         cpu: 500m
         memory: 512M
-        storage: 5G
       limits:
         cpu: 1
         memory: 1G

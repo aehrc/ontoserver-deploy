@@ -29,22 +29,25 @@
 #   - cert-manager installed (optional, for TLS)
 #
 # Usage:
-#   helm install my-ontoserver ./charts/ontoserver -f aks/scaled-ro-envoy.yaml
+#   helm install my-ontoserver ./charts/ontoserver -f aks/scaled-ro-envoy.yaml \
+#     --set ontoserver.imageCredentials.username=<quay-username> \
+#     --set ontoserver.imageCredentials.password=<quay-password>
 
 ontoserver:
-  imageCredentials:
-    username: ""   # quay.io username
-    password: ""   # quay.io password
-
   serverName: ontoserver.example.com
   hostNames:
     - ontoserver.example.com
 
   deployment:
+    # Image pull auth:
+    # - preferred for production: create a docker-registry Secret and reference it here
+    # - alternative: pass ontoserver.imageCredentials.username/password via --set at install time
+    imagePullSecrets:
+      - name: ontoserver-quay-pull-secret
     kind: StatefulSet
     type: scaled
     image: quay.io/aehrc/ontoserver:ctsa-6
-    replicas: 3
+    replicas: 2
     isReadOnly: true
 
     # clusterName scopes Infinispan discovery to this deployment.
@@ -55,12 +58,12 @@ ontoserver:
       enabled: false   # external PostgreSQL required — sidecar not supported for scaled
 
     persistence:
-      mode: split
       # Azure Disk (Premium_LRS) — ReadWriteOnce per pod. StatefulSet
       # volumeClaimTemplates provision a dedicated disk for each pod so
       # Lucene indexes are never shared between instances.
       files:
         accessMode: ReadWriteOnce
+        storageSize: 50G   # per-pod disk for Lucene indexes — size for your terminology set
         storageClass:
           provided:
             enabled: true
@@ -73,7 +76,7 @@ ontoserver:
 
     podDisruptionBudget:
       enabled: true
-      minAvailable: 2   # keep at least 2 instances available during updates
+      minAvailable: 1   # keep at least 1 instance available during updates
 
   config:
     # External PostgreSQL connection — replace with your server details.
@@ -85,21 +88,19 @@ ontoserver:
     enabled: true
     className: envoy-gateway-class
 
-  # ── TLS via cert-manager ──────────────────────────────────────────────────
-  # tls:
-  #   enabled: true
-  #   certRef: ontoserver-tls
-  # certmanager:
-  #   enabled: true
-  #   clusterIssuerName: letsencrypt-prod
-  #   email: your-email@example.com
+  tls:
+    enabled: true
+    certRef: ontoserver-tls
+  certmanager:
+    enabled: true
+    clusterIssuerName: letsencrypt-prod
+    email: your-email@example.com
 
   resources:
     ontoserver:
       requests:
         cpu: 2
         memory: 4G
-        storage: 50G   # per-pod disk for Lucene indexes — size for your terminology set
       limits:
         cpu: 4
         memory: 8G

@@ -5,7 +5,7 @@ metadata:
   name: {{ required "ontoserver.deployment.persistence.files.existingVolume.name is required when files.pv.enabled" .Values.ontoserver.deployment.persistence.files.existingVolume.name }}
 spec:
   capacity:
-    storage: {{ .Values.ontoserver.deployment.persistence.files.pv.storageSize }}
+    storage: {{ .Values.ontoserver.deployment.persistence.files.storageSize }}
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
@@ -22,7 +22,7 @@ metadata:
   name: {{ required "ontoserver.deployment.persistence.dbfiles.existingVolume.name is required when dbfiles.pv.enabled" .Values.ontoserver.deployment.persistence.dbfiles.existingVolume.name }}
 spec:
   capacity:
-    storage: {{ .Values.ontoserver.deployment.persistence.dbfiles.pv.storageSize }}
+    storage: {{ .Values.ontoserver.deployment.persistence.dbfiles.storageSize }}
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
