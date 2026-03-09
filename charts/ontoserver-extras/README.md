@@ -178,10 +178,12 @@ When Varnish fronts a scaled StatefulSet Ontoserver cluster, two additional sett
 
 **`varnish.graceSeconds`** — Seconds to serve stale cached content when the backend is temporarily unavailable (default `30s`). This covers rolling updates of the Ontoserver StatefulSet: while a pod is being replaced, Varnish continues serving its last-known response rather than returning a 503. Set to `0` to disable grace mode.
 
-**`varnish.closureBackend`** — The [`$closure` FHIR operation](https://www.hl7.org/fhir/conceptmap-operation-closure.html) is stateful and must always reach the same Ontoserver instance. When set, Varnish routes all `POST /fhir/ConceptMap/$closure` requests to this specific backend hostname, bypassing the cache and the normal load-balanced backend. Set to the stable DNS name of pod-0 via the headless service (e.g. `RELEASE-statefulset-0.RELEASE-ontoserver-headless`). Empty string (the default) disables dedicated `$closure` routing.
+**`varnish.closureBackend`** — Optional dedicated backend for the [`$closure` FHIR operation](https://www.hl7.org/fhir/conceptmap-operation-closure.html), which is stateful and must always reach the same Ontoserver instance. When set, Varnish routes all `POST /fhir/ConceptMap/$closure` requests to this specific backend hostname, bypassing the cache and the normal load-balanced backend. Set it to the stable DNS name of pod-0 via the headless service (e.g. `RELEASE-statefulset-0.RELEASE-ontoserver-headless`). Empty string (the default) disables dedicated `$closure` routing.
 
 > [!IMPORTANT]
-> When Varnish is the entry point for a scaled StatefulSet deployment (i.e. `ontoserver.gateway.backendServiceNameOverride` or `ontoserver.ingress` routes traffic to the Varnish service), you **must** set `varnish.closureBackend`. Without it, `$closure` requests are load-balanced across all pods and will fail intermittently because each pod maintains its own independent closure table state.
+> You usually do **not** need `varnish.closureBackend` when using the `ontoserver` chart's Gateway or Ingress. In that setup, the `ontoserver` chart already routes `/fhir/ConceptMap/$closure` directly to `RELEASE-ontoserver-pod0-service` before the catchall route to Varnish, so `$closure` bypasses Varnish entirely.
+>
+> Set `varnish.closureBackend` only when clients send `$closure` requests to Varnish directly, bypassing the `ontoserver` chart's Gateway/Ingress path-based routing. That is a niche setup, such as port-forwarding or exposing Varnish through a separate ingress/proxy in front of the Ontoserver chart. Without `varnish.closureBackend`, Varnish forwards `$closure` to its normal backend service, which load-balances across all Ontoserver pods and breaks the stateful closure table.
 >
 > Set it to the stable pod-0 DNS name:
 > ```yaml

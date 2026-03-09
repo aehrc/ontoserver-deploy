@@ -6,8 +6,22 @@ on:
 
 jobs:
   integration-tests:
-    name: Integration Tests
+    name: Integration Tests (${{ matrix.mode.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode:
+          - name: read-only
+            release: ontoserver-ro
+            isReadOnly: "true"
+            expectedHook: ontoserver-ro-ontoserver-test-fhir-ro
+            unexpectedHook: ontoserver-ro-ontoserver-test-fhir-rw
+          - name: read-write
+            release: ontoserver-rw
+            isReadOnly: "false"
+            expectedHook: ontoserver-rw-ontoserver-test-fhir-rw
+            unexpectedHook: ontoserver-rw-ontoserver-test-fhir-ro
     steps:
       - uses: actions/checkout@v4
 
@@ -30,8 +44,8 @@ jobs:
 
       - name: Install chart
         run: |
-          helm install ontoserver ./charts/ontoserver \
-            --set ontoserver.deployment.isReadOnly=false \
+          helm install ${{ matrix.mode.release }} ./charts/ontoserver \
+            --set ontoserver.deployment.isReadOnly=${{ matrix.mode.isReadOnly }} \
             --set ontoserver.managementService.enabled=true \
             --set ontoserver.imageCredentials.username=${{ secrets.QUAY_USERNAME }} \
             --set ontoserver.imageCredentials.password=${{ secrets.QUAY_PASSWORD }} \
@@ -56,12 +70,20 @@ jobs:
           echo "=== Pod description ==="
           kubectl describe pods
           echo "=== Pod logs ==="
-          kubectl logs -l app=ontoserver-ontoserver --all-containers=true --tail=100 || true
+          kubectl logs -l app=${{ matrix.mode.release }}-ontoserver --all-containers=true --tail=100 || true
           echo "=== Events ==="
           kubectl get events --sort-by='.lastTimestamp'
 
       - name: Run integration tests
-        run: helm test ontoserver --timeout 10m
+        run: helm test ${{ matrix.mode.release }} --timeout 10m
+
+      - name: Verify mode-specific test hook rendered
+        run: |
+          kubectl get job ${{ matrix.mode.expectedHook }}
+          if kubectl get job ${{ matrix.mode.unexpectedHook }} >/dev/null 2>&1; then
+            echo "Unexpected Helm test job found: ${{ matrix.mode.unexpectedHook }}"
+            exit 1
+          fi
 
       - name: Collect test logs
         if: always()
@@ -69,10 +91,12 @@ jobs:
           echo "=== Events ==="
           kubectl get events --sort-by='.lastTimestamp'
           echo "=== Ontoserver pod logs (all containers) ==="
-          kubectl logs -l app=ontoserver-ontoserver --all-containers=true --tail=50 || true
+          kubectl logs -l app=${{ matrix.mode.release }}-ontoserver --all-containers=true --tail=50 || true
           echo "=== test-metadata job ==="
-          kubectl describe job ontoserver-ontoserver-test-metadata || true
+          kubectl describe job ${{ matrix.mode.release }}-ontoserver-test-metadata || true
           echo "=== test-metadata logs ==="
-          kubectl logs -l job-name=ontoserver-ontoserver-test-metadata --tail=200 || true
-          echo "=== test-fhir-rw logs ==="
-          kubectl logs -l job-name=ontoserver-ontoserver-test-fhir-rw --tail=200 || true
+          kubectl logs -l job-name=${{ matrix.mode.release }}-ontoserver-test-metadata --tail=200 || true
+          echo "=== mode-specific test job ==="
+          kubectl describe job ${{ matrix.mode.expectedHook }} || true
+          echo "=== mode-specific test logs ==="
+          kubectl logs -l job-name=${{ matrix.mode.expectedHook }} --tail=200 || true
