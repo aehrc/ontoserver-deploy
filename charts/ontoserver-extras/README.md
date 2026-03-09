@@ -107,7 +107,7 @@ varnish:
   enabled: true
   opentelemetry:
     enabled: true
-    collectorEndpoint: http://<release-name>-otel-collector:9411
+    collectorEndpoint: http://<argo-release-name>-otel-collector:9411
 
 collector:
   enabled: true
@@ -119,7 +119,7 @@ collector:
 # ontoserver values.yaml — route Gateway/Ingress through Varnish
 ontoserver:
   gateway:
-    backendServiceNameOverride: <release-name>-varnish-service
+    backendServiceNameOverride: <argo-release-name>-varnish-service
 ```
 
 ### Plain Helm install
