@@ -178,3 +178,19 @@ tests:
       - equal:
           path: spec.template.spec.containers[2].env[0].value
           value: "http://zipkin:9411/api/v2/spans"
+
+  - it: uses POSIX-safe span ID truncation in trace-forwarder
+    set:
+      varnish.enabled: true
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[2].args[0]
+          pattern: 'span_id_short=\$\(printf ''%s'' "\$span_id" \| cut -c1-16\)'
+      - matchRegex:
+          path: spec.template.spec.containers[2].args[0]
+          pattern: 'parent_id_short=\$\(printf ''%s'' "\$parent_id" \| cut -c1-16\)'
+      - notMatchRegex:
+          path: spec.template.spec.containers[2].args[0]
+          pattern: '\$\{span_id:0:16\}'

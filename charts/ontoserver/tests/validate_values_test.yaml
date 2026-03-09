@@ -135,3 +135,22 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "Scaled deployments with persistence must use kind: StatefulSet, not Deployment. A scaled Deployment shares a single PVC across all replicas causing Lucene index corruption. StatefulSet volumeClaimTemplates provision a dedicated ReadWriteOnce volume per pod."
+
+  - it: fails when StatefulSet files.existingVolume is enabled
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.persistence.files.existingVolume.enabled: true
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+    asserts:
+      - failedTemplate:
+          errorMessage: "StatefulSet deployments do not support ontoserver.deployment.persistence.files.existingVolume. Each replica needs its own volume; use dynamic provisioning via storageClass or a Deployment for single-instance prebound volumes."
+
+  - it: fails when StatefulSet dbfiles.existingVolume is enabled
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.persistence.dbfiles.existingVolume.enabled: true
+      ontoserver.deployment.persistence.dbfiles.existingVolume.name: my-dbfiles-pv
+    asserts:
+      - failedTemplate:
+          errorMessage: "StatefulSet deployments do not support ontoserver.deployment.persistence.dbfiles.existingVolume. Each replica needs its own volume; use dynamic provisioning via storageClass or a Deployment for single-instance prebound volumes."

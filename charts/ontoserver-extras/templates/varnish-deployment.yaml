@@ -166,11 +166,14 @@ spec:
                   duration=1
                 fi
 
+                span_id_short=$(printf '%s' "$span_id" | cut -c1-16)
+                parent_id_short=$(printf '%s' "$parent_id" | cut -c1-16)
+
                 # Build single-span Zipkin v2 JSON array
                 body=$(printf '[{"traceId":"%s","id":"%s","parentId":"%s","name":"%s","timestamp":%s,"duration":%s,"localEndpoint":{"serviceName":"{{ .Release.Name }}/varnish-cache"},"tags":{"http.method":"%s","http.url":"%s","http.status_code":"%s","cache.status":"%s"}}]' \
                   "$(json_str "$trace_id")" \
-                  "$(json_str "${span_id:0:16}")" \
-                  "$(json_str "${parent_id:0:16}")" \
+                  "$(json_str "$span_id_short")" \
+                  "$(json_str "$parent_id_short")" \
                   "$(json_str "$operation")" \
                   "$start_time" \
                   "$duration" \

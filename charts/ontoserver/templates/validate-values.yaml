@@ -73,3 +73,11 @@
 {{- if and (eq .Values.ontoserver.deployment.type "scaled") (eq .Values.ontoserver.deployment.kind "Deployment") .Values.ontoserver.deployment.persistence.enabledForDeployment }}
   {{- fail "Scaled deployments with persistence must use kind: StatefulSet, not Deployment. A scaled Deployment shares a single PVC across all replicas causing Lucene index corruption. StatefulSet volumeClaimTemplates provision a dedicated ReadWriteOnce volume per pod." }}
 {{- end }}
+
+{{- if and (eq .Values.ontoserver.deployment.kind "StatefulSet") .Values.ontoserver.deployment.persistence.files.existingVolume.enabled }}
+  {{- fail "StatefulSet deployments do not support ontoserver.deployment.persistence.files.existingVolume. Each replica needs its own volume; use dynamic provisioning via storageClass or a Deployment for single-instance prebound volumes." }}
+{{- end }}
+
+{{- if and (eq .Values.ontoserver.deployment.kind "StatefulSet") .Values.ontoserver.deployment.persistence.dbfiles.existingVolume.enabled }}
+  {{- fail "StatefulSet deployments do not support ontoserver.deployment.persistence.dbfiles.existingVolume. Each replica needs its own volume; use dynamic provisioning via storageClass or a Deployment for single-instance prebound volumes." }}
+{{- end }}

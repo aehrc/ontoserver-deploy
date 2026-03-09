@@ -70,7 +70,7 @@ ontoserver:
         ## @param ontoserver.deployment.persistence.files.accessMode  PVC access mode. Use ReadWriteOnce for single instances and StatefulSet scaled deployments (each pod gets its own PVC via volumeClaimTemplates). Shared volumes across pods are not supported — Lucene indexes are pod-local.
         accessMode: ReadWriteOnce
         existingVolume:
-          ## @param ontoserver.deployment.persistence.files.existingVolume.enabled  Bind to existing PV
+          ## @param ontoserver.deployment.persistence.files.existingVolume.enabled  Bind to existing PV (Deployment only; not supported for StatefulSet)
           enabled: false
           ## @param ontoserver.deployment.persistence.files.existingVolume.name     Name of existing PV
           name: ""
@@ -107,7 +107,7 @@ ontoserver:
         ## @param ontoserver.deployment.persistence.dbfiles.accessMode  PVC access mode. Use ReadWriteOnce; only relevant for single-instance deployments with sidecar db (scaled deployments require external PostgreSQL and do not use dbfiles).
         accessMode: ReadWriteOnce
         existingVolume:
-          ## @param ontoserver.deployment.persistence.dbfiles.existingVolume.enabled  Bind to existing PV
+          ## @param ontoserver.deployment.persistence.dbfiles.existingVolume.enabled  Bind to existing PV (Deployment only; not supported for StatefulSet)
           enabled: false
           ## @param ontoserver.deployment.persistence.dbfiles.existingVolume.name     Name of existing PV
           name: ""

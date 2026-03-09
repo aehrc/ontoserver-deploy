@@ -36,7 +36,7 @@ spec:
   {{ $releaseName := .Release.Name }}
   {{- range $i, $host := .Values.ontoserver.hostNames }}
     - name: websecure-{{ $i }}
-      hostname: {{ $host }}
+      hostname: {{ $host | quote }}
       port: {{ required "ontoserver.gateway.listenerPortSecure is required" $.Values.ontoserver.gateway.listenerPortSecure }}
       protocol: HTTPS
       allowedRoutes:
@@ -57,7 +57,7 @@ metadata:
 spec:
   hostnames:
     {{- range .Values.ontoserver.hostNames }}
-    - {{ . }}
+    - {{ . | quote }}
     {{- end }}
   parentRefs:
   {{- range $i := until (len .Values.ontoserver.hostNames) }}
@@ -101,7 +101,7 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: letsencrypt-{{ .Release.Name }}
+  name: {{ .Values.ontoserver.certmanager.clusterIssuerName }}-{{ .Release.Name }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "1"
