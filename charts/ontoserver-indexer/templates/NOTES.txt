@@ -1,7 +1,14 @@
 Job {{ include "ontoserver-indexer.jobName" . }} submitted to namespace {{ .Release.Namespace }}.
 
-Monitor progress:
+Follow logs while the Job is running:
   kubectl logs -f job/{{ include "ontoserver-indexer.jobName" . }} -n {{ .Release.Namespace }}
+
+The Job name above is the exact name to use. By default it includes a random suffix unless you set job.name explicitly.
 
 Check status:
   kubectl get job {{ include "ontoserver-indexer.jobName" . }} -n {{ .Release.Namespace }}
+
+Log retention:
+  ttlSecondsAfterFinished is set to {{ .Values.job.ttlSecondsAfterFinished }} seconds.
+  After the Job finishes, Kubernetes may delete the Job and its Pods after this TTL expires.
+  Once the Pods are deleted, `kubectl logs` output is no longer available.
