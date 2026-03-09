@@ -48,7 +48,6 @@ ontoserver:
       enabled: false   # external PostgreSQL required
 
     persistence:
-      mode: split
       # Azure Disk (Premium_LRS) — ReadWriteOnce per pod via StatefulSet
       # volumeClaimTemplates. Each pod has its own dedicated disk.
       files:

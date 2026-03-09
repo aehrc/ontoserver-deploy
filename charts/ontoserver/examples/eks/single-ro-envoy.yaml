@@ -49,7 +49,6 @@ ontoserver:
 
     persistence:
       enabledForDeployment: true
-      mode: split
       # EBS (gp3) — ReadWriteOnce, suitable for single-instance deployments.
       files:
         accessMode: ReadWriteOnce

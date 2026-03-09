@@ -50,7 +50,6 @@ ontoserver:
 
     persistence:
       enabledForDeployment: true
-      mode: split
       # Azure Disk (Premium_LRS) — ReadWriteOnce, backed by Azure managed disks.
       files:
         accessMode: ReadWriteOnce

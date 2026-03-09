@@ -49,7 +49,6 @@ ontoserver:
       enabled: false   # external PostgreSQL required
 
     persistence:
-      mode: split
       # EBS (gp3) — ReadWriteOnce per pod via StatefulSet volumeClaimTemplates.
       files:
         accessMode: ReadWriteOnce

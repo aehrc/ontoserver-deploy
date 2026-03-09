@@ -59,7 +59,6 @@ ontoserver:
       enabled: false   # external PostgreSQL required — sidecar not supported for scaled
 
     persistence:
-      mode: split
       # EBS (gp3) — ReadWriteOnce per pod via StatefulSet volumeClaimTemplates.
       # Each pod receives its own dedicated EBS volume so Lucene indexes
       # are never shared between instances.
