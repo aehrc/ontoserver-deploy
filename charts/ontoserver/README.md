@@ -478,7 +478,7 @@ Ready-to-use ArgoCD Application manifests are in [`examples/argocd/`](../../exam
 
 The ArgoCD examples use multi-source Applications with both the `ontoserver` and `ontoserver-extras` charts as sources, wired together so that enabling Varnish automatically routes the Ingress through it. See the [extras chart README](../../charts/ontoserver-extras/README.md#deploying-alongside-the-ontoserver-chart) for the wiring details.
 
-> **Note:** The GitHub Actions integration workflow uses a similar k3d setup (single agent, no load balancer, Traefik disabled) to run `helm install` followed by `helm test` in both read-only and read-write modes. See [`.github/workflows/integration-tests.yml`](../.github/workflows/integration-tests.yml) for details.
+> **Note:** The GitHub Actions integration workflow uses a similar k3d setup (single agent, no load balancer, Traefik disabled) to run `helm install` followed by `helm test` in both read-only and read-write modes. See [`.github/workflows/integration-tests.yml`](../../.github/workflows/integration-tests.yml) for details.
 
 ## Parameters
 
