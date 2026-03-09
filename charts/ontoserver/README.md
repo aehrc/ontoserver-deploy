@@ -409,7 +409,7 @@ ontoserver:
 
 Option A (recommended) — Gateway API via Envoy Gateway (tested by the chart developers):
 ```bash
-kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/v1.3.1/install.yaml
+kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/v1.6.1/install.yaml
 ```
 ```yaml
 ontoserver:
