@@ -78,6 +78,8 @@ The `ontoserver` chart is intentionally unaware of Varnish — it routes traffic
 
 When both charts are sources in the same ArgoCD Application, both are reconciled together. Set `backendServiceNameOverride` in your ontoserver values file and ArgoCD will keep both in sync — no manual intervention needed after the initial setup.
 
+The examples below assume both charts share the same Helm release name inside the ArgoCD Application, so generated resource names use that single release prefix.
+
 ```yaml
 # ArgoCD Application
 spec:
@@ -105,7 +107,7 @@ varnish:
   enabled: true
   opentelemetry:
     enabled: true
-    collectorEndpoint: http://ontoserver-r4-otel-collector:9411
+    collectorEndpoint: http://<release-name>-otel-collector:9411
 
 collector:
   enabled: true
@@ -117,7 +119,7 @@ collector:
 # ontoserver values.yaml — route Gateway/Ingress through Varnish
 ontoserver:
   gateway:
-    backendServiceNameOverride: ontoserver-r4-varnish-service
+    backendServiceNameOverride: <release-name>-varnish-service
 ```
 
 ### Plain Helm install
@@ -131,7 +133,7 @@ helm install ontoserver-r4 ./charts/ontoserver -f values.yaml
 # 2. Install the extras chart (deploys Varnish and its service)
 helm install ontoserver-r4-extras ./charts/ontoserver-extras -f extras-values.yaml
 
-# 3. Now upgrade the main chart to route traffic through Varnish
+# 3. Now upgrade the main chart to route traffic through the extras release's Varnish service
 helm upgrade ontoserver-r4 ./charts/ontoserver -f values.yaml \
   --set ontoserver.gateway.backendServiceNameOverride=ontoserver-r4-extras-varnish-service
 ```
