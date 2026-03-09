@@ -143,7 +143,7 @@ ontoserver:
 Create the secret manually and reference it:
 
 ```bash
-kubectl create secret docker-registry my-pull-secret \
+kubectl create secret docker-registry my-pull-secret -n my-namespace \
   --docker-server=quay.io \
   --docker-username=<quay-username> \
   --docker-password=<quay-password>
