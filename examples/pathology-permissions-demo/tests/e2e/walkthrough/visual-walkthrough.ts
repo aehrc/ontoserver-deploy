@@ -18,7 +18,6 @@ import {
   warn,
   pause,
   promptOnError,
-  resetSteps,
 } from './narrator';
 
 // ---------------------------------------------------------------------------
@@ -326,54 +325,56 @@ async function main(): Promise<void> {
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
 
-  // Run core scenes (shared between simple and atomio)
-  const coreScenes: SceneFn[] = [
-    scene1_anonymousProduction,
-    scene2_alphaAuthor,
-    scene3_betaComparison,
-    scene4_adminSeesAll,
-    scene5_viewerVsAuthor,
-    scene6_authorEdits,
-    scene7_conceptMaps,
-    scene8_syndication,
-    scene9_csvContent,
-  ];
+  try {
+    // Run core scenes (shared between simple and atomio)
+    const coreScenes: SceneFn[] = [
+      scene1_anonymousProduction,
+      scene2_alphaAuthor,
+      scene3_betaComparison,
+      scene4_adminSeesAll,
+      scene5_viewerVsAuthor,
+      scene6_authorEdits,
+      scene7_conceptMaps,
+      scene8_syndication,
+      scene9_csvContent,
+    ];
 
-  // Atomio-only scenes
-  const atomioScenes: SceneFn[] = [
-    scene10_atomioFeeds,
-    scene11_atomioAliases,
-    scene12_atomioPromotion,
-  ];
+    // Atomio-only scenes
+    const atomioScenes: SceneFn[] = [
+      scene10_atomioFeeds,
+      scene11_atomioAliases,
+      scene12_atomioPromotion,
+    ];
 
-  const allScenes = variant === 'atomio'
-    ? [...coreScenes, ...atomioScenes]
-    : coreScenes;
+    const allScenes = variant === 'atomio'
+      ? [...coreScenes, ...atomioScenes]
+      : coreScenes;
 
-  for (const sceneFn of allScenes) {
-    const shouldContinue = await runScene(page, sceneFn);
-    if (!shouldContinue) {
-      break;
+    for (const sceneFn of allScenes) {
+      const shouldContinue = await runScene(page, sceneFn);
+      if (!shouldContinue) {
+        break;
+      }
     }
-  }
 
-  // Wrap up
-  console.log('');
-  console.log('============================================================');
-  console.log('  Walkthrough Complete!');
-  console.log('============================================================');
-  console.log('');
-  console.log('Key takeaways:');
-  console.log('  1. Community isolation — each provider sees only their resources');
-  console.log('  2. Shared national content — visible to everyone via *.read label');
-  console.log('  3. Role-based access — viewers read, authors write');
-  console.log('  4. Syndication preserves security labels');
-  if (variant === 'atomio') {
-    console.log('  5. Atomio feeds enable release management with instant rollback');
+    // Wrap up
+    console.log('');
+    console.log('============================================================');
+    console.log('  Walkthrough Complete!');
+    console.log('============================================================');
+    console.log('');
+    console.log('Key takeaways:');
+    console.log('  1. Community isolation — each provider sees only their resources');
+    console.log('  2. Shared national content — visible to everyone via *.read label');
+    console.log('  3. Role-based access — viewers read, authors write');
+    console.log('  4. Syndication preserves security labels');
+    if (variant === 'atomio') {
+      console.log('  5. Atomio feeds enable release management with instant rollback');
+    }
+    console.log('');
+  } finally {
+    await browser.close();
   }
-  console.log('');
-
-  await browser.close();
 }
 
 main().catch(async (error) => {

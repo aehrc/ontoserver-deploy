@@ -44,26 +44,28 @@ test.describe('Atomio Release Workflow @atomio', () => {
     const uatAlias = aliases.find((a: any) => a.name === 'uat');
     const originalFeed = uatAlias?.feedName || 'release-1-0';
 
-    // Point uat alias to the test feed
-    const updateResp = await page.request.put(`${ATOMIO_URL}/alias/uat`, {
-      headers: { 'Content-Type': 'application/json' },
-      data: { aliasName: 'uat', feedName: TEST_FEED },
-    });
-    expect(updateResp.status()).toBe(200);
+    try {
+      // Point uat alias to the test feed
+      const updateResp = await page.request.put(`${ATOMIO_URL}/alias/uat`, {
+        headers: { 'Content-Type': 'application/json' },
+        data: { aliasName: 'uat', feedName: TEST_FEED },
+      });
+      expect(updateResp.status()).toBe(200);
 
-    // Verify the alias now points to the test feed
-    const verifyResp = await page.request.get(`${ATOMIO_URL}/alias`, {
-      headers: { Accept: 'application/json' },
-    });
-    const updatedAliases = await verifyResp.json();
-    const updatedUat = updatedAliases.find((a: any) => a.name === 'uat');
-    expect(updatedUat?.feedName).toBe(TEST_FEED);
-
-    // Rollback: restore original alias
-    await page.request.put(`${ATOMIO_URL}/alias/uat`, {
-      headers: { 'Content-Type': 'application/json' },
-      data: { aliasName: 'uat', feedName: originalFeed },
-    });
+      // Verify the alias now points to the test feed
+      const verifyResp = await page.request.get(`${ATOMIO_URL}/alias`, {
+        headers: { Accept: 'application/json' },
+      });
+      const updatedAliases = await verifyResp.json();
+      const updatedUat = updatedAliases.find((a: any) => a.name === 'uat');
+      expect(updatedUat?.feedName).toBe(TEST_FEED);
+    } finally {
+      // Rollback: restore original alias even if assertions fail
+      await page.request.put(`${ATOMIO_URL}/alias/uat`, {
+        headers: { 'Content-Type': 'application/json' },
+        data: { aliasName: 'uat', feedName: originalFeed },
+      });
+    }
   });
 
   test('alias syndication XML is accessible', async ({ page }) => {
