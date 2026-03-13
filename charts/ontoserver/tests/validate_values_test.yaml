@@ -20,7 +20,30 @@ tests:
       ontoserver.gateway.enabled: true
     asserts:
       - failedTemplate:
-          errorMessage: "You must choose between Ingress or Gateway API!"
+          errorMessage: "You must choose between Ingress, Gateway API, or IngressRoute!"
+
+  - it: fails when both ingressRoute and ingress enabled
+    set:
+      traefik.ingressRoute.enabled: true
+      ontoserver.ingress.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "You must choose between Ingress, Gateway API, or IngressRoute!"
+
+  - it: fails when both ingressRoute and gateway enabled
+    set:
+      traefik.ingressRoute.enabled: true
+      ontoserver.gateway.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "You must choose between Ingress, Gateway API, or IngressRoute!"
+
+  - it: fails when serversTransport enabled without ingressRoute
+    set:
+      traefik.ingressRoute.serversTransport.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "traefik.ingressRoute.serversTransport.enabled requires traefik.ingressRoute.enabled"
 
   - it: fails when nginx-ingress enabled without ingress
     set:

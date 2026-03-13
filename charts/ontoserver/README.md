@@ -1,12 +1,13 @@
 # Ontoserver Helm Chart
 
-This chart provides flexible deployment options for [Ontoserver](https://ontoserver.csiro.au/) — a FHIR terminology server — on Kubernetes. It supports single or scaled deployments, read-only or read-write modes, optional persistence, and networking via the Kubernetes Gateway API or standard Ingress (with an optional bundled [F5 Nginx Ingress Controller](https://docs.nginx.com/nginx-ingress-controller/)). Optional features include a Postgres sidecar, Prometheus metrics, OpenTelemetry distributed tracing, Envoy Gateway traffic policies, and External Secrets integration.
+This chart provides flexible deployment options for [Ontoserver](https://ontoserver.csiro.au/) — a FHIR terminology server — on Kubernetes. It supports single or scaled deployments, read-only or read-write modes, optional persistence, and networking via the Kubernetes Gateway API, standard Ingress, or Traefik IngressRoute (with an optional bundled [F5 Nginx Ingress Controller](https://docs.nginx.com/nginx-ingress-controller/)). Optional features include a Postgres sidecar, Prometheus metrics, OpenTelemetry distributed tracing, Envoy Gateway traffic policies, and External Secrets integration.
 
 > **Prerequisites:** Depending on which features you enable, the following cluster-level components may be required — install them separately if not already present:
 >
 > - **Kubernetes 1.29+** — required when `ontoserver.deployment.db.enabled: true` (the default). The Postgres sidecar uses the [native sidecar init container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) pattern (`restartPolicy: Always`), which is stable from K8s 1.29.
 > - **[Envoy Gateway](https://gateway.envoyproxy.io/)** — required when `ontoserver.gateway.enabled: true` (Gateway API networking, and any Envoy traffic/security policies)
 > - **[F5 Nginx Ingress Controller](https://docs.nginx.com/nginx-ingress-controller/)** — required when `ontoserver.ingress.enabled: true` and you are **not** using the bundled `nginx-ingress` subchart (`nginx-ingress.enabled: false`)
+> - **[Traefik](https://doc.traefik.io/traefik/)** with CRD support — required when `traefik.ingressRoute.enabled: true`
 > - **[External Secrets Operator](https://external-secrets.io/)** — required when `ontoserver.externalSecret.enabled: true`
 
 ## Deployment Modes
@@ -666,6 +667,21 @@ The ArgoCD examples use multi-source Applications with both the `ontoserver` and
 | `envoygateway.securityPolicy.defaultAction`                                       | Default authorization action (Allow or Deny)                                                                                     | `Allow`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `envoygateway.securityPolicy.deniedCIDRs`                                         | List of CIDRs to deny                                                                                                            | `[]`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
+### Traefik Ingress Controller
+
+| Name                                                        | Description                                                                                                                 | Value           |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `traefik.ingressRoute.enabled`                              | Enable Traefik IngressRoute (use instead of ontoserver.ingress when Traefik is the ingress controller and backends use TLS) | `false`         |
+| `traefik.ingressRoute.annotations`                          | IngressRoute annotations                                                                                                    | `{}`            |
+| `traefik.ingressRoute.entryPoints`                          | Traefik entryPoints to bind (e.g. web, websecure)                                                                           | `["websecure"]` |
+| `traefik.ingressRoute.backendPort`                          | Backend service port                                                                                                        | `80`            |
+| `traefik.ingressRoute.backendScheme`                        | Backend scheme override — set to "https" when the backend service uses TLS                                                  | `""`            |
+| `traefik.ingressRoute.backendServiceNameOverride`           | Override IngressRoute backend service name (e.g. to route through the Varnish service from ontoserver-extras)               | `""`            |
+| `traefik.ingressRoute.serversTransport.enabled`             | Enable ServersTransport — required when the backend exposes HTTPS/TLS so Traefik can trust the backend certificate          | `false`         |
+| `traefik.ingressRoute.serversTransport.insecureSkipVerify`  | Skip TLS certificate verification for the backend (use true for self-signed certificates)                                   | `false`         |
+| `traefik.ingressRoute.serversTransport.rootCAsSecrets`      | List of Secret names containing root CA certificates used to verify the backend TLS certificate                             | `[]`            |
+| `traefik.ingressRoute.serversTransport.certificatesSecrets` | List of Secret names containing client certificates for mutual TLS with the backend                                         | `[]`            |
+
 ### Nginx Ingress Controller
 
 | Name                                           | Description                        | Value              |
@@ -683,6 +699,7 @@ The ArgoCD examples use multi-source Applications with both the `ontoserver` and
 | `ontoserver.opentelemetry.instrumentation.enabled` | [OpenTelemetry Operator](https://opentelemetry.io/docs/kubernetes/operator/) installed |
 | `envoygateway.*` policies | [Envoy Gateway](https://gateway.envoyproxy.io/) CRDs installed |
 | `envoygateway.gatewayServiceMonitor.enabled` | [Envoy Gateway](https://gateway.envoyproxy.io/) installed + [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) CRDs installed |
+| `traefik.ingressRoute.enabled` | [Traefik](https://doc.traefik.io/traefik/) installed with CRD support (`traefik.io/v1alpha1` for v3, `traefik.containo.us/v1alpha1` for v2) |
 | `ontoserver.externalSecret.enabled` | [External Secrets Operator](https://external-secrets.io/) installed |
 
 Table generated with Readme Generator For Helm: [https://github.com/bitnami/readme-generator-for-helm](https://github.com/bitnami/readme-generator-for-helm)
@@ -762,15 +779,17 @@ ontoserver:
 
 > **Gateway API is the recommended networking mode.** Active development of the standard Kubernetes Ingress API is suspended by the K8s community in favor of the newer Gateway API. Gateway API is the configuration used by the chart developers and unlocks the full set of Envoy Gateway traffic policies (rate limiting, request buffering, CIDR deny rules). Unless you have a specific reason to use Ingress (e.g. legacy cluster constraints), we strongly steer you toward Envoy Gateway and the Gateway API.
 
-By default neither is enabled — the chart deploys Ontoserver with no external access, suitable for internal use or testing. Enable one to expose the server:
+By default none is enabled — the chart deploys Ontoserver with no external access, suitable for internal use or testing. Enable one to expose the server:
 
 * **Gateway API** (`ontoserver.gateway.enabled: true`) *(recommended)*: requires Gateway API CRDs and a compatible GatewayClass (e.g. [Envoy Gateway](https://gateway.envoyproxy.io/), [Traefik](https://doc.traefik.io/traefik/routing/providers/kubernetes-gateway/), [Cilium](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/), or any conformant implementation). Creates `Gateway`, `HTTPRoute`, and optionally a cert-manager `Issuer` resource. The default `className` is `envoy-gateway-class` — set `ontoserver.gateway.className` to match your GatewayClass. The default listener port is `443`; some implementations use a different port (e.g. Traefik defaults to `8443` — set `ontoserver.gateway.listenerPortSecure: 8443`). TLS termination is optional: set `ontoserver.tls.enabled: true` with a certificate reference, or enable cert-manager for automatic provisioning.
 * **Ingress** (`ontoserver.ingress.enabled: true`) *(deprecated)*: creates a standard `networking.k8s.io/v1` Ingress. Use the bundled F5 nginx-ingress subchart (`nginx-ingress.enabled: true`), the cluster's default controller (e.g. Traefik on k3d/k3s), or any other Ingress controller by setting `ontoserver.ingress.className` appropriately.
+* **Traefik IngressRoute** (`traefik.ingressRoute.enabled: true`): creates a Traefik-native `IngressRoute` CRD resource. Use this instead of `ontoserver.ingress` when Traefik is your ingress controller **and** any backend pod exposes HTTPS/TLS. See [Traefik Ingress Controller](#traefik-ingress-controller-1) below.
 
-Gateway API and Ingress are mutually exclusive. Both support a `backendServiceNameOverride` to route traffic through an intermediate proxy such as the Varnish cache from `ontoserver-extras`:
+Gateway API, Ingress, and IngressRoute are mutually exclusive. All three support a `backendServiceNameOverride` to route traffic through an intermediate proxy such as the Varnish cache from `ontoserver-extras`:
 
 - Gateway: `ontoserver.gateway.backendServiceNameOverride: <release>-varnish-service`
 - Ingress: `ontoserver.ingress.backendServiceNameOverride: <release>-varnish-service`
+- IngressRoute: `traefik.ingressRoute.backendServiceNameOverride: <release>-varnish-service`
 
 See the [extras chart README](../../charts/ontoserver-extras/README.md) for the full wiring instructions, including the recommended ArgoCD multi-source approach.
 
@@ -805,6 +824,57 @@ Three optional traffic policies and a data-plane ServiceMonitor can be independe
 - **BackendTrafficPolicy** (`envoygateway.backendTrafficPolicy.enabled`) — caps the maximum upstream request body size and enforces a local rate limit (requests per time unit).
 - **SecurityPolicy** (`envoygateway.securityPolicy.enabled`) — enforces IP-based authorization by denying traffic from a list of CIDRs.
 - **Gateway ServiceMonitor** (`envoygateway.gatewayServiceMonitor.enabled`) — creates a Prometheus `ServiceMonitor` targeting the Envoy Gateway data-plane pods (scraping `/stats/prometheus` on the `metrics` port). Set `envoygateway.controlPlaneNamespace` to the namespace where Envoy Gateway is installed (default: `envoy-gateway-system`). Requires Prometheus Operator CRDs.
+
+## Traefik Ingress Controller
+
+### IngressRoute vs standard Ingress
+
+Traefik supports both the standard Kubernetes `Ingress` API (`ontoserver.ingress.enabled: true`, `className: traefik`) and its own `IngressRoute` CRD (`traefik.ingressRoute.enabled: true`). The key difference is TLS backend trust:
+
+- **Standard Ingress** — Traefik, unlike NGINX, does **not** connect to self-signed backend TLS certificates by default. There is no way to attach a `ServersTransport` to a standard `Ingress` resource, so backend certificate trust cannot be configured through the standard API.
+- **IngressRoute** — Traefik's native CRD allows a `ServersTransport` resource to be attached directly to a backend service, giving explicit control over how Traefik connects to TLS backends (CA trust, client certificates, insecure skip-verify).
+
+Use `traefik.ingressRoute.enabled: true` whenever:
+1. Traefik is your ingress controller, **and**
+2. Any backend pod in the release exposes HTTPS/TLS (e.g. OntoServer configured with `server.ssl.enabled`, OntoCloak/Keycloak, or any TLS-terminating sidecar).
+
+For HTTP backends with Traefik, the standard `ontoserver.ingress` is sufficient.
+
+### ServersTransport
+
+When `traefik.ingressRoute.serversTransport.enabled: true`, the chart creates a `ServersTransport` resource in the same namespace as the `IngressRoute`. Two trust modes are supported:
+
+**Option A — Skip verification (self-signed certificates):**
+
+```yaml
+traefik:
+  ingressRoute:
+    enabled: true
+    backendPort: 443
+    backendScheme: https
+    serversTransport:
+      enabled: true
+      insecureSkipVerify: true
+```
+
+**Option B — CA-signed certificate (provide the CA):**
+
+```yaml
+traefik:
+  ingressRoute:
+    enabled: true
+    backendPort: 443
+    backendScheme: https
+    serversTransport:
+      enabled: true
+      insecureSkipVerify: false
+      rootCAsSecrets:
+        - my-backend-ca-secret   # Secret with key tls.crt containing the CA certificate
+```
+
+### Traefik API version
+
+The templates use `traefik.io/v1alpha1` (Traefik v3). For Traefik v2, change the `apiVersion` in `templates/traefik-ingressroute.yaml` and `templates/traefik-serverstransport.yaml` to `traefik.containo.us/v1alpha1`.
 
 ## Observability
 

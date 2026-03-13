@@ -11,7 +11,19 @@
 {{- end }}
 
 {{- if and .Values.ontoserver.ingress.enabled .Values.ontoserver.gateway.enabled }}
-  {{- fail "You must choose between Ingress or Gateway API!" }}
+  {{- fail "You must choose between Ingress, Gateway API, or IngressRoute!" }}
+{{- end }}
+
+{{- if and .Values.traefik.ingressRoute.enabled .Values.ontoserver.ingress.enabled }}
+  {{- fail "You must choose between Ingress, Gateway API, or IngressRoute!" }}
+{{- end }}
+
+{{- if and .Values.traefik.ingressRoute.enabled .Values.ontoserver.gateway.enabled }}
+  {{- fail "You must choose between Ingress, Gateway API, or IngressRoute!" }}
+{{- end }}
+
+{{- if and .Values.traefik.ingressRoute.serversTransport.enabled (not .Values.traefik.ingressRoute.enabled) }}
+  {{- fail "traefik.ingressRoute.serversTransport.enabled requires traefik.ingressRoute.enabled" }}
 {{- end }}
 
 {{- $ngi := index .Values "nginx-ingress" }}

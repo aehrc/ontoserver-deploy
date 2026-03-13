@@ -368,6 +368,31 @@ envoygateway:
     defaultAction: Allow
     ## @param envoygateway.securityPolicy.deniedCIDRs      List of CIDRs to deny
     deniedCIDRs: []
+## @section Traefik Ingress Controller
+traefik:
+  ingressRoute:
+    ## @param traefik.ingressRoute.enabled                    Enable Traefik IngressRoute (use instead of ontoserver.ingress when Traefik is the ingress controller and backends use TLS)
+    enabled: false
+    ## @param traefik.ingressRoute.annotations                IngressRoute annotations
+    annotations: {}
+    ## @param traefik.ingressRoute.entryPoints                Traefik entryPoints to bind (e.g. web, websecure)
+    entryPoints:
+      - websecure
+    ## @param traefik.ingressRoute.backendPort                Backend service port
+    backendPort: 80
+    ## @param traefik.ingressRoute.backendScheme              Backend scheme override — set to "https" when the backend service uses TLS
+    backendScheme: ""
+    ## @param traefik.ingressRoute.backendServiceNameOverride Override IngressRoute backend service name (e.g. to route through the Varnish service from ontoserver-extras)
+    backendServiceNameOverride: ""
+    serversTransport:
+      ## @param traefik.ingressRoute.serversTransport.enabled             Enable ServersTransport — required when the backend exposes HTTPS/TLS so Traefik can trust the backend certificate
+      enabled: false
+      ## @param traefik.ingressRoute.serversTransport.insecureSkipVerify  Skip TLS certificate verification for the backend (use true for self-signed certificates)
+      insecureSkipVerify: false
+      ## @param traefik.ingressRoute.serversTransport.rootCAsSecrets      List of Secret names containing root CA certificates used to verify the backend TLS certificate
+      rootCAsSecrets: []
+      ## @param traefik.ingressRoute.serversTransport.certificatesSecrets List of Secret names containing client certificates for mutual TLS with the backend
+      certificatesSecrets: []
 ## @section Nginx Ingress Controller
 nginx-ingress:
   ## @param nginx-ingress.enabled                        Enable F5 nginx-ingress-controller

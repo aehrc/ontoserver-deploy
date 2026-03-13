@@ -251,3 +251,199 @@ tests:
       - equal:
           path: spec.rules[0].http.paths[0].path
           value: /
+
+  # ── Traefik IngressRoute ──────────────────────────────────────────────────
+
+  - it: renders no IngressRoute by default
+    templates:
+      - templates/traefik-ingressroute.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders IngressRoute when traefik.ingressRoute.enabled=true
+    templates:
+      - templates/traefik-ingressroute.yaml
+    set:
+      traefik.ingressRoute.enabled: true
+    asserts:
+      - isKind:
+          of: IngressRoute
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-ingressroute
+      - equal:
+          path: spec.entryPoints[0]
+          value: websecure
+
+  - it: IngressRoute uses hostNames for route match
+    templates:
+      - templates/traefik-ingressroute.yaml
+    set:
+      traefik.ingressRoute.enabled: true
+      ontoserver.hostNames:
+        - myserver.example.com
+      ontoserver.serverName: myserver.example.com
+    asserts:
+      - matchRegex:
+          path: spec.routes[0].match
+          pattern: "myserver\\.example\\.com"
+
+  - it: IngressRoute includes TLS secretName when tls.enabled
+    templates:
+      - templates/traefik-ingressroute.yaml
+    set:
+      traefik.ingressRoute.enabled: true
+      ontoserver.tls.enabled: true
+      ontoserver.tls.certRef: my-tls-secret
+    asserts:
+      - equal:
+          path: spec.tls.secretName
+          value: my-tls-secret
+
+  - it: IngressRoute routes to default backend service
+    templates:
+      - templates/traefik-ingressroute.yaml
+    set:
+      traefik.ingressRoute.enabled: true
+    asserts:
+      - equal:
+          path: spec.routes[0].services[0].name
+          value: RELEASE-NAME-ontoserver-service
+      - equal:
+          path: spec.routes[0].services[0].port
+          value: 80
+
+  - it: IngressRoute uses backendServiceNameOverride when set
+    templates:
+      - templates/traefik-ingressroute.yaml
+    set:
+      traefik.ingressRoute.enabled: true
+      traefik.ingressRoute.backendServiceNameOverride: my-varnish-service
+    asserts:
+      - equal:
+          path: spec.routes[0].services[0].name
+          value: my-varnish-service
+
+  - it: IngressRoute sets scheme when backendScheme is configured
+    templates:
+      - templates/traefik-ingressroute.yaml
+    set:
+      traefik.ingressRoute.enabled: true
+      traefik.ingressRoute.backendPort: 443
+      traefik.ingressRoute.backendScheme: https
+    asserts:
+      - equal:
+          path: spec.routes[0].services[0].scheme
+          value: https
+      - equal:
+          path: spec.routes[0].services[0].port
+          value: 443
+
+  - it: IngressRoute references serversTransport when enabled
+    templates:
+      - templates/traefik-ingressroute.yaml
+    set:
+      traefik.ingressRoute.enabled: true
+      traefik.ingressRoute.serversTransport.enabled: true
+    asserts:
+      - equal:
+          path: spec.routes[0].services[0].serversTransport
+          value: RELEASE-NAME-ontoserver-serverstransport
+
+  - it: IngressRoute adds closure route for scaled StatefulSet
+    templates:
+      - templates/traefik-ingressroute.yaml
+    set:
+      traefik.ingressRoute.enabled: true
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: false
+      ontoserver.hostNames:
+        - myserver.example.com
+      ontoserver.serverName: myserver.example.com
+    values:
+      - fixtures/external-db-values.yaml
+    asserts:
+      - matchRegex:
+          path: spec.routes[0].match
+          pattern: "\\$closure"
+      - equal:
+          path: spec.routes[0].services[0].name
+          value: RELEASE-NAME-ontoserver-pod0-service
+      - matchRegex:
+          path: spec.routes[1].match
+          pattern: "Host\\("
+      - equal:
+          path: spec.routes[1].services[0].name
+          value: RELEASE-NAME-ontoserver-service
+
+  - it: IngressRoute has no closure route for single Deployment
+    templates:
+      - templates/traefik-ingressroute.yaml
+    set:
+      traefik.ingressRoute.enabled: true
+      ontoserver.hostNames:
+        - myserver.example.com
+      ontoserver.serverName: myserver.example.com
+    asserts:
+      - notMatchRegex:
+          path: spec.routes[0].match
+          pattern: "\\$closure"
+
+  # ── Traefik ServersTransport ──────────────────────────────────────────────
+
+  - it: renders no ServersTransport by default
+    templates:
+      - templates/traefik-serverstransport.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders no ServersTransport when ingressRoute enabled but serversTransport disabled
+    templates:
+      - templates/traefik-serverstransport.yaml
+    set:
+      traefik.ingressRoute.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders ServersTransport when ingressRoute and serversTransport both enabled
+    templates:
+      - templates/traefik-serverstransport.yaml
+    set:
+      traefik.ingressRoute.enabled: true
+      traefik.ingressRoute.serversTransport.enabled: true
+    asserts:
+      - isKind:
+          of: ServersTransport
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-serverstransport
+
+  - it: ServersTransport sets insecureSkipVerify=true when configured
+    templates:
+      - templates/traefik-serverstransport.yaml
+    set:
+      traefik.ingressRoute.enabled: true
+      traefik.ingressRoute.serversTransport.enabled: true
+      traefik.ingressRoute.serversTransport.insecureSkipVerify: true
+    asserts:
+      - equal:
+          path: spec.insecureSkipVerify
+          value: true
+
+  - it: ServersTransport includes rootCAsSecrets when provided
+    templates:
+      - templates/traefik-serverstransport.yaml
+    set:
+      traefik.ingressRoute.enabled: true
+      traefik.ingressRoute.serversTransport.enabled: true
+      traefik.ingressRoute.serversTransport.rootCAsSecrets:
+        - my-ca-secret
+    asserts:
+      - equal:
+          path: spec.rootCAsSecrets[0]
+          value: my-ca-secret
