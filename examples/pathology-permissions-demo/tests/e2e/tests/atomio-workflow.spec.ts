@@ -41,7 +41,7 @@ test.describe('Atomio Release Workflow @atomio', () => {
       headers: { Accept: 'application/json' },
     });
     const aliases = await aliasResp.json();
-    const uatAlias = aliases.find((a: any) => a.name === 'uat');
+    const uatAlias = aliases.find((a: any) => a.aliasName === 'uat');
     const originalFeed = uatAlias?.feedName || 'release-1-0';
 
     try {
@@ -57,7 +57,7 @@ test.describe('Atomio Release Workflow @atomio', () => {
         headers: { Accept: 'application/json' },
       });
       const updatedAliases = await verifyResp.json();
-      const updatedUat = updatedAliases.find((a: any) => a.name === 'uat');
+      const updatedUat = updatedAliases.find((a: any) => a.aliasName === 'uat');
       expect(updatedUat?.feedName).toBe(TEST_FEED);
     } finally {
       // Rollback: restore original alias even if assertions fail
@@ -88,7 +88,7 @@ test.describe('Atomio Release Workflow @atomio', () => {
     const aliases = await response.json();
 
     // Both uat and production aliases should exist
-    const aliasNames = aliases.map((a: any) => a.name);
+    const aliasNames = aliases.map((a: any) => a.aliasName);
     expect(aliasNames).toContain('uat');
     expect(aliasNames).toContain('production');
 
