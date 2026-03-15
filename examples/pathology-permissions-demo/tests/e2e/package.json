@@ -10,7 +10,9 @@
     "test:headed": "npx playwright test --headed",
     "install-browsers": "npx playwright install chromium",
     "walkthrough": "npx tsx walkthrough/visual-walkthrough.ts",
-    "walkthrough:atomio": "npx tsx walkthrough/visual-walkthrough.ts --variant atomio"
+    "walkthrough:auto": "npx tsx walkthrough/visual-walkthrough.ts --auto",
+    "walkthrough:atomio": "npx tsx walkthrough/visual-walkthrough.ts --variant atomio",
+    "walkthrough:atomio:auto": "npx tsx walkthrough/visual-walkthrough.ts --variant atomio --auto"
   },
   "devDependencies": {
     "@playwright/test": "^1.45.0",

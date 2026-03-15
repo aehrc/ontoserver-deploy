@@ -7,6 +7,15 @@ const CYAN = '\x1b[0;36m';
 const NC = '\x1b[0m';
 
 let stepNumber = 0;
+let auto = false;
+
+/**
+ * Enable auto mode — skips pauses and auto-skips on errors.
+ * Useful for CI or non-interactive testing.
+ */
+export function setAutoMode(enabled: boolean): void {
+  auto = enabled;
+}
 
 /**
  * Print a numbered step header with a cyan border box.
@@ -45,6 +54,11 @@ export function warn(text: string): void {
  * Pause execution and wait for the presenter to press Enter.
  */
 export async function pause(message?: string): Promise<void> {
+  if (auto) {
+    console.log(`\n${YELLOW}${message || '[auto] continuing...'}${NC}`);
+    return;
+  }
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -67,6 +81,12 @@ export async function pause(message?: string): Promise<void> {
  */
 export async function promptOnError(error: Error): Promise<'retry' | 'skip' | 'quit'> {
   warn(`Error: ${error.message}`);
+
+  if (auto) {
+    warn('[auto] skipping scene');
+    return 'skip';
+  }
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,

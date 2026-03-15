@@ -1,96 +1,220 @@
-import { Page, expect } from '@playwright/test';
+import { Page, expect, request as playwrightRequest } from '@playwright/test';
+
+// ---------------------------------------------------------------------------
+// Licence Agreement
+// ---------------------------------------------------------------------------
+
+/**
+ * Accept the SNOMED CT licence agreement if presented.
+ * Shrimp shows a simple button; Snapper requires checking 3 boxes first.
+ * After acceptance, waits for the redirect back to the main app.
+ */
+async function acceptLicenceAgreement(page: Page): Promise<void> {
+  const acceptButton = page.getByRole('button', { name: /I accept the licence conditions/i });
+  if (await acceptButton.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    // Snapper has checkboxes that must be checked before the accept button works
+    const checkboxes = await page.locator('input[type=checkbox]').all();
+    for (const cb of checkboxes) {
+      await cb.check();
+    }
+
+    const urlBefore = page.url();
+    await acceptButton.click();
+
+    // Wait for redirect away from the licence page
+    if (urlBefore.includes('licence')) {
+      await page.waitForURL((url) => !url.href.includes('licence'), {
+        timeout: 15_000,
+      }).catch(() => {});
+    }
+
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2_000);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Keycloak SMART-on-FHIR Login / Logout
+// ---------------------------------------------------------------------------
 
 /**
  * Get a bearer token for a demo user via direct access grant.
+ * Uses Playwright's standalone request context (Node-level HTTP, no browser
+ * security restrictions) to avoid CORS / mixed-content / PNA issues.
  */
 export async function getToken(
-  page: Page,
   username: string,
   password: string = 'demo',
 ): Promise<string> {
   const ontocloakUrl = process.env.ONTOCLOAK_URL || 'http://localhost:9090';
   const realm = 'pathology-demo';
 
-  const response = await page.request.post(
-    `${ontocloakUrl}/auth/realms/${realm}/protocol/openid-connect/token`,
-    {
-      form: {
-        grant_type: 'password',
-        client_id: 'demo-cli',
-        username,
-        password,
+  const context = await playwrightRequest.newContext();
+  try {
+    const response = await context.post(
+      `${ontocloakUrl}/auth/realms/${realm}/protocol/openid-connect/token`,
+      {
+        form: {
+          grant_type: 'password',
+          client_id: 'demo-cli',
+          username,
+          password,
+        },
       },
-    },
-  );
+    );
 
-  const body = await response.json();
-  if (!body.access_token) {
-    throw new Error(`Failed to get token for ${username}: ${JSON.stringify(body)}`);
+    const body = await response.json();
+    if (!body.access_token) {
+      throw new Error(`Failed to get token for ${username}: ${JSON.stringify(body)}`);
+    }
+    return body.access_token;
+  } finally {
+    await context.dispose();
   }
-  return body.access_token;
 }
 
 /**
- * Log in to Snapper via the Ontocloak login page.
+ * Log in via Keycloak using the app's SMART-on-FHIR login flow.
+ * Clicks the login button in the current app (Shrimp or Snapper),
+ * fills the Keycloak login form, and waits for the redirect back.
  *
- * Snapper uses SMART-on-FHIR which redirects to Ontocloak.
- * This helper fills in the login form and waits for the redirect back.
+ * The app must already be loaded and showing its Login button.
  */
-export async function snapperLogin(
+export async function loginViaKeycloak(
   page: Page,
   username: string,
   password: string = 'demo',
 ): Promise<void> {
-  // Snapper's login button - try multiple selector strategies
-  const loginButton = page.getByRole('button', { name: /login|sign in|authorize/i })
-    .or(page.getByRole('link', { name: /login|sign in|authorize/i }))
-    .or(page.locator('[ng-click*="login"]'));
-  await loginButton.first().click();
+  // Click the login button — Shrimp uses <a id="fhir-server-login">,
+  // Snapper uses <button id="toggle-login-btn">
+  const shrimpLogin = page.locator('#fhir-server-login');
+  const snapperLogin = page.locator('#toggle-login-btn');
 
-  // Wait for redirect to Ontocloak login page
-  // Ontocloak may use /auth/realms/... or /realms/... depending on version
-  await page.waitForURL(/.*\/realms\/pathology-demo\/protocol\/openid-connect\/auth.*/, {
-    timeout: 15_000,
-  });
+  if (await shrimpLogin.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await shrimpLogin.click();
+  } else if (await snapperLogin.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await snapperLogin.click();
 
-  // Fill in credentials on the Keycloak/Ontocloak login form
+    // Snapper shows a confirmation modal "Confirm FHIR Server Login?"
+    // with Cancel/Login buttons — click the Login button to proceed
+    const modalLogin = page.locator('.modal-footer button.btn-success');
+    await modalLogin.waitFor({ state: 'visible', timeout: 5_000 });
+    await modalLogin.click();
+  } else {
+    throw new Error('No login button found on page');
+  }
+
+  // Wait for Keycloak login page to load
+  await page.waitForURL(/localhost:9090/, { timeout: 15_000 });
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(1_000);
+
+  // Fill in credentials and submit
   await page.locator('#username').fill(username);
   await page.locator('#password').fill(password);
   await page.locator('#kc-login').click();
 
-  // Wait for redirect back to Snapper
-  await page.waitForURL(/.*ontoserver\.csiro\.au\/snapper.*/, {
-    timeout: 15_000,
-  });
-
-  // Wait for Snapper to finish loading after auth
-  await page.waitForTimeout(2_000);
+  // Wait for redirect back to the app
+  await page.waitForURL(/ontoserver\.csiro\.au/, { timeout: 15_000 });
   await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(3_000);
 }
 
 /**
- * Log out of Snapper.
+ * Log out from Keycloak — clears cookies and browser storage so the next
+ * login prompt shows a fresh Keycloak login form (not auto-login from
+ * existing session).
  */
-export async function snapperLogout(page: Page): Promise<void> {
-  const logoutButton = page.getByRole('button', { name: /logout|sign out/i })
-    .or(page.getByRole('link', { name: /logout|sign out/i }))
-    .or(page.locator('[ng-click*="logout"]'));
-  if (await logoutButton.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await logoutButton.first().click();
-    await page.waitForTimeout(1_000);
+export async function logout(page: Page): Promise<void> {
+  // Clear all cookies (Keycloak session + app state)
+  await page.context().clearCookies();
+
+  // Clear browser storage
+  await page.evaluate(() => {
+    try { sessionStorage.clear(); } catch {}
+    try { localStorage.clear(); } catch {}
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Navigation helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Navigate to Shrimp connected to a specific FHIR server.
+ * Uses ?fhir= (direct connection). Automatically accepts the licence if shown.
+ */
+export async function openShrimp(page: Page, fhirServerUrl: string): Promise<void> {
+  const shrimpBase = 'https://ontoserver.csiro.au/shrimp';
+  const shrimpUrl = `${shrimpBase}?fhir=${encodeURIComponent(fhirServerUrl)}`;
+  await page.goto(shrimpUrl);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(2_000);
+
+  // Accept SNOMED CT licence agreement if presented
+  await acceptLicenceAgreement(page);
+
+  // The licence redirect may strip the ?fhir= parameter, so re-navigate
+  if (!page.url().includes('fhir=') && !page.url().includes('iss=')) {
+    await page.goto(shrimpUrl);
     await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2_000);
   }
+
+  // Give AngularJS time to bootstrap and render
+  await page.waitForTimeout(3_000);
+}
+
+/**
+ * Wait for Shrimp to show its main navigation.
+ * Shrimp uses "Terminology" and "ECL" as top-level nav items.
+ */
+export async function waitForShrimpReady(page: Page): Promise<void> {
+  // Use getByRole('link') to avoid strict mode violation — Shrimp has multiple
+  // elements containing "ECL" (nav link + radio label) and "Terminology" text.
+  await expect(
+    page.getByRole('link', { name: 'Terminology' }),
+  ).toBeVisible({ timeout: 20_000 });
 }
 
 /**
  * Navigate to Snapper connected to a specific FHIR server.
+ * Uses ?iss= (SMART launch) since Snapper requires it for FHIR server
+ * connection. Automatically accepts the SNOMED CT licence agreement if shown.
  */
 export async function openSnapper(page: Page, fhirServerUrl: string): Promise<void> {
   const snapperBase = 'https://ontoserver.csiro.au/snapper';
-  await page.goto(`${snapperBase}?iss=${encodeURIComponent(fhirServerUrl)}`);
+  const snapperUrl = `${snapperBase}?iss=${encodeURIComponent(fhirServerUrl)}`;
+  await page.goto(snapperUrl);
   await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(2_000);
+
+  // Accept SNOMED CT licence agreement if presented
+  await acceptLicenceAgreement(page);
+
+  // The licence redirect strips ?iss=, so re-navigate to reconnect
+  if (!page.url().includes('iss=') && !page.url().includes('fhir=')) {
+    await page.goto(snapperUrl);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2_000);
+  }
+
   // Give AngularJS time to bootstrap and render
   await page.waitForTimeout(3_000);
+}
+
+/**
+ * Wait for Snapper to show a navigation tab (Code Systems, Value Sets, etc.)
+ * This confirms the app has bootstrapped and connected to the FHIR server.
+ */
+export async function waitForSnapperReady(page: Page): Promise<void> {
+  // Use .first() to avoid strict mode violation if multiple elements match
+  await expect(
+    page.getByText('Code Systems')
+      .or(page.getByText('Value Sets'))
+      .or(page.getByText('Concept Maps'))
+      .first(),
+  ).toBeVisible({ timeout: 20_000 });
 }
 
 /**
@@ -111,90 +235,4 @@ export async function openAtomioUI(page: Page, atomioUrl: string): Promise<void>
   await page.goto(`${atomioUiBase}?iss=${encodeURIComponent(atomioUrl)}`);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(3_000);
-}
-
-/**
- * Wait for Snapper to show a navigation tab (Code Systems, Value Sets, etc.)
- * This confirms the app has bootstrapped and connected to the FHIR server.
- */
-export async function waitForSnapperReady(page: Page): Promise<void> {
-  await expect(
-    page.getByText('Code Systems')
-      .or(page.getByText('Value Sets'))
-      .or(page.getByText('Concept Maps')),
-  ).toBeVisible({ timeout: 20_000 });
-}
-
-/**
- * Navigate to Shrimp connected to a specific FHIR server.
- */
-export async function openShrimp(page: Page, fhirServerUrl: string): Promise<void> {
-  const shrimpBase = 'https://ontoserver.csiro.au/shrimp';
-  await page.goto(`${shrimpBase}?iss=${encodeURIComponent(fhirServerUrl)}`);
-  await page.waitForLoadState('domcontentloaded');
-  // Give AngularJS time to bootstrap and render
-  await page.waitForTimeout(3_000);
-}
-
-/**
- * Wait for Shrimp to show its main navigation (Code Systems tab, etc.)
- * This confirms the app has bootstrapped and connected to the FHIR server.
- */
-export async function waitForShrimpReady(page: Page): Promise<void> {
-  await expect(
-    page.getByText('Code Systems')
-      .or(page.getByText('Value Sets'))
-      .or(page.getByText('Concept Maps')),
-  ).toBeVisible({ timeout: 20_000 });
-}
-
-/**
- * Log in to Shrimp via the Ontocloak login page.
- *
- * Shrimp uses SMART-on-FHIR which redirects to Ontocloak (same as Snapper).
- * This helper fills in the login form and waits for the redirect back.
- */
-export async function shrimpLogin(
-  page: Page,
-  username: string,
-  password: string = 'demo',
-): Promise<void> {
-  // Shrimp's login button — try multiple selector strategies
-  const loginButton = page.getByRole('button', { name: /login|sign in|authorize/i })
-    .or(page.getByRole('link', { name: /login|sign in|authorize/i }))
-    .or(page.locator('[ng-click*="login"]'));
-  await loginButton.first().click();
-
-  // Wait for redirect to Ontocloak login page
-  await page.waitForURL(/.*\/realms\/pathology-demo\/protocol\/openid-connect\/auth.*/, {
-    timeout: 15_000,
-  });
-
-  // Fill in credentials on the Keycloak/Ontocloak login form
-  await page.locator('#username').fill(username);
-  await page.locator('#password').fill(password);
-  await page.locator('#kc-login').click();
-
-  // Wait for redirect back to Shrimp
-  await page.waitForURL(/.*ontoserver\.csiro\.au\/shrimp.*/, {
-    timeout: 15_000,
-  });
-
-  // Wait for Shrimp to finish loading after auth
-  await page.waitForTimeout(2_000);
-  await page.waitForLoadState('domcontentloaded');
-}
-
-/**
- * Log out of Shrimp.
- */
-export async function shrimpLogout(page: Page): Promise<void> {
-  const logoutButton = page.getByRole('button', { name: /logout|sign out/i })
-    .or(page.getByRole('link', { name: /logout|sign out/i }))
-    .or(page.locator('[ng-click*="logout"]'));
-  if (await logoutButton.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await logoutButton.first().click();
-    await page.waitForTimeout(1_000);
-    await page.waitForLoadState('domcontentloaded');
-  }
 }

@@ -4,10 +4,8 @@ import {
   openShrimp,
   openDashboard,
   openAtomioUI,
-  snapperLogin,
-  snapperLogout,
-  shrimpLogin,
-  shrimpLogout,
+  loginViaKeycloak,
+  logout,
   waitForSnapperReady,
   waitForShrimpReady,
 } from '../helpers/auth';
@@ -18,6 +16,7 @@ import {
   warn,
   pause,
   promptOnError,
+  setAutoMode,
 } from './narrator';
 
 // ---------------------------------------------------------------------------
@@ -26,12 +25,13 @@ import {
 const args = process.argv.slice(2);
 const variantFlag = args.indexOf('--variant');
 const variant = variantFlag !== -1 && args[variantFlag + 1] ? args[variantFlag + 1] : 'simple';
+const autoMode = args.includes('--auto');
 
-const AUTHORING_URL = process.env.AUTHORING_URL || 'http://localhost:9081';
+const AUTHORING_URL = process.env.AUTHORING_URL || 'http://localhost:9081/fhir';
 const PRODUCTION_URL = process.env.PRODUCTION_URL || (
-  variant === 'atomio' ? 'http://localhost:9085' : 'http://localhost:9082'
+  variant === 'atomio' ? 'http://localhost:9085/fhir' : 'http://localhost:9082/fhir'
 );
-const UAT_URL = process.env.UAT_URL || 'http://localhost:9084';
+const UAT_URL = process.env.UAT_URL || 'http://localhost:9084/fhir';
 const ATOMIO_URL = process.env.ATOMIO_URL || 'http://localhost:9083';
 
 // ---------------------------------------------------------------------------
@@ -72,6 +72,7 @@ async function scene1_anonymousProduction(page: Page): Promise<void> {
   explain('Community-labeled resources (Alpha, Beta, Gamma) are silently filtered.');
   await pause();
 
+  await logout(page);
   await openShrimp(page, PRODUCTION_URL);
   await waitForShrimpReady(page);
 
@@ -89,11 +90,12 @@ async function scene2_alphaAuthor(page: Page): Promise<void> {
 
   await openShrimp(page, AUTHORING_URL);
   await waitForShrimpReady(page);
-  await shrimpLogin(page, 'alpha-author');
+
+  // Log in via Keycloak SMART-on-FHIR flow
+  await loginViaKeycloak(page, 'alpha-author');
   await waitForShrimpReady(page);
 
-  // Navigate to Code Systems
-  await page.getByText('Code Systems').first().click();
+  await page.getByRole('link', { name: 'Terminology' }).click();
   await page.waitForTimeout(2_000);
 
   highlight('Alpha-author sees Pathology Alpha Local Order Codes + national content.');
@@ -103,16 +105,19 @@ async function scene2_alphaAuthor(page: Page): Promise<void> {
 
 async function scene3_betaComparison(page: Page): Promise<void> {
   step('Beta Author — Same Server, Different View');
-  explain('Logging out and switching to beta-author.');
+  explain('Logging out and switching to beta-author on the same server.');
   explain('beta-author has PERM_BETA_READ — they should see only Beta resources.');
   await pause();
 
-  await shrimpLogout(page);
-  await page.waitForTimeout(1_000);
-  await shrimpLogin(page, 'beta-author');
+  // Logout and re-open Shrimp to get a fresh login
+  await logout(page);
+  await openShrimp(page, AUTHORING_URL);
   await waitForShrimpReady(page);
 
-  await page.getByText('Code Systems').first().click();
+  await loginViaKeycloak(page, 'beta-author');
+  await waitForShrimpReady(page);
+
+  await page.getByRole('link', { name: 'Terminology' }).click();
   await page.waitForTimeout(2_000);
 
   highlight('Same Shrimp URL, same server — but now we see Pathology Beta instead of Alpha.');
@@ -126,12 +131,14 @@ async function scene4_adminSeesAll(page: Page): Promise<void> {
   explain('admin has PERM_READ (wildcard) — they see ALL community resources.');
   await pause();
 
-  await shrimpLogout(page);
-  await page.waitForTimeout(1_000);
-  await shrimpLogin(page, 'admin');
+  await logout(page);
+  await openShrimp(page, AUTHORING_URL);
   await waitForShrimpReady(page);
 
-  await page.getByText('Code Systems').first().click();
+  await loginViaKeycloak(page, 'admin');
+  await waitForShrimpReady(page);
+
+  await page.getByRole('link', { name: 'Terminology' }).click();
   await page.waitForTimeout(2_000);
 
   highlight('Admin sees Alpha, Beta, AND Gamma CodeSystems — plus national content.');
@@ -139,60 +146,92 @@ async function scene4_adminSeesAll(page: Page): Promise<void> {
   await pause();
 }
 
+/**
+ * Navigate Snapper to its "Find existing FHIR Resources" search page and
+ * select a resource type. The search auto-runs, showing resources visible
+ * to the currently authenticated user.
+ */
+async function snapperSearchByType(page: Page, type: 'CodeSystem' | 'ValueSet' | 'ConceptMap'): Promise<void> {
+  // Click the "Find existing FHIR Resources" button to go to the search page
+  await page.locator('#search-view-btn').click();
+  await page.waitForTimeout(2_000);
+
+  // Select the desired resource type — auto-triggers search
+  await page.locator('#search-type').selectOption({ label: type });
+  await page.waitForTimeout(3_000);
+}
+
 async function scene5_viewerVsAuthor(page: Page): Promise<void> {
   step('Viewer vs Author — Read-Only Access');
-  explain('Opening Snapper (the editing tool) and logging in as alpha-viewer.');
+  explain('Opening Snapper (the editing tool) as alpha-viewer.');
   explain('alpha-viewer has PERM_ALPHA_READ but NOT PERM_ALPHA_WRITE.');
   explain('They can browse Alpha resources but cannot modify them.');
   await pause();
 
+  await logout(page);
   await openSnapper(page, AUTHORING_URL);
   await waitForSnapperReady(page);
-  await snapperLogin(page, 'alpha-viewer');
 
-  // Navigate to Code Systems
-  await page.getByText('Code Systems').first().click();
-  await page.waitForTimeout(2_000);
+  // Log in via Keycloak
+  await loginViaKeycloak(page, 'alpha-viewer');
+  await waitForSnapperReady(page);
 
-  // Open the Alpha CodeSystem
-  await page.getByText('Pathology Alpha').first().click();
-  await page.waitForTimeout(2_000);
+  // Search for CodeSystems — Snapper's landing page is an editor,
+  // not a browser; use the search page to find server resources
+  await snapperSearchByType(page, 'CodeSystem');
 
-  highlight('alpha-viewer can open and browse the Alpha CodeSystem.');
-  highlight('But Save/Edit buttons are disabled or will return 403 if attempted.');
+  // Wait for Pathology Alpha to appear in search results
+  await page.getByText('Pathology Alpha').first().waitFor({ timeout: 15_000 });
+
+  highlight('alpha-viewer sees Pathology Alpha CodeSystem in search results.');
+  highlight('They can open and browse it, but Save/Edit will return 403.');
   highlight('The server enforces write protection even if the UI shows edit controls.');
   await pause();
 }
 
 async function scene6_authorEdits(page: Page): Promise<void> {
   step('Author Edits — Adding a Concept');
-  explain('Logging out and switching to alpha-author in Snapper.');
+  explain('Switching to alpha-author in Snapper.');
   explain('alpha-author has PERM_ALPHA_WRITE — they can modify Alpha resources.');
   await pause();
 
-  await snapperLogout(page);
-  await page.waitForTimeout(1_000);
-  await snapperLogin(page, 'alpha-author');
+  await logout(page);
+  await openSnapper(page, AUTHORING_URL);
+  await waitForSnapperReady(page);
 
-  await page.getByText('Code Systems').first().click();
-  await page.waitForTimeout(2_000);
+  await loginViaKeycloak(page, 'alpha-author');
+  await waitForSnapperReady(page);
 
-  await page.getByText('Pathology Alpha').first().click();
-  await page.waitForTimeout(2_000);
+  // Search for CodeSystems as alpha-author
+  await snapperSearchByType(page, 'CodeSystem');
 
-  highlight('alpha-author can open the same CodeSystem and make edits.');
-  highlight('In the demo-workflow script, we add a D-Dimer concept here.');
-  highlight('The security labels on the resource match the author\'s PERM_ALPHA_WRITE role.');
+  // Wait for Pathology Alpha to appear
+  await page.getByText('Pathology Alpha').first().waitFor({ timeout: 15_000 });
+
+  highlight('alpha-author sees the same Pathology Alpha CodeSystem.');
+  highlight('But unlike alpha-viewer, this user has PERM_ALPHA_WRITE.');
+  highlight('The security labels on the resource match the author\'s write permission.');
   await pause();
 }
 
 async function scene7_conceptMaps(page: Page): Promise<void> {
   step('ConceptMaps — Community Isolation for All Resource Types');
-  explain('Navigating to Concept Maps in Snapper (still logged in as alpha-author).');
+  explain('Searching for ConceptMaps in Snapper (still as alpha-author).');
   explain('ConceptMaps are also community-labeled — Alpha can only see their own.');
   await pause();
 
-  await page.getByText('Concept Maps').first().click();
+  // If we're still on the Snapper search page from scene 6, just switch type.
+  // Otherwise open Snapper fresh.
+  const isOnSnapper = page.url().includes('snapper');
+  if (!isOnSnapper) {
+    await logout(page);
+    await openSnapper(page, AUTHORING_URL);
+    await waitForSnapperReady(page);
+    await loginViaKeycloak(page, 'alpha-author');
+    await waitForSnapperReady(page);
+  }
+
+  await snapperSearchByType(page, 'ConceptMap');
   await page.waitForTimeout(2_000);
 
   highlight('Alpha\'s ConceptMap maps local codes (FBC, BGL, HBA1C) to SNOMED CT.');
@@ -206,6 +245,7 @@ async function scene8_syndication(page: Page): Promise<void> {
   explain('The Dashboard shows which resources are loaded on each server.');
   await pause();
 
+  await logout(page);
   await openDashboard(page, AUTHORING_URL);
   await page.waitForTimeout(3_000);
 
@@ -231,10 +271,11 @@ async function scene9_csvContent(page: Page): Promise<void> {
 
   await openShrimp(page, AUTHORING_URL);
   await waitForShrimpReady(page);
-  await shrimpLogin(page, 'admin');
+
+  await loginViaKeycloak(page, 'admin');
   await waitForShrimpReady(page);
 
-  await page.getByText('Code Systems').first().click();
+  await page.getByRole('link', { name: 'Terminology' }).click();
   await page.waitForTimeout(2_000);
 
   highlight('Admin sees Pathology Gamma — 15 concepts loaded from CSV.');
@@ -250,6 +291,7 @@ async function scene10_atomioFeeds(page: Page): Promise<void> {
   explain('Feeds are immutable snapshots of content cloned from authoring.');
   await pause();
 
+  await logout(page);
   await openAtomioUI(page, ATOMIO_URL);
   await page.waitForTimeout(3_000);
 
@@ -278,10 +320,11 @@ async function scene12_atomioPromotion(page: Page): Promise<void> {
 
   await openShrimp(page, UAT_URL);
   await waitForShrimpReady(page);
-  await shrimpLogin(page, 'admin');
+
+  await loginViaKeycloak(page, 'admin');
   await waitForShrimpReady(page);
 
-  await page.getByText('Code Systems').first().click();
+  await page.getByRole('link', { name: 'Terminology' }).click();
   await page.waitForTimeout(2_000);
 
   highlight('UAT has the same content as the feed its alias points to.');
@@ -294,6 +337,8 @@ async function scene12_atomioPromotion(page: Page): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
+  if (autoMode) setAutoMode(true);
+
   console.log('');
   console.log('============================================================');
   console.log('  Pathology Permissions Demo — Visual Walkthrough');
@@ -309,6 +354,15 @@ async function main(): Promise<void> {
   const browser: Browser = await chromium.launch({
     headless: false,
     slowMo: 500,
+    args: [
+      // Cloud-hosted Shrimp/Snapper at ontoserver.csiro.au makes XHR requests to
+      // localhost FHIR servers. Chromium blocks this by default (Private Network
+      // Access + CORS + mixed content). This flag disables web security to allow
+      // the cross-origin localhost requests needed for the demo.
+      '--disable-web-security',
+      // Also allow HTTPS pages to fetch from HTTP localhost
+      '--allow-running-insecure-content',
+    ],
   });
 
   const context = await browser.newContext({

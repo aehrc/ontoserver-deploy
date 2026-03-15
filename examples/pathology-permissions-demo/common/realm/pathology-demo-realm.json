@@ -1,0 +1,814 @@
+{
+  "id": "pathology-demo",
+  "realm": "pathology-demo",
+  "displayName": "Pathology Terminology Demo",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": false,
+  "defaultSignatureAlgorithm": "RS256",
+  "revokeRefreshToken": false,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+
+  "roles": {
+    "realm": [
+      {
+        "name": "PERM_READ",
+        "description": "Wildcard read access to all community resources",
+        "composite": false
+      },
+      {
+        "name": "PERM_WRITE",
+        "description": "Wildcard write access to all community resources",
+        "composite": false
+      },
+      {
+        "name": "Community creator",
+        "description": "Can create new communities via Ontocloak admin UI",
+        "composite": false
+      },
+      {
+        "name": "Community owner",
+        "description": "Base role for community ownership and group management",
+        "composite": true,
+        "composites": {
+          "client": {
+            "realm-management": [
+              "query-groups",
+              "query-users",
+              "view-users"
+            ],
+            "account": [
+              "view-profile",
+              "manage-account"
+            ]
+          }
+        }
+      },
+      {
+        "name": "All communities owner",
+        "description": "Owner rights across all communities",
+        "composite": true,
+        "composites": {
+          "realm": ["Community owner"]
+        }
+      },
+      {
+        "name": "All communities authors",
+        "description": "Read and write access to all community resources",
+        "composite": true,
+        "composites": {
+          "realm": ["PERM_READ", "PERM_WRITE"]
+        }
+      },
+      {
+        "name": "Community content administrator",
+        "description": "Emergency read/write access to all FHIR resources regardless of labels",
+        "composite": true,
+        "composites": {
+          "realm": ["PERM_READ", "PERM_WRITE"]
+        }
+      },
+      {
+        "name": "Consumer",
+        "description": "Read-only access to authoring and production FHIR endpoints",
+        "composite": true,
+        "composites": {
+          "client": {
+            "authoring-server": ["authoring-serverFHIR_READ"],
+            "production-server": ["production-serverFHIR_READ"]
+          }
+        }
+      },
+      {
+        "name": "Author",
+        "description": "Read/write access to authoring FHIR, read access to production",
+        "composite": true,
+        "composites": {
+          "client": {
+            "authoring-server": ["authoring-serverFHIR_READ", "authoring-serverFHIR_WRITE"],
+            "production-server": ["production-serverFHIR_READ"]
+          }
+        }
+      },
+      {
+        "name": "Approver",
+        "description": "Author access plus syndication management for releasing content",
+        "composite": true,
+        "composites": {
+          "realm": ["Author"],
+          "client": {
+            "authoring-server": ["authoring-serverSYND_READ", "authoring-serverSYND_WRITE"]
+          }
+        }
+      },
+      {
+        "name": "Full administrator",
+        "description": "Full access to all endpoints and all communities",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "All communities owner",
+            "All communities authors",
+            "Community creator",
+            "Approver"
+          ],
+          "client": {
+            "authoring-server": ["authoring-serverAPI_READ", "authoring-serverAPI_WRITE", "authoring-serverFHIR_READ", "authoring-serverFHIR_WRITE", "authoring-serverSYND_READ", "authoring-serverSYND_WRITE"],
+            "production-server": ["production-serverFHIR_READ", "production-serverSYND_READ"]
+          }
+        }
+      },
+      {
+        "name": "offline_access",
+        "description": "OpenID Connect built-in scope: offline_access",
+        "composite": false
+      },
+      {
+        "name": "uma_authorization",
+        "description": "UMA authorization",
+        "composite": false
+      },
+      {
+        "name": "default-roles-pathology-demo",
+        "description": "Default roles for the realm",
+        "composite": true,
+        "composites": {
+          "realm": ["offline_access"],
+          "client": {
+            "account": ["view-profile", "manage-account"]
+          }
+        }
+      }
+    ],
+    "client": {
+      "authoring-server": [
+        {
+          "name": "authoring-serverFHIR_READ",
+          "description": "Read access to the authoring FHIR endpoint (audience-prefixed for token scoping)"
+        },
+        {
+          "name": "authoring-serverFHIR_WRITE",
+          "description": "Write access to the authoring FHIR endpoint (audience-prefixed for token scoping)"
+        },
+        {
+          "name": "authoring-serverAPI_READ",
+          "description": "Read access to the authoring admin API (audience-prefixed for token scoping)"
+        },
+        {
+          "name": "authoring-serverAPI_WRITE",
+          "description": "Write access to the authoring admin API (audience-prefixed for token scoping)"
+        },
+        {
+          "name": "authoring-serverSYND_READ",
+          "description": "Read access to the authoring syndication endpoint (audience-prefixed for token scoping)"
+        },
+        {
+          "name": "authoring-serverSYND_WRITE",
+          "description": "Write access to the authoring syndication endpoint (audience-prefixed for token scoping)"
+        }
+      ],
+      "production-server": [
+        {
+          "name": "production-serverFHIR_READ",
+          "description": "Read access to the production FHIR endpoint (audience-prefixed for token scoping)"
+        },
+        {
+          "name": "production-serverSYND_READ",
+          "description": "Read access to the production syndication endpoint (audience-prefixed for token scoping)"
+        }
+      ],
+      "atomio-server": [
+        {
+          "name": "atomio-serverATOMIO_READ",
+          "description": "Read access to Atomio feeds (audience-prefixed for token scoping)"
+        },
+        {
+          "name": "atomio-serverATOMIO_WRITE",
+          "description": "Write access to Atomio feeds (audience-prefixed for token scoping)"
+        }
+      ]
+    }
+  },
+
+  "groups": [
+    {
+      "name": "Communities",
+      "subGroups": [
+        {
+          "name": "All communities authors",
+          "realmRoles": ["All communities authors"]
+        }
+      ]
+    },
+    {
+      "name": "Community owners",
+      "subGroups": [
+        {
+          "name": "All communities owners",
+          "realmRoles": ["All communities owner"]
+        }
+      ]
+    },
+    {
+      "name": "System",
+      "subGroups": [
+        {
+          "name": "Authors",
+          "realmRoles": ["Author", "Community creator"]
+        },
+        {
+          "name": "Consumers",
+          "realmRoles": ["Consumer"]
+        },
+        {
+          "name": "Approvers",
+          "realmRoles": ["Approver"]
+        }
+      ]
+    }
+  ],
+
+  "defaultGroups": ["/System/Consumers"],
+
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@example.org",
+      "firstName": "System",
+      "lastName": "Administrator",
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }],
+      "realmRoles": ["Full administrator", "default-roles-pathology-demo"],
+      "groups": ["/System/Consumers"]
+    },
+    {
+      "username": "national-admin",
+      "enabled": true,
+      "email": "national-admin@example.org",
+      "firstName": "National",
+      "lastName": "Administrator",
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }],
+      "realmRoles": ["Approver", "default-roles-pathology-demo"],
+      "groups": ["/System/Approvers", "/System/Consumers"]
+    },
+    {
+      "username": "alpha-viewer",
+      "enabled": true,
+      "email": "alpha-viewer@pathology-alpha.example.com",
+      "firstName": "Alice",
+      "lastName": "Viewer",
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }],
+      "realmRoles": ["default-roles-pathology-demo"],
+      "groups": ["/System/Consumers"]
+    },
+    {
+      "username": "alpha-author",
+      "enabled": true,
+      "email": "alpha-author@pathology-alpha.example.com",
+      "firstName": "Alice",
+      "lastName": "Author",
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }],
+      "realmRoles": ["default-roles-pathology-demo"],
+      "groups": ["/System/Authors", "/System/Consumers"]
+    },
+    {
+      "username": "alpha-approver",
+      "enabled": true,
+      "email": "alpha-approver@pathology-alpha.example.com",
+      "firstName": "Alice",
+      "lastName": "Approver",
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }],
+      "realmRoles": ["default-roles-pathology-demo"],
+      "groups": ["/System/Approvers", "/System/Consumers"]
+    },
+    {
+      "username": "beta-viewer",
+      "enabled": true,
+      "email": "beta-viewer@pathology-beta.example.com",
+      "firstName": "Bob",
+      "lastName": "Viewer",
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }],
+      "realmRoles": ["default-roles-pathology-demo"],
+      "groups": ["/System/Consumers"]
+    },
+    {
+      "username": "beta-author",
+      "enabled": true,
+      "email": "beta-author@pathology-beta.example.com",
+      "firstName": "Bob",
+      "lastName": "Author",
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }],
+      "realmRoles": ["default-roles-pathology-demo"],
+      "groups": ["/System/Authors", "/System/Consumers"]
+    },
+    {
+      "username": "beta-approver",
+      "enabled": true,
+      "email": "beta-approver@pathology-beta.example.com",
+      "firstName": "Bob",
+      "lastName": "Approver",
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }],
+      "realmRoles": ["default-roles-pathology-demo"],
+      "groups": ["/System/Approvers", "/System/Consumers"]
+    }
+  ],
+
+  "clients": [
+    {
+      "clientId": "authoring-server",
+      "name": "Authoring Ontoserver",
+      "description": "Resource server representing the authoring Ontoserver instance",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "production-server",
+      "name": "Production Ontoserver",
+      "description": "Resource server representing the production Ontoserver instance",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "atomio-server",
+      "name": "Atomio Server",
+      "description": "Resource server representing the Atomio syndication server",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "snapper-authoring",
+      "name": "Snapper (Authoring)",
+      "description": "Snapper web UI for the authoring Ontoserver",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "rootUrl": "http://localhost:9081",
+      "baseUrl": "/snapper",
+      "redirectUris": ["http://localhost:9081/*"],
+      "webOrigins": ["http://localhost:9081"],
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "authoring-server",
+        "user-realm-roles-authorities",
+        "openid",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "snapper-production",
+      "name": "Snapper (Production)",
+      "description": "Snapper web UI for the production Ontoserver",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "rootUrl": "http://localhost:9082",
+      "baseUrl": "/snapper",
+      "redirectUris": ["http://localhost:9082/*"],
+      "webOrigins": ["http://localhost:9082"],
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "production-server",
+        "user-realm-roles-authorities",
+        "openid",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "demo-cli",
+      "name": "Demo CLI Client",
+      "description": "Client for setup scripts and API demos using direct access grants",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "authoring-server",
+        "production-server",
+        "user-realm-roles-authorities",
+        "openid",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "syndication-consumer",
+      "name": "Syndication Consumer",
+      "description": "Service account for downstream Ontoserver instances to authenticate when consuming syndication feeds from authoring. Granted PERM_READ (all communities) so it can access all community-labeled resources.",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "syndication-consumer-secret",
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "authoring-server",
+        "user-realm-roles-authorities",
+        "openid"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "shrimp",
+      "name": "Shrimp (Cloud-hosted)",
+      "description": "Cloud-hosted Shrimp browser UI at ontoserver.csiro.au — used for the visual walkthrough and manual demos",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": ["https://ontoserver.csiro.au/*"],
+      "webOrigins": ["https://ontoserver.csiro.au"],
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "authoring-server",
+        "production-server",
+        "user-realm-roles-authorities",
+        "openid",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "system/*.read",
+        "system/*.write",
+        "user/*.read",
+        "user/*.write",
+        "launch",
+        "fhirUser"
+      ]
+    },
+    {
+      "clientId": "snapper",
+      "name": "Snapper (Cloud-hosted)",
+      "description": "Cloud-hosted Snapper browser UI at ontoserver.csiro.au — used for the visual walkthrough and manual demos",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": ["https://ontoserver.csiro.au/*"],
+      "webOrigins": ["https://ontoserver.csiro.au"],
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "authoring-server",
+        "production-server",
+        "user-realm-roles-authorities",
+        "openid",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "system/*.read",
+        "system/*.write",
+        "user/*.read",
+        "user/*.write",
+        "launch",
+        "fhirUser"
+      ]
+    }
+  ],
+
+  "clientScopes": [
+    {
+      "name": "authoring-server",
+      "description": "Maps authoring-server client roles to the access token",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Access to authoring terminology server"
+      },
+      "protocolMappers": [
+        {
+          "name": "authoring-server-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "authoring-server",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "authoring-server-client-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "authorities",
+            "jsonType.label": "String",
+            "usermodel.clientRoleMapping.clientId": "authoring-server"
+          }
+        }
+      ]
+    },
+    {
+      "name": "production-server",
+      "description": "Maps production-server client roles to the access token",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Access to production terminology server"
+      },
+      "protocolMappers": [
+        {
+          "name": "production-server-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "production-server",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "production-server-client-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "authorities",
+            "jsonType.label": "String",
+            "usermodel.clientRoleMapping.clientId": "production-server"
+          }
+        }
+      ]
+    },
+    {
+      "name": "user-realm-roles-authorities",
+      "description": "Maps user realm roles (including community permissions) to the authorities claim",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-role-authorities-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "authorities",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
+    {
+      "name": "openid",
+      "description": "OpenID Connect scope",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "sub",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": {
+            "introspection.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "profile",
+      "description": "OpenID Connect profile scope",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "username",
+            "claim.name": "preferred_username",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "full name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-full-name-mapper",
+          "consentRequired": false,
+          "config": {
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "given name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "firstName",
+            "claim.name": "given_name",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "family name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "lastName",
+            "claim.name": "family_name",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
+    {
+      "name": "email",
+      "description": "OpenID Connect email scope",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "email",
+            "claim.name": "email",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
+    {
+      "name": "system/*.read",
+      "description": "SMART-on-FHIR scope: system-level read access",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": []
+    },
+    {
+      "name": "system/*.write",
+      "description": "SMART-on-FHIR scope: system-level write access",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": []
+    },
+    {
+      "name": "user/*.read",
+      "description": "SMART-on-FHIR scope: user-level read access",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": []
+    },
+    {
+      "name": "user/*.write",
+      "description": "SMART-on-FHIR scope: user-level write access",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": []
+    },
+    {
+      "name": "launch",
+      "description": "SMART-on-FHIR scope: launch context",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": []
+    },
+    {
+      "name": "fhirUser",
+      "description": "SMART-on-FHIR scope: FHIR user identity",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": []
+    }
+  ],
+
+  "defaultDefaultClientScopes": [
+    "openid",
+    "profile",
+    "email"
+  ],
+
+  "scopeMappings": [
+    {
+      "clientScope": "offline_access",
+      "roles": ["offline_access"]
+    }
+  ],
+
+  "clientScopeMappings": {
+    "account": [
+      {
+        "clientScope": "openid",
+        "roles": ["view-profile"]
+      }
+    ]
+  },
+
+  "smtpServer": {},
+  "loginTheme": "ontocloak",
+  "accountTheme": "ontocloak",
+  "adminTheme": "ontocloak",
+  "internationalizationEnabled": false,
+  "defaultLocale": "en"
+}
