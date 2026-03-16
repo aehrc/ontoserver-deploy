@@ -27,7 +27,7 @@ Three charts are published from this repository:
 
 ### Installing
 
-**From GitHub Pages (Helm repository):**
+**From GitHub Pages (Helm repository): **
 ```bash
 helm repo add ontoserver https://aehrc.github.io/ontoserver-deploy
 helm repo update
