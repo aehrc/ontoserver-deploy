@@ -3,6 +3,7 @@ name: Integration Tests
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   integration-tests:
@@ -50,11 +51,27 @@ jobs:
             --no-lb
             --k3s-arg "--disable=traefik@server:0"
 
+      - name: Install Traefik v3
+        if: matrix.mode.verifyTraefikRoute
+        run: |
+          helm repo add traefik https://traefik.github.io/charts
+          helm repo update
+          helm install traefik traefik/traefik \
+            --namespace kube-system \
+            --version 39.0.5 \
+            --set ports.web.expose.default=true \
+            --set ports.web.exposedPort=80 \
+            --wait --timeout 2m
+
       - name: Build chart dependencies
         run: helm dependency build ./charts/ontoserver
 
       - name: Install chart
         run: |
+          EXTRA_VALUES=""
+          if [[ "${{ matrix.mode.verifyTraefikRoute }}" == "true" ]]; then
+            EXTRA_VALUES="--values ./charts/ontoserver/tests/fixtures/traefik-https-backend-values.yaml"
+          fi
           helm install ${{ matrix.mode.release }} ./charts/ontoserver \
             --set ontoserver.deployment.isReadOnly=${{ matrix.mode.isReadOnly }} \
             --set ontoserver.managementService.enabled=true \
@@ -70,6 +87,7 @@ jobs:
             --set ontoserver.resources.db.limits.cpu=1 \
             --set ontoserver.resources.db.requests.memory=512Mi \
             --set ontoserver.resources.db.limits.memory=1G \
+            $EXTRA_VALUES \
             --wait \
             --timeout 10m
 
@@ -97,6 +115,27 @@ jobs:
             echo "Unexpected Helm test job found: ${{ matrix.mode.unexpectedHook }}"
             exit 1
           fi
+
+      - name: Verify Traefik route (HTTPS backend)
+        if: matrix.mode.verifyTraefikRoute
+        run: |
+          # Expose Traefik's web entrypoint locally (ports.web.exposedPort=80)
+          kubectl port-forward -n kube-system svc/traefik 18080:80 &
+
+          # Wait for port-forward to be ready (up to 15 s).
+          # Uses Traefik's built-in /ping health endpoint with --fail so the loop
+          # only breaks on an actual HTTP 200, not on connection errors returning 0.
+          for i in $(seq 15); do
+            curl -sf http://localhost:18080/ping >/dev/null 2>&1 && break
+            sleep 1
+          done
+
+          # Full path: curl → Traefik (web entrypoint) → ServersTransport (insecureSkipVerify)
+          #            → Ontoserver HTTPS (self-signed /keystore.p12)
+          curl -sf \
+            -H "Host: ontoserver.traefik-test.local" \
+            http://localhost:18080/fhir/metadata \
+          | grep '"resourceType":"CapabilityStatement"'
 
       - name: Collect test logs
         if: always()
