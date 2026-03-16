@@ -20,21 +20,42 @@ Add a CI integration test that proves Traefik can successfully proxy requests to
 
 ### 1. Matrix parameterization
 
-Two boolean fields are added to the matrix schema. Existing entries retain their current behaviour via defaults.
+Three new boolean fields are added to the matrix schema alongside the existing fields. Existing entries retain their current behaviour unchanged.
 
 | Field | read-only | read-write | traefik-https-backend |
 |---|---|---|---|
-| `disableTraefik` | `true` | `true` | `false` |
+| `name` | `read-only` | `read-write` | `traefik-https-backend` |
+| `release` | `ontoserver-ro` | `ontoserver-rw` | `ontoserver-traefik` |
+| `isReadOnly` | `"true"` | `"false"` | `"true"` |
+| `expectedHook` | `ontoserver-ro-ontoserver-test-fhir-ro` | `ontoserver-rw-ontoserver-test-fhir-rw` | `""` |
+| `unexpectedHook` | `ontoserver-ro-ontoserver-test-fhir-rw` | `ontoserver-rw-ontoserver-test-fhir-ro` | `""` |
 | `runHelmTest` | `true` | `true` | `false` |
 | `verifyTraefikRoute` | `false` | `false` | `true` |
-| `expectedHook` | (existing value) | (existing value) | `""` |
-| `unexpectedHook` | (existing value) | (existing value) | `""` |
 
-### 2. k3d cluster
+**Important:** `runHelmTest` and `verifyTraefikRoute` must be explicitly set on **all three** matrix entries. In GitHub Actions, a matrix field absent from an entry evaluates to `""` (falsy), so omitting these fields from the existing `read-only` and `read-write` entries would silently skip their `helm test` steps and break the existing test suite.
 
-The k3d creation step conditionally adds `--k3s-arg "--disable=traefik@server:0"` only when `matrix.mode.disableTraefik == true`. For the Traefik entry the flag is omitted so that k3s's built-in Traefik runs.
+### 2. k3d cluster and Traefik v3 installation
 
-**CRD compatibility note:** k3s ships Traefik v2, which uses `traefik.containo.us/v1alpha1`. The chart templates use `traefik.io/v1alpha1` (Traefik v3). This must be verified at implementation time. If the bundled Traefik version does not support `traefik.io/v1alpha1`, the CI job must either install a newer Traefik or the test must use a Traefik Helm chart installation with a pinned v3 version.
+The k3d creation step is **unchanged** — `--disable=traefik@server:0` remains for all matrix entries. The bundled k3s Traefik is always disabled.
+
+**Why not use the k3s-bundled Traefik:** k3s ships Traefik v2, which uses `traefik.containo.us/v1alpha1`. The chart templates use `traefik.io/v1alpha1` (Traefik v3). Applying the chart against Traefik v2 CRDs would fail with `no matches for kind "IngressRoute" in version "traefik.io/v1alpha1"`.
+
+**Preferred resolution:** A dedicated "Install Traefik v3" step runs after cluster creation, conditional on `matrix.mode.verifyTraefikRoute`:
+
+```bash
+helm repo add traefik https://traefik.github.io/charts
+helm repo update
+helm install traefik traefik/traefik \
+  --namespace kube-system \
+  --version <pin to a stable Traefik v3 chart version, e.g. 30.0.0 — verify latest stable at implementation time> \
+  --set ports.web.expose.default=true \
+  --set ports.web.exposedPort=80 \
+  --wait --timeout 2m
+```
+
+**No `allowCrossNamespace` flag needed.** The chart deploys both the IngressRoute and the ServersTransport into the same Helm release namespace (default: `default`). The `serversTransport:` field in the IngressRoute template is an unqualified name string, which Traefik resolves relative to the IngressRoute's own namespace. Since both resources land in the same namespace, this is a same-namespace reference. Traefik installed in `kube-system` watching resources in `default` is standard behaviour that does not require cross-namespace resolution. The `allowCrossNamespace` flag would only be needed if the IngressRoute in one namespace referenced a ServersTransport in a different namespace — which this test does not do.
+
+**Version pinning:** Use a concrete chart version string (e.g. `30.0.0`). An unpinned version would silently upgrade on each CI run, risking undetected breaking changes. The pinned version should be recorded in the workflow file and updated intentionally.
 
 ### 3. Fixture values file
 
@@ -46,61 +67,87 @@ ontoserver:
     - ontoserver.traefik-test.local
   serverName: ontoserver.traefik-test.local
   config:
-    ONTOSERVER_INSECURE: "false"   # re-enables Ontoserver's default HTTPS (self-signed /keystore.p12)
+    # ONTOSERVER_INSECURE=true makes Ontoserver serve plain HTTP (disables its inbound TLS
+    # listener). The chart default is "true" for convenience in cluster-internal deployments.
+    # Setting to "false" restores Ontoserver's out-of-box behaviour: HTTPS on port 8080
+    # using its bundled self-signed keystore at /keystore.p12.
+    #
+    # Note: values.yaml documents this flag as "Disable TLS verification for outgoing
+    # connections", which is incomplete. Per Ontoserver documentation: "By default,
+    # Ontoserver will run using SSL/TLS. To disable SSL/TLS, add ONTOSERVER_INSECURE=true."
+    # The flag controls the server's inbound TLS listener; the values.yaml comment should
+    # be corrected as a follow-up.
+    ONTOSERVER_INSECURE: "false"
 
 traefik:
   ingressRoute:
     enabled: true
     entryPoints:
-      - web            # client → Traefik over plain HTTP; TLS is backend-only in this test
-    backendPort: 80    # Kubernetes Service port (routes to container port 8080, which serves HTTPS)
+      - web              # client → Traefik over plain HTTP; HTTPS is only on the backend side
+    backendPort: 80      # Kubernetes Service port. Traefik opens a TLS connection over the TCP
+                         # stream to Service port 80. kube-proxy forwards that TCP stream to the
+                         # container on port 8080, where Ontoserver answers the TLS handshake.
+                         # Use port 80 (not 8080): the Service only exposes port 80.
     backendScheme: https
     serversTransport:
       enabled: true
       insecureSkipVerify: true   # trust Ontoserver's built-in self-signed certificate
 ```
 
-The matrix entry passes this file via `--values` to the Helm install step.
-
 ### 4. Helm install
 
-The existing install step passes `--values` with the fixture file when `matrix.mode.verifyTraefikRoute == true`, in addition to the per-entry resource sizing flags already present.
+The install step conditionally appends `--values ./charts/ontoserver/tests/fixtures/traefik-https-backend-values.yaml` when `matrix.mode.verifyTraefikRoute == true`. All other flags (`--set ontoserver.deployment.isReadOnly`, resource sizing) are unchanged.
 
-`ONTOSERVER_INSECURE` is not passed via `--set` for this entry (the fixture file overrides the chart default of `"true"` to `"false"`), so Ontoserver boots with its bundled self-signed keystore at `/keystore.p12` and serves HTTPS on container port 8080.
+### 5. Step conditionality and guards
 
-### 5. Verification step
+Three existing steps need guards:
 
-`helm test` is skipped for this entry (`if: matrix.mode.runHelmTest`) because the existing test hook jobs use `http://` URLs and would fail against an HTTPS backend.
+| Step | Change |
+|---|---|
+| "Run integration tests" (`helm test`) | Add `if: matrix.mode.runHelmTest` |
+| "Verify mode-specific test hook rendered" | Add `if: matrix.mode.runHelmTest` — without this guard, `kubectl get job ""` is an invalid command that will fail the job |
+| "Collect test logs" `expectedHook` log lines | **Must** guard on `matrix.mode.runHelmTest` — `kubectl describe job ""` and `kubectl logs -l job-name=` with an empty value produce API errors. The existing `\|\| true` suppresses exit codes but not the error output; explicit guarding is required. |
 
-A dedicated step runs when `matrix.mode.verifyTraefikRoute == true`:
+**Why `helm test` is skipped for this entry:** The existing test hooks (`test-metadata-job.yaml`, `test-fhir-ro-job.yaml`) hardcode `BASE_URL="http://..."` pointing at the ClusterIP Service. With `ONTOSERVER_INSECURE: "false"`, Ontoserver serves HTTPS on port 8080. A plain HTTP request to the Service's port 80 (which NATs to HTTPS port 8080) will fail with an SSL handshake error. Enabling `runHelmTest` for this entry would require new HTTPS-aware test hook templates, which is out of scope for this test.
 
+### 6. Verification step
+
+A dedicated step runs when `matrix.mode.verifyTraefikRoute == true`. The `kubectl rollout status` is omitted — the preceding `helm install traefik ... --wait` already guarantees Traefik is fully ready before this step runs.
+
+```bash
+# Open a local port to Traefik's web entrypoint
+kubectl port-forward -n kube-system svc/traefik 18080:80 &
+
+# Wait for port-forward to be ready with a retry loop (more reliable than a fixed sleep)
+for i in $(seq 15); do
+  curl -s http://localhost:18080/ >/dev/null 2>&1 && break
+  sleep 1
+done
+
+# Verify the full proxy path: curl → Traefik → ServersTransport → Ontoserver HTTPS
+curl -sf \
+  -H "Host: ontoserver.traefik-test.local" \
+  http://localhost:18080/fhir/metadata \
+| grep '"resourceType":"CapabilityStatement"'
 ```
-1. kubectl port-forward -n kube-system svc/traefik 18080:80 &
-2. sleep 2
-3. curl -sf -H "Host: ontoserver.traefik-test.local" \
-         http://localhost:18080/fhir/metadata \
-   | grep '"resourceType":"CapabilityStatement"'
-```
 
-This validates the full path: curl → Traefik (port-forward) → ServersTransport (insecureSkipVerify) → Ontoserver HTTPS (self-signed cert).
+This validates: Traefik receives the request → matches the IngressRoute rule → initiates an HTTPS connection to the Service via ServersTransport (`insecureSkipVerify: true`) → Ontoserver responds over HTTPS → response reaches the curl client.
 
-### 6. Diagnostics
+### 7. Diagnostics
 
-The existing "Diagnose failed install" and "Collect test logs" steps cover all matrix entries. The "Collect test logs" step gains one additional line for the Traefik entry:
+The existing "Diagnose failed install" (`if: failure()`) and "Collect test logs" (`if: always()`) steps apply to all matrix entries. The "Collect test logs" step gains one additional line conditional on `matrix.mode.verifyTraefikRoute`:
 
-```
+```bash
 kubectl logs -n kube-system -l app.kubernetes.io/name=traefik --tail=50 || true
 ```
 
-This can be made conditional on `matrix.mode.verifyTraefikRoute` or included unconditionally (the command is a no-op when Traefik is not running).
+### 8. CI trigger note
+
+The `integration-tests.yml` workflow currently triggers on `push: branches: [main]` only. The new matrix entry will not run in CI until the branch is merged to `main`. To validate the new job before merging, temporarily add a `pull_request` trigger on the feature branch, or run the workflow manually via `workflow_dispatch`.
 
 ## Files changed
 
 | File | Change |
 |---|---|
-| `.github/workflows/integration-tests.yml` | Add matrix fields; parameterize k3d step; add conditional verify step; add Traefik log line |
+| `.github/workflows/integration-tests.yml` | Add matrix fields; add "Install Traefik v3" step; add `if:` guards; add conditional verify step; add Traefik log line |
 | `charts/ontoserver/tests/fixtures/traefik-https-backend-values.yaml` | New fixture values file |
-
-## Open question (resolve at implementation)
-
-Verify the Traefik CRD API group in the k3s-bundled Traefik version used by the k3d cluster. If it is `traefik.containo.us/v1alpha1` (v2) rather than `traefik.io/v1alpha1` (v3), the CI job will need to install Traefik v3 via Helm before running the chart install.
