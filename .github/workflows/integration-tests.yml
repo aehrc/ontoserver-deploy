@@ -57,7 +57,9 @@ jobs:
 
       - name: Wait for Traefik CRDs
         if: matrix.mode.verifyTraefikRoute
-        run: kubectl wait --for=condition=established crd/ingressroutes.traefik.io --timeout=120s
+        run: |
+          until kubectl get crd ingressroutes.traefik.io >/dev/null 2>&1; do sleep 2; done
+          kubectl wait --for=condition=established crd/ingressroutes.traefik.io --timeout=120s
 
       - name: Build chart dependencies
         run: helm dependency build ./charts/ontoserver
