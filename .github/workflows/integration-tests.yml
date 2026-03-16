@@ -17,11 +17,22 @@ jobs:
             isReadOnly: "true"
             expectedHook: ontoserver-ro-ontoserver-test-fhir-ro
             unexpectedHook: ontoserver-ro-ontoserver-test-fhir-rw
+            runHelmTest: true
+            verifyTraefikRoute: false
           - name: read-write
             release: ontoserver-rw
             isReadOnly: "false"
             expectedHook: ontoserver-rw-ontoserver-test-fhir-rw
             unexpectedHook: ontoserver-rw-ontoserver-test-fhir-ro
+            runHelmTest: true
+            verifyTraefikRoute: false
+          - name: traefik-https-backend
+            release: ontoserver-traefik
+            isReadOnly: "true"
+            expectedHook: ""
+            unexpectedHook: ""
+            runHelmTest: false
+            verifyTraefikRoute: true
     steps:
       - uses: actions/checkout@v4
 
