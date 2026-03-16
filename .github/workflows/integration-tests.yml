@@ -52,20 +52,7 @@ jobs:
           args: >-
             --agents 1
             --no-lb
-            --image rancher/k3s:v1.30.8-k3s1
-            --k3s-arg "--disable=traefik@server:0"
-
-      - name: Install Traefik v3
-        if: matrix.mode.verifyTraefikRoute
-        run: |
-          helm repo add traefik https://traefik.github.io/charts
-          helm repo update
-          helm install traefik traefik/traefik \
-            --namespace kube-system \
-            --version 39.0.5 \
-            --set ports.web.expose.default=true \
-            --set ports.web.exposedPort=80 \
-            --wait --timeout 2m
+            --image rancher/k3s:v1.32.10-k3s1
 
       - name: Build chart dependencies
         run: helm dependency build ./charts/ontoserver
