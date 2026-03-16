@@ -86,9 +86,11 @@ jobs:
           kubectl get events --sort-by='.lastTimestamp'
 
       - name: Run integration tests
+        if: matrix.mode.runHelmTest
         run: helm test ${{ matrix.mode.release }} --timeout 10m
 
       - name: Verify mode-specific test hook rendered
+        if: matrix.mode.runHelmTest
         run: |
           kubectl get job ${{ matrix.mode.expectedHook }}
           if kubectl get job ${{ matrix.mode.unexpectedHook }} >/dev/null 2>&1; then
@@ -107,7 +109,17 @@ jobs:
           kubectl describe job ${{ matrix.mode.release }}-ontoserver-test-metadata || true
           echo "=== test-metadata logs ==="
           kubectl logs -l job-name=${{ matrix.mode.release }}-ontoserver-test-metadata --tail=200 || true
+
+      - name: Collect helm test hook logs
+        if: always() && matrix.mode.runHelmTest
+        run: |
           echo "=== mode-specific test job ==="
           kubectl describe job ${{ matrix.mode.expectedHook }} || true
           echo "=== mode-specific test logs ==="
           kubectl logs -l job-name=${{ matrix.mode.expectedHook }} --tail=200 || true
+
+      - name: Collect Traefik logs
+        if: always() && matrix.mode.verifyTraefikRoute
+        run: |
+          echo "=== Traefik logs ==="
+          kubectl logs -n kube-system -l app.kubernetes.io/name=traefik --tail=50 || true
