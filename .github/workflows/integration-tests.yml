@@ -55,6 +55,10 @@ jobs:
             --no-lb
             --image rancher/k3s:v1.32.10-k3s1
 
+      - name: Wait for Traefik CRDs
+        if: matrix.mode.verifyTraefikRoute
+        run: kubectl wait --for=condition=established crd/ingressroutes.traefik.io --timeout=120s
+
       - name: Build chart dependencies
         run: helm dependency build ./charts/ontoserver
 
