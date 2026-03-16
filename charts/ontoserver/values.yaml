@@ -284,7 +284,7 @@ ontoserver:
   customization: ""
   ## Additional Ontoserver config entries - https://ontoserver.csiro.au/docs/6/config-all.html
   config:
-    ## @param ontoserver.config.ONTOSERVER_INSECURE        Disable TLS verification for outgoing connections
+    ## @param ontoserver.config.ONTOSERVER_INSECURE        Disable Ontoserver's inbound TLS listener — set to "true" to serve plain HTTP, "false" (or omit) to serve HTTPS using the bundled self-signed keystore
     ONTOSERVER_INSECURE: "true"
   ## @param ontoserver.secretConfig                      Secret-backed Ontoserver config entries
   secretConfig: {}
