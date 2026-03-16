@@ -65,6 +65,9 @@ jobs:
         run: helm dependency build ./charts/ontoserver
 
       - name: Install chart
+        env:
+          QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+          QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
         run: |
           EXTRA_VALUES=""
           if [[ "${{ matrix.mode.verifyTraefikRoute }}" == "true" ]]; then
@@ -73,8 +76,8 @@ jobs:
           helm install ${{ matrix.mode.release }} ./charts/ontoserver \
             --set ontoserver.deployment.isReadOnly=${{ matrix.mode.isReadOnly }} \
             --set ontoserver.managementService.enabled=true \
-            --set ontoserver.imageCredentials.username=${{ secrets.QUAY_USERNAME }} \
-            --set ontoserver.imageCredentials.password=${{ secrets.QUAY_PASSWORD }} \
+            --set ontoserver.imageCredentials.username="$QUAY_USERNAME" \
+            --set ontoserver.imageCredentials.password="$QUAY_PASSWORD" \
             --set ontoserver.resources.ontoserver.requests.cpu=500m \
             --set ontoserver.resources.ontoserver.limits.cpu=2 \
             --set ontoserver.resources.ontoserver.requests.memory=2G \
