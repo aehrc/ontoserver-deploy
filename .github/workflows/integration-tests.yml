@@ -49,6 +49,7 @@ jobs:
         uses: AbsaOSS/k3d-action@v2
         with:
           cluster-name: ontoserver-test
+          k3d-version: v5.8.3
           args: >-
             --agents 1
             --no-lb
