@@ -208,7 +208,7 @@ services:
       atomio.base.url: https://localhost:9083
       # Security - use Ontocloak for JWT validation
       atomio.security.enabled: "true"
-      atomio.security.audience: atomio-server
+      atomio.security.audience: https://localhost:9083
       # JWK set URI for token signature validation (internal Docker network)
       atomio.security.jkw-set-uri: http://ontocloak:8080/auth/realms/pathology-demo/protocol/openid-connect/certs
       # SMART endpoints use browser-accessible URLs for the Atomio UI login flow

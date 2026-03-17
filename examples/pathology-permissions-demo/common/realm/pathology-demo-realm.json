@@ -648,7 +648,7 @@
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.client.audience": "atomio-server",
+            "included.custom.audience": "https://localhost:9083",
             "id.token.claim": "false",
             "access.token.claim": "true"
           }
