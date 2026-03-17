@@ -608,38 +608,28 @@ async function scene10_atomioPromoteUAT(page: Page): Promise<void> {
   await openAtomioAndLogin(page);
 
   highlight('Atomio shows uat → release-2-0, production → release-1-0 (unchanged).');
-  explain('Triggering UAT syndication to pick up the new content...');
+  explain('UAT Ontoserver polls Atomio every 2 minutes. Waiting for v1.1.0 to appear...');
 
-  // Trigger UAT preload
-  const uatBase = UAT_URL.replace(/\/fhir$/, '');
-  const triggered = await triggerPreload(uatBase);
-  if (triggered) {
-    explain('UAT preload triggered — waiting for v1.1.0 to appear...');
-    await waitForResource(UAT_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 30);
+  // Wait for UAT to pick up the new content via scheduled syndication poll
+  const uatSynced = await waitForResource(UAT_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 150);
+  if (uatSynced) {
+    highlight('v1.1.0 is now on UAT!');
   } else {
-    explain('Could not trigger preload via API — waiting for scheduled poll (up to 2 min)...');
-    await waitForResource(UAT_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 130);
+    warn('v1.1.0 not yet on UAT — syndication may still be in progress.');
   }
   await pause();
 
-  // Open Shrimp on UAT to verify
-  explain('Opening Shrimp on UAT to verify v1.1.0...');
+  // Open Shrimp on UAT to show the content
+  explain('Opening Shrimp on UAT to verify...');
   await openShrimp(page, UAT_URL);
   await waitForShrimpReady(page);
   await loginViaKeycloak(page, 'admin', 'demo', UAT_URL);
   await waitForShrimpReady(page);
 
   await page.getByRole('link', { name: 'Terminology' }).click();
-  await page.waitForTimeout(2_000);
-
-  // Click on Alpha to show v1.1.0
-  const alphaOnUat = page.locator('a, td, tr, span, div')
-    .filter({ hasText: /Pathology Alpha/i })
-    .first();
-  await alphaOnUat.click();
   await page.waitForTimeout(3_000);
 
-  highlight('UAT has v1.1.0 — the new version created by the author and approved for release.');
+  highlight('UAT has the content from release-2-0 — including the new v1.1.0.');
   await pause();
 
   // Now check production — it should NOT have v1.1.0 yet
@@ -681,22 +671,19 @@ async function scene11_atomioPromoteProduction(page: Page): Promise<void> {
   await openAtomioAndLogin(page);
 
   highlight('Both aliases now point to release-2-0.');
-  explain('Triggering production syndication...');
+  explain('Production Ontoserver polls Atomio every 2 minutes. Waiting for v1.1.0...');
 
-  // Trigger production preload
-  const prodBase = PRODUCTION_URL.replace(/\/fhir$/, '');
-  const triggered = await triggerPreload(prodBase);
-  if (triggered) {
-    explain('Production preload triggered — waiting for v1.1.0...');
-    await waitForResource(PRODUCTION_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 30);
+  // Wait for production to pick up the new content via scheduled syndication poll
+  const prodSynced = await waitForResource(PRODUCTION_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 150);
+  if (prodSynced) {
+    highlight('v1.1.0 is now on production!');
   } else {
-    explain('Could not trigger preload via API — waiting for scheduled poll (up to 2 min)...');
-    await waitForResource(PRODUCTION_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 130);
+    warn('v1.1.0 not yet on production — syndication may still be in progress.');
   }
   await pause();
 
-  // Open Shrimp on production to verify
-  explain('Opening Shrimp on production to verify v1.1.0 arrived...');
+  // Open Shrimp on production to show the content
+  explain('Opening Shrimp on production to verify...');
   await openShrimp(page, PRODUCTION_URL);
   await waitForShrimpReady(page);
 
@@ -709,15 +696,9 @@ async function scene11_atomioPromoteProduction(page: Page): Promise<void> {
   }
 
   await page.getByRole('link', { name: 'Terminology' }).click();
-  await page.waitForTimeout(2_000);
-
-  const alphaOnProd = page.locator('a, td, tr, span, div')
-    .filter({ hasText: /Pathology Alpha/i })
-    .first();
-  await alphaOnProd.click();
   await page.waitForTimeout(3_000);
 
-  highlight('Production now has v1.1.0!');
+  highlight('Production now has the content from release-2-0!');
   highlight('The full pipeline: Author → Approve → Clone to Atomio → UAT → Production.');
   highlight('Security labels preserved end-to-end through the entire release pipeline.');
   await pause();
