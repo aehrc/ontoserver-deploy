@@ -75,6 +75,7 @@ services:
       - --import-realm
       - --hostname-strict=false
       - --http-enabled=true
+      - --proxy-headers=xforwarded
       - --optimized
     environment:
       KC_DB: postgres
