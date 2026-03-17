@@ -561,13 +561,18 @@ main() {
     # Wait a moment for authoring syndication to be populated
     sleep 5
 
+    # Get an admin token for Atomio API calls (Atomio security is enabled)
+    local atomio_token
+    atomio_token=$(get_user_token "admin")
+
     # Create initial release candidate feed by cloning authoring syndication.
     # Atomio feed names must match ^[A-Za-z0-9-_]+$ (no dots allowed).
     log "Creating release candidate 'release-1-0' from authoring feed..."
     local clone_code
     clone_code=$(curl -sf -k -o /dev/null -w "%{http_code}" -X POST \
         "${ATOMIO_URL}/feed/\$clone?name=release-1-0&url=http://authoring-ontoserver:8080/synd/syndication.xml" \
-        -H "Content-Type: application/json" 2>&1) || true
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${atomio_token}" 2>&1) || true
 
     if [ "$clone_code" = "201" ] || [ "$clone_code" = "200" ]; then
         success "Release candidate 'release-1-0' created"
@@ -577,6 +582,7 @@ main() {
         log "Attempting to create feed manually..."
         curl -sf -k -o /dev/null -X POST "${ATOMIO_URL}/feed" \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${atomio_token}" \
             -d '{"name": "release-1-0", "title": "Release Candidate 1.0"}' || true
     fi
 
@@ -585,6 +591,7 @@ main() {
     log "Creating 'uat' alias..."
     curl -sf -k -o /dev/null -X POST "${ATOMIO_URL}/alias" \
         -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${atomio_token}" \
         -d '{"aliasName": "uat", "feedName": "release-1-0"}' 2>/dev/null || \
         warn "Failed to create 'uat' alias (may already exist)"
     success "Alias 'uat' -> 'release-1-0'"
@@ -593,6 +600,7 @@ main() {
     log "Creating 'production' alias..."
     curl -sf -k -o /dev/null -X POST "${ATOMIO_URL}/alias" \
         -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${atomio_token}" \
         -d '{"aliasName": "production", "feedName": "release-1-0"}' 2>/dev/null || \
         warn "Failed to create 'production' alias (may already exist)"
     success "Alias 'production' -> 'release-1-0'"
@@ -601,6 +609,7 @@ main() {
     log "Creating 'gamma-content' feed for CSV pipeline..."
     curl -sf -k -o /dev/null -X POST "${ATOMIO_URL}/feed" \
         -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${atomio_token}" \
         -d '{"name": "gamma-content", "title": "Pathology Gamma - CSV-Sourced Content"}' 2>/dev/null || \
         warn "Failed to create 'gamma-content' feed (may already exist)"
     success "Feed 'gamma-content' created"
