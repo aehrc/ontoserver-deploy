@@ -1,0 +1,18 @@
+# Reverse proxy with TLS termination for cloud-hosted UI access.
+# Caddy generates self-signed certificates automatically with "tls internal".
+# Browser will show a certificate warning on first visit — accept it to proceed.
+
+:9081 {
+	tls internal
+	reverse_proxy authoring-ontoserver:8080
+}
+
+:9082 {
+	tls internal
+	reverse_proxy production-ontoserver:8080
+}
+
+:9090 {
+	tls internal
+	reverse_proxy ontocloak:8080
+}

@@ -43,10 +43,10 @@ These cloud-hosted tools connect to your local servers via the `?iss=` parameter
 | **Atomio UI** | Release management — feeds, aliases, promotion | `https://ontoserver.csiro.au/atomio/` |
 
 Server connections:
-- **Authoring**: append `?iss=http://localhost:9081`
-- **Atomio**: append `?iss=http://localhost:9083`
-- **UAT**: append `?iss=http://localhost:9084`
-- **Production**: append `?iss=http://localhost:9085`
+- **Authoring**: append `?iss=https://localhost:9081`
+- **Atomio**: append `?iss=https://localhost:9083`
+- **UAT**: append `?iss=https://localhost:9084`
+- **Production**: append `?iss=https://localhost:9085`
 
 Demo users (all passwords: **`demo`**):
 `admin`, `alpha-viewer`, `alpha-author`, `alpha-approver`, `beta-viewer`, `beta-author`, `beta-approver`, `national-admin`
@@ -58,7 +58,7 @@ Demo users (all passwords: **`demo`**):
 **Using Atomio UI:**
 
 1. Open the Atomio UI:
-   `https://ontoserver.csiro.au/atomio/?iss=http://localhost:9083`
+   `https://ontoserver.csiro.au/atomio/?iss=https://localhost:9083`
 2. Browse **Feeds** — you should see:
    - `release-1-0` — the initial release candidate (cloned from authoring)
    - `gamma-content` — dedicated feed for Pathology Gamma's CSV-sourced content
@@ -68,16 +68,16 @@ Demo users (all passwords: **`demo`**):
 
 ```bash
 # List feeds
-curl -s http://localhost:9083/feed | jq '.[] | {name: .name, title: .title}'
+curl -sk https://localhost:9083/feed | jq '.[] | {name: .name, title: .title}'
 
 # List aliases
-curl -s http://localhost:9083/alias | jq '.[] | {alias: .aliasName, feed: .feedName}'
+curl -sk https://localhost:9083/alias | jq '.[] | {alias: .aliasName, feed: .feedName}'
 
 # View feed contents as Atom XML (what Ontoserver consumes)
-curl -s http://localhost:9083/feed/release-1-0/syndication.xml | head -30
+curl -sk https://localhost:9083/feed/release-1-0/syndication.xml | head -30
 ```
 
-> Atomio also has a Swagger UI at `http://localhost:9083/swagger-ui.html` for interactive API exploration.
+> Atomio also has a Swagger UI at `https://localhost:9083/swagger-ui.html` for interactive API exploration.
 
 ## Part 2: Resource Isolation
 
@@ -88,7 +88,7 @@ Resource-level permissions work identically to the simple variant. The key diffe
 **Using Shrimp:**
 
 1. Open Shrimp pointed at production (no login):
-   `https://ontoserver.csiro.au/shrimp?iss=http://localhost:9085`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9085`
 2. The **CodeSystems** list is empty — all CodeSystems have community labels
 3. Switch to **ValueSets** — the **National Pathology Reference Set** is visible (`*.read` label)
 
@@ -96,7 +96,7 @@ Resource-level permissions work identically to the simple variant. The key diffe
 
 ```bash
 # National valueset visible anonymously on production
-curl -s http://localhost:9085/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset \
+curl -sk https://localhost:9085/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset \
   | jq '.total'
 # Output: 1
 ```
@@ -106,7 +106,7 @@ curl -s http://localhost:9085/fhir/ValueSet?url=http://example.org/ValueSet/nati
 **Using Shrimp:**
 
 1. Open Shrimp pointed at authoring:
-   `https://ontoserver.csiro.au/shrimp?iss=http://localhost:9081`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9081`
 2. Log in as **alpha-author** / **demo** — see Alpha CodeSystem + national content
 3. **Log out**, log in as **beta-author** / **demo** — see Beta CodeSystem + national content
 4. **Log out**, log in as **admin** / **demo** — see all CodeSystems
@@ -116,14 +116,14 @@ curl -s http://localhost:9085/fhir/ValueSet?url=http://example.org/ValueSet/nati
 **Using curl:**
 
 ```bash
-ALPHA_TOKEN=$(curl -s -X POST \
-  http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
+ALPHA_TOKEN=$(curl -sk -X POST \
+  https://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
   -d "grant_type=password&client_id=demo-cli&username=alpha-author&password=demo" \
   | jq -r '.access_token')
 
 # Alpha sees only Alpha resources
-curl -s -H "Authorization: Bearer $ALPHA_TOKEN" \
-  http://localhost:9081/fhir/CodeSystem \
+curl -sk -H "Authorization: Bearer $ALPHA_TOKEN" \
+  https://localhost:9081/fhir/CodeSystem \
   | jq '[.entry[].resource | {url: .url, title: .title}]'
 ```
 
@@ -139,13 +139,13 @@ Published (syndicated) resources are protected by `secureSyndicated`. Authors ca
 
 ```bash
 # Try to modify the published CodeSystem 1.0.0 as alpha-author
-CURRENT=$(curl -s -H "Authorization: Bearer $ALPHA_TOKEN" \
-  http://localhost:9081/fhir/CodeSystem/alpha-pathology-codes)
+CURRENT=$(curl -sk -H "Authorization: Bearer $ALPHA_TOKEN" \
+  https://localhost:9081/fhir/CodeSystem/alpha-pathology-codes)
 
 MODIFIED=$(echo "$CURRENT" | jq '.description = .description + " (modified)"')
 
-curl -s -o /dev/null -w "HTTP %{http_code}\n" -X PUT \
-  http://localhost:9081/fhir/CodeSystem/alpha-pathology-codes \
+curl -sk -o /dev/null -w "HTTP %{http_code}\n" -X PUT \
+  https://localhost:9081/fhir/CodeSystem/alpha-pathology-codes \
   -H "Authorization: Bearer $ALPHA_TOKEN" \
   -H "Content-Type: application/fhir+json" \
   -d "$MODIFIED"
@@ -162,8 +162,8 @@ Instead of modifying the published resource, the author creates a new version �
 
 ```bash
 # Get the published 1.0.0 as a starting point
-CURRENT=$(curl -s -H "Authorization: Bearer $ALPHA_TOKEN" \
-  http://localhost:9081/fhir/CodeSystem/alpha-pathology-codes)
+CURRENT=$(curl -sk -H "Authorization: Bearer $ALPHA_TOKEN" \
+  https://localhost:9081/fhir/CodeSystem/alpha-pathology-codes)
 
 # Create version 1.1.0 with a new concept
 NEW_VERSION=$(echo "$CURRENT" | jq '
@@ -174,8 +174,8 @@ NEW_VERSION=$(echo "$CURRENT" | jq '
   | del(.meta.versionId, .meta.lastUpdated)
 ')
 
-curl -s -o /dev/null -w "HTTP %{http_code}\n" -X PUT \
-  http://localhost:9081/fhir/CodeSystem/alpha-pathology-codes-v1-1-0 \
+curl -sk -o /dev/null -w "HTTP %{http_code}\n" -X PUT \
+  https://localhost:9081/fhir/CodeSystem/alpha-pathology-codes-v1-1-0 \
   -H "Authorization: Bearer $ALPHA_TOKEN" \
   -H "Content-Type: application/fhir+json" \
   -d "$NEW_VERSION"
@@ -191,13 +191,13 @@ The approver sets syndication status on the new version, making it available in 
 **Using curl:**
 
 ```bash
-APPROVER_TOKEN=$(curl -s -X POST \
-  http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
+APPROVER_TOKEN=$(curl -sk -X POST \
+  https://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
   -d "grant_type=password&client_id=demo-cli&username=alpha-approver&password=demo" \
   | jq -r '.access_token')
 
-curl -s -o /dev/null -w "HTTP %{http_code}\n" -X POST \
-  "http://localhost:9081/synd/setSyndicationStatus?resourceType=CodeSystem&id=alpha-pathology-codes-v1-1-0&syndicate=true" \
+curl -sk -o /dev/null -w "HTTP %{http_code}\n" -X POST \
+  "https://localhost:9081/synd/setSyndicationStatus?resourceType=CodeSystem&id=alpha-pathology-codes-v1-1-0&syndicate=true" \
   -H "Authorization: Bearer $APPROVER_TOKEN"
 # Output: HTTP 200
 ```
@@ -209,7 +209,7 @@ curl -s -o /dev/null -w "HTTP %{http_code}\n" -X POST \
 **Using Atomio UI:**
 
 1. Open the Atomio UI:
-   `https://ontoserver.csiro.au/atomio/?iss=http://localhost:9083`
+   `https://ontoserver.csiro.au/atomio/?iss=https://localhost:9083`
 2. Create a new feed by cloning the authoring syndication feed
 3. Name it `release-2-0`
 4. Verify both `release-1-0` and `release-2-0` appear in the feeds list
@@ -218,11 +218,11 @@ curl -s -o /dev/null -w "HTTP %{http_code}\n" -X POST \
 
 ```bash
 # Clone authoring's syndication feed into a new snapshot
-curl -s -o /dev/null -w "HTTP %{http_code}\n" -X POST \
-  "http://localhost:9083/feed/\$clone?name=release-2-0&url=http://authoring-ontoserver:8080/synd/syndication.xml"
+curl -sk -o /dev/null -w "HTTP %{http_code}\n" -X POST \
+  "https://localhost:9083/feed/\$clone?name=release-2-0&url=http://authoring-ontoserver:8080/synd/syndication.xml"
 
 # Verify both feeds exist
-curl -s http://localhost:9083/feed | jq '.[].name'
+curl -sk https://localhost:9083/feed | jq '.[].name'
 # "release-1-0"
 # "release-2-0"
 ```
@@ -240,13 +240,13 @@ curl -s http://localhost:9083/feed | jq '.[].name'
 **Using curl:**
 
 ```bash
-curl -s -o /dev/null -w "HTTP %{http_code}\n" -X PUT \
-  http://localhost:9083/alias/uat \
+curl -sk -o /dev/null -w "HTTP %{http_code}\n" -X PUT \
+  https://localhost:9083/alias/uat \
   -H "Content-Type: application/json" \
   -d '{"aliasName": "uat", "feedName": "release-2-0"}'
 
 # Verify
-curl -s http://localhost:9083/alias | jq '.[] | {alias: .aliasName, feed: .feedName}'
+curl -sk https://localhost:9083/alias | jq '.[] | {alias: .aliasName, feed: .feedName}'
 ```
 
 **Result**: UAT points to `release-2-0` (new content), production still on `release-1-0`.
@@ -256,13 +256,13 @@ The UAT Ontoserver polls every 2 minutes. After waiting, verify the new content:
 **Using Shrimp:**
 
 1. Open Shrimp pointed at UAT:
-   `https://ontoserver.csiro.au/shrimp?iss=http://localhost:9084`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9084`
 2. Log in as **alpha-author** — check that the Troponin concept appears
 
 **Using curl:**
 
 ```bash
-curl -s http://localhost:9084/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes \
+curl -sk https://localhost:9084/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes \
   | jq '.entry[0].resource.version // "not synced yet"'
 ```
 
@@ -271,13 +271,13 @@ curl -s http://localhost:9084/fhir/CodeSystem?url=http://pathology-alpha.example
 **Using Shrimp:**
 
 1. Open Shrimp pointed at production:
-   `https://ontoserver.csiro.au/shrimp?iss=http://localhost:9085`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9085`
 2. Log in as **alpha-author** — the Troponin concept is **not yet present**
 
 **Using curl:**
 
 ```bash
-curl -s http://localhost:9085/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes \
+curl -sk https://localhost:9085/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes \
   | jq '.entry[0].resource.version // "not found"'
 ```
 
@@ -293,13 +293,13 @@ After UAT testing, promote to production:
 **Using curl:**
 
 ```bash
-curl -s -o /dev/null -w "HTTP %{http_code}\n" -X PUT \
-  http://localhost:9083/alias/production \
+curl -sk -o /dev/null -w "HTTP %{http_code}\n" -X PUT \
+  https://localhost:9083/alias/production \
   -H "Content-Type: application/json" \
   -d '{"aliasName": "production", "feedName": "release-2-0"}'
 
 # Verify
-curl -s http://localhost:9083/alias | jq '.[] | {alias: .aliasName, feed: .feedName}'
+curl -sk https://localhost:9083/alias | jq '.[] | {alias: .aliasName, feed: .feedName}'
 ```
 
 > The production Ontoserver polls every 2 minutes and automatically picks up the new content. No restart needed.
@@ -317,13 +317,13 @@ If issues are found, rollback is instant — repoint the alias to the previous f
 
 ```bash
 # Rollback production to release-1-0
-curl -s -o /dev/null -w "HTTP %{http_code}\n" -X PUT \
-  http://localhost:9083/alias/production \
+curl -sk -o /dev/null -w "HTTP %{http_code}\n" -X PUT \
+  https://localhost:9083/alias/production \
   -H "Content-Type: application/json" \
   -d '{"aliasName": "production", "feedName": "release-1-0"}'
 
 # UAT stays on release-2-0
-curl -s http://localhost:9083/alias | jq '.[] | {alias: .aliasName, feed: .feedName}'
+curl -sk https://localhost:9083/alias | jq '.[] | {alias: .aliasName, feed: .feedName}'
 # {"alias":"uat","feed":"release-2-0"}
 # {"alias":"production","feed":"release-1-0"}
 ```
@@ -379,9 +379,9 @@ jq '{url: .url, count: .count, security: [.meta.security[].code]}' generated/gam
 ### 5.1 Using OntoCommand
 
 1. Open OntoCommand for each environment and compare loaded resources:
-   - **Authoring**: `https://ontoserver.csiro.au/ui?iss=http://localhost:9081`
-   - **UAT**: `https://ontoserver.csiro.au/ui?iss=http://localhost:9084`
-   - **Production**: `https://ontoserver.csiro.au/ui?iss=http://localhost:9085`
+   - **Authoring**: `https://ontoserver.csiro.au/ui?iss=https://localhost:9081`
+   - **UAT**: `https://ontoserver.csiro.au/ui?iss=https://localhost:9084`
+   - **Production**: `https://ontoserver.csiro.au/ui?iss=https://localhost:9085`
 2. Log in as **admin** on each to see the full resource inventory
 3. Compare versions — UAT and production reflect whichever Atomio feed their alias points to
 
@@ -390,7 +390,7 @@ jq '{url: .url, count: .count, security: [.meta.security[].code]}' generated/gam
 **Using Shrimp:**
 
 1. Open Shrimp pointed at UAT:
-   `https://ontoserver.csiro.au/shrimp?iss=http://localhost:9084`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9084`
 2. Log in as **alpha-author** — see only Alpha resources + national
 3. **Log out**, log in as **beta-author** — see only Beta resources + national
 
@@ -400,19 +400,19 @@ jq '{url: .url, count: .count, security: [.meta.security[].code]}' generated/gam
 
 ```bash
 # Authenticated Alpha user on UAT
-ALPHA_TOKEN=$(curl -s -X POST \
-  http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
+ALPHA_TOKEN=$(curl -sk -X POST \
+  https://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
   -d "grant_type=password&client_id=demo-cli&username=alpha-viewer&password=demo" \
   | jq -r '.access_token')
 
 # Alpha sees their resources on UAT
-curl -s -H "Authorization: Bearer $ALPHA_TOKEN" \
-  http://localhost:9084/fhir/CodeSystem \
+curl -sk -H "Authorization: Bearer $ALPHA_TOKEN" \
+  https://localhost:9084/fhir/CodeSystem \
   | jq '[.entry[].resource | {url: .url, title: .title}]'
 
 # Alpha cannot see Beta's resources on UAT
-curl -s -H "Authorization: Bearer $ALPHA_TOKEN" \
-  http://localhost:9084/fhir/CodeSystem?url=http://pathology-beta.example.com/CodeSystem/pathology-codes \
+curl -sk -H "Authorization: Bearer $ALPHA_TOKEN" \
+  https://localhost:9084/fhir/CodeSystem?url=http://pathology-beta.example.com/CodeSystem/pathology-codes \
   | jq '.total'
 # Output: 0
 ```
@@ -486,20 +486,20 @@ rm -rf generated/ .env        # Remove generated files and environment config
 
 Ensure the authoring server's syndication feed is populated:
 ```bash
-curl -s http://localhost:9081/synd/syndication.xml | head -5
+curl -sk https://localhost:9081/synd/syndication.xml | head -5
 ```
 
 ### UAT/Production not syncing?
 
 Check alias configuration and feed contents:
 ```bash
-curl -s http://localhost:9083/alias | jq .
-curl -s http://localhost:9083/feed/release-1-0 | jq '.entries | length'
+curl -sk https://localhost:9083/alias | jq .
+curl -sk https://localhost:9083/feed/release-1-0 | jq '.entries | length'
 docker compose logs uat-ontoserver | grep -i "synd\|preload\|feed"
 ```
 
 ### Token errors?
 
 ```bash
-curl -s http://localhost:9090/auth/health/ready
+curl -sk https://localhost:9090/auth/health/ready
 ```

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { openAtomioUI } from '../helpers/auth';
 
-const ATOMIO_URL = process.env.ATOMIO_URL || 'http://localhost:9083';
+const ATOMIO_URL = process.env.ATOMIO_URL || 'https://localhost:9083';
 
 test.describe('Atomio UI @atomio', () => {
   test('loads Atomio UI with iss parameter', async ({ page }) => {

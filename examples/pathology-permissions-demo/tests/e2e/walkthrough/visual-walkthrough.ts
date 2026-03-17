@@ -27,12 +27,12 @@ const variantFlag = args.indexOf('--variant');
 const variant = variantFlag !== -1 && args[variantFlag + 1] ? args[variantFlag + 1] : 'simple';
 const autoMode = args.includes('--auto');
 
-const AUTHORING_URL = process.env.AUTHORING_URL || 'http://localhost:9081/fhir';
+const AUTHORING_URL = process.env.AUTHORING_URL || 'https://localhost:9081/fhir';
 const PRODUCTION_URL = process.env.PRODUCTION_URL || (
-  variant === 'atomio' ? 'http://localhost:9085/fhir' : 'http://localhost:9082/fhir'
+  variant === 'atomio' ? 'https://localhost:9085/fhir' : 'https://localhost:9082/fhir'
 );
-const UAT_URL = process.env.UAT_URL || 'http://localhost:9084/fhir';
-const ATOMIO_URL = process.env.ATOMIO_URL || 'http://localhost:9083';
+const UAT_URL = process.env.UAT_URL || 'https://localhost:9084/fhir';
+const ATOMIO_URL = process.env.ATOMIO_URL || 'https://localhost:9083';
 const AUTHORING_BASE = AUTHORING_URL.replace(/\/fhir$/, '');
 
 // ---------------------------------------------------------------------------
@@ -371,7 +371,7 @@ async function scene7_approverPublishes(page: Page): Promise<void> {
     const syndUrl = `${AUTHORING_BASE}/synd/setSyndicationStatus`
       + '?resourceType=CodeSystem&id=alpha-pathology-codes-v1-1-0&syndicate=true';
 
-    const ctx = await playwrightRequest.newContext();
+    const ctx = await playwrightRequest.newContext({ ignoreHTTPSErrors: true });
     try {
       const response = await ctx.post(syndUrl, {
         headers: { Authorization: `Bearer ${approverToken}` },
@@ -480,51 +480,256 @@ async function scene10_csvContent(page: Page): Promise<void> {
   await pause();
 }
 
-// Atomio-only scenes
-async function scene11_atomioFeeds(page: Page): Promise<void> {
-  step('Atomio — Release Feeds');
-  explain('Opening the Atomio UI to browse release feeds.');
-  explain('Feeds are immutable snapshots of content cloned from authoring.');
+// ---------------------------------------------------------------------------
+// Atomio-only scenes: Release pipeline replacing simple syndication
+// ---------------------------------------------------------------------------
+
+/** Helper: trigger Ontoserver preload/syndication via API */
+async function triggerPreload(serverBaseUrl: string): Promise<boolean> {
+  const token = await getToken('admin');
+  const ctx = await playwrightRequest.newContext({ ignoreHTTPSErrors: true });
+  try {
+    const resp = await ctx.post(`${serverBaseUrl}/api/preload`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return resp.status() === 200;
+  } catch {
+    return false;
+  } finally {
+    await ctx.dispose();
+  }
+}
+
+/** Helper: wait for a resource to appear on a server */
+async function waitForResource(
+  serverUrl: string, resourcePath: string, maxWaitSec: number = 30,
+): Promise<boolean> {
+  const token = await getToken('admin');
+  const ctx = await playwrightRequest.newContext({ ignoreHTTPSErrors: true });
+  try {
+    const deadline = Date.now() + maxWaitSec * 1000;
+    while (Date.now() < deadline) {
+      const resp = await ctx.get(`${serverUrl}/${resourcePath}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/fhir+json' },
+      });
+      if (resp.status() === 200) {
+        const body = await resp.json();
+        if (body.resourceType !== 'OperationOutcome') return true;
+      }
+      await new Promise(r => setTimeout(r, 3000));
+    }
+    return false;
+  } finally {
+    await ctx.dispose();
+  }
+}
+
+async function scene9_atomioReleasePipeline(page: Page): Promise<void> {
+  step('Atomio — Clone Release Candidate');
+  explain('In the atomio variant, content flows: Authoring → Atomio → UAT → Production.');
+  explain('Atomio creates immutable release snapshots. Aliases control which feed each server uses.');
+  explain('Opening the Atomio UI to clone authoring\'s syndication feed into a new release...');
   await pause();
 
+  // Open Atomio UI and show current feeds
   await logout(page);
   await openAtomioUI(page, ATOMIO_URL);
   await page.waitForTimeout(3_000);
 
-  highlight('You should see release-1-0 (the initial release) and gamma-content feeds.');
-  highlight('Each feed is a point-in-time snapshot — it never changes after creation.');
+  highlight('Current feeds: release-1-0 (initial) and gamma-content.');
+  highlight('Both "uat" and "production" aliases point to release-1-0 (the old content).');
+  explain('Now cloning a new release candidate from authoring — this captures v1.1.0...');
+  await pause();
+
+  // Clone authoring feed via Atomio API (requires auth since security is enabled)
+  const adminToken = await getToken('admin');
+  const cloneCtx = await playwrightRequest.newContext({ ignoreHTTPSErrors: true });
+  try {
+    const cloneUrl = `${ATOMIO_URL}/feed/$clone?name=release-2-0&url=http://authoring-ontoserver:8080/synd/syndication.xml`;
+    const cloneResp = await cloneCtx.post(cloneUrl, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    if (cloneResp.status() === 200 || cloneResp.status() === 201) {
+      highlight('Release candidate "release-2-0" created from authoring feed.');
+    } else {
+      warn(`Clone returned HTTP ${cloneResp.status()}`);
+    }
+  } finally {
+    await cloneCtx.dispose();
+  }
+
+  // Refresh Atomio UI to show the new feed
+  await openAtomioUI(page, ATOMIO_URL);
+  await page.waitForTimeout(3_000);
+
+  highlight('Three feeds now: release-1-0, release-2-0 (with v1.1.0), and gamma-content.');
   await pause();
 }
 
-async function scene12_atomioAliases(page: Page): Promise<void> {
-  step('Atomio — Aliases for Promotion');
-  explain('Aliases are named pointers (uat, production) that reference a feed.');
-  explain('Downstream Ontoservers poll an alias URL, not a feed directly.');
-  explain('Promotion = update the alias. Rollback = repoint to the previous feed.');
+async function scene10_atomioPromoteUAT(page: Page): Promise<void> {
+  step('Atomio — Promote to UAT');
+  explain('Updating the "uat" alias to point to release-2-0.');
+  explain('The UAT Ontoserver polls the uat alias for changes.');
   await pause();
 
-  highlight('Currently both "uat" and "production" point to release-1-0.');
-  highlight('To promote new content: clone a new feed, then update the alias.');
-  await pause();
-}
+  // Update UAT alias via API (requires auth)
+  const uatToken = await getToken('admin');
+  const aliasCtx = await playwrightRequest.newContext({ ignoreHTTPSErrors: true });
+  try {
+    await aliasCtx.put(`${ATOMIO_URL}/alias/uat`, {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${uatToken}` },
+      data: JSON.stringify({ aliasName: 'uat', feedName: 'release-2-0' }),
+    });
+    highlight('"uat" alias now points to release-2-0.');
+  } finally {
+    await aliasCtx.dispose();
+  }
 
-async function scene13_atomioPromotion(page: Page): Promise<void> {
-  step('Atomio — Content on UAT');
-  explain('Opening Shrimp pointed at the UAT server to verify content.');
-  explain('UAT syndicates from the Atomio "uat" alias.');
+  // Refresh Atomio UI to show updated alias
+  await openAtomioUI(page, ATOMIO_URL);
+  await page.waitForTimeout(3_000);
+
+  highlight('Atomio shows uat → release-2-0, production → release-1-0 (unchanged).');
+  explain('Triggering UAT syndication to pick up the new content...');
+
+  // Trigger UAT preload
+  const uatBase = UAT_URL.replace(/\/fhir$/, '');
+  const triggered = await triggerPreload(uatBase);
+  if (triggered) {
+    explain('UAT preload triggered — waiting for v1.1.0 to appear...');
+    await waitForResource(UAT_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 30);
+  } else {
+    explain('Could not trigger preload via API — waiting for scheduled poll (up to 2 min)...');
+    await waitForResource(UAT_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 130);
+  }
   await pause();
 
+  // Open Shrimp on UAT to verify
+  explain('Opening Shrimp on UAT to verify v1.1.0...');
   await openShrimp(page, UAT_URL);
   await waitForShrimpReady(page);
-
   await loginViaKeycloak(page, 'admin', 'demo', UAT_URL);
   await waitForShrimpReady(page);
 
   await page.getByRole('link', { name: 'Terminology' }).click();
   await page.waitForTimeout(2_000);
 
-  highlight('UAT has the same content as the feed its alias points to.');
-  highlight('After promotion, UAT would pick up the new content within 2 minutes.');
+  // Click on Alpha to show v1.1.0
+  const alphaOnUat = page.locator('a, td, tr, span, div')
+    .filter({ hasText: /Pathology Alpha/i })
+    .first();
+  await alphaOnUat.click();
+  await page.waitForTimeout(3_000);
+
+  highlight('UAT has v1.1.0 — the new version created by the author and approved for release.');
+  await pause();
+
+  // Now check production — it should NOT have v1.1.0 yet
+  explain('Now checking production — it still points to release-1-0 (the old feed)...');
+  await logout(page);
+  await openShrimp(page, PRODUCTION_URL);
+  await waitForShrimpReady(page);
+  await loginViaKeycloak(page, 'admin', 'demo', PRODUCTION_URL);
+  await waitForShrimpReady(page);
+
+  await page.getByRole('link', { name: 'Terminology' }).click();
+  await page.waitForTimeout(2_000);
+
+  highlight('Production does NOT have v1.1.0 yet — it is still on release-1-0.');
+  highlight('This is the governance gate: UAT can test before production gets the update.');
+  await pause();
+}
+
+async function scene11_atomioPromoteProduction(page: Page): Promise<void> {
+  step('Atomio — Promote to Production');
+  explain('After UAT testing passes, updating the "production" alias to release-2-0.');
+  explain('Then triggering production to syndicate the new content.');
+  await pause();
+
+  // Update production alias via API (requires auth)
+  const prodToken = await getToken('admin');
+  const aliasCtx = await playwrightRequest.newContext({ ignoreHTTPSErrors: true });
+  try {
+    await aliasCtx.put(`${ATOMIO_URL}/alias/production`, {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${prodToken}` },
+      data: JSON.stringify({ aliasName: 'production', feedName: 'release-2-0' }),
+    });
+    highlight('"production" alias now points to release-2-0.');
+  } finally {
+    await aliasCtx.dispose();
+  }
+
+  // Show updated aliases in Atomio UI
+  await openAtomioUI(page, ATOMIO_URL);
+  await page.waitForTimeout(3_000);
+
+  highlight('Both aliases now point to release-2-0.');
+  explain('Triggering production syndication...');
+
+  // Trigger production preload
+  const prodBase = PRODUCTION_URL.replace(/\/fhir$/, '');
+  const triggered = await triggerPreload(prodBase);
+  if (triggered) {
+    explain('Production preload triggered — waiting for v1.1.0...');
+    await waitForResource(PRODUCTION_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 30);
+  } else {
+    explain('Could not trigger preload via API — waiting for scheduled poll (up to 2 min)...');
+    await waitForResource(PRODUCTION_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 130);
+  }
+  await pause();
+
+  // Open Shrimp on production to verify
+  explain('Opening Shrimp on production to verify v1.1.0 arrived...');
+  await openShrimp(page, PRODUCTION_URL);
+  await waitForShrimpReady(page);
+
+  const loginBtn = page.locator('#fhir-server-login');
+  if (await loginBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await loginBtn.click();
+    await page.waitForURL(/ontoserver\.csiro\.au/, { timeout: 15_000 }).catch(() => {});
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(3_000);
+  }
+
+  await page.getByRole('link', { name: 'Terminology' }).click();
+  await page.waitForTimeout(2_000);
+
+  const alphaOnProd = page.locator('a, td, tr, span, div')
+    .filter({ hasText: /Pathology Alpha/i })
+    .first();
+  await alphaOnProd.click();
+  await page.waitForTimeout(3_000);
+
+  highlight('Production now has v1.1.0!');
+  highlight('The full pipeline: Author → Approve → Clone to Atomio → UAT → Production.');
+  highlight('Security labels preserved end-to-end through the entire release pipeline.');
+  await pause();
+}
+
+async function scene12_csvContent(page: Page): Promise<void> {
+  step('CSV-to-FHIR Pipeline — Gamma Content');
+  explain('Switching Shrimp to the authoring server (still logged in as admin via SSO).');
+  explain('Pathology Gamma maintains codes in CSV files under version control.');
+  explain('The csv-transform.py script converts them to FHIR with GAMMA security labels.');
+  await pause();
+
+  await openShrimp(page, AUTHORING_URL);
+  await waitForShrimpReady(page);
+
+  const loginBtn = page.locator('#fhir-server-login');
+  if (await loginBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await loginBtn.click();
+    await page.waitForURL(/ontoserver\.csiro\.au/, { timeout: 15_000 }).catch(() => {});
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(3_000);
+  }
+
+  await page.getByRole('link', { name: 'Terminology' }).click();
+  await page.waitForTimeout(2_000);
+
+  highlight('Admin sees Pathology Gamma — 15 concepts loaded from CSV.');
+  highlight('These have GAMMA.read and GAMMA.write security labels.');
+  explain('If we logged in as alpha-author, the Gamma CodeSystem would disappear.');
   await pause();
 }
 
@@ -563,6 +768,7 @@ async function main(): Promise<void> {
 
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
+    ignoreHTTPSErrors: true,
   });
   const page = await context.newPage();
 
@@ -600,8 +806,8 @@ async function main(): Promise<void> {
   process.on('SIGTERM', cleanup);
 
   try {
-    // Run core scenes (shared between simple and atomio)
-    const coreScenes: SceneFn[] = [
+    // Scenes 1-8 are shared between simple and atomio
+    const sharedScenes: SceneFn[] = [
       scene1_anonymousProduction,
       scene2_alphaAuthor,
       scene3_betaComparison,
@@ -610,20 +816,25 @@ async function main(): Promise<void> {
       scene6_authorUploads,
       scene7_approverPublishes,
       scene8_conceptMaps,
+    ];
+
+    // Simple: direct syndication to production + CSV content
+    const simpleScenes: SceneFn[] = [
       scene9_syndication,
       scene10_csvContent,
     ];
 
-    // Atomio-only scenes
+    // Atomio: release pipeline (clone → UAT → production) + CSV content
     const atomioScenes: SceneFn[] = [
-      scene11_atomioFeeds,
-      scene12_atomioAliases,
-      scene13_atomioPromotion,
+      scene9_atomioReleasePipeline,
+      scene10_atomioPromoteUAT,
+      scene11_atomioPromoteProduction,
+      scene12_csvContent,
     ];
 
     const allScenes = variant === 'atomio'
-      ? [...coreScenes, ...atomioScenes]
-      : coreScenes;
+      ? [...sharedScenes, ...atomioScenes]
+      : [...sharedScenes, ...simpleScenes];
 
     for (const sceneFn of allScenes) {
       const shouldContinue = await runScene(page, sceneFn);
@@ -641,10 +852,11 @@ async function main(): Promise<void> {
     console.log('Key takeaways:');
     console.log('  1. Community isolation — each provider sees only their resources');
     console.log('  2. Shared national content — visible to everyone via *.read label');
-    console.log('  3. Role-based access — viewers read, authors write');
-    console.log('  4. Syndication preserves security labels');
+    console.log('  3. Role-based access — viewers read, authors write, approvers publish');
+    console.log('  4. Syndication preserves security labels end-to-end');
     if (variant === 'atomio') {
-      console.log('  5. Atomio feeds enable release management with instant rollback');
+      console.log('  5. Atomio: clone → UAT alias → test → production alias → promote');
+      console.log('  6. Rollback = repoint alias to previous feed (instant)');
     }
     console.log('');
   } finally {

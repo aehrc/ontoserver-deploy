@@ -353,7 +353,7 @@ This ensures only Pathology Gamma community members can access the generated res
 
 Snapper (Ontoserver's terminology browser/editor) uses the SMART-on-FHIR authorization flow:
 
-1. User opens Snapper at `https://ontoserver.csiro.au/snapper?iss=http://localhost:9081`
+1. User opens Snapper at `https://ontoserver.csiro.au/snapper?iss=https://localhost:9081`
 2. Snapper reads Ontoserver's `CapabilityStatement` to find the auth endpoints
 3. Snapper redirects to Ontocloak's authorization endpoint
 4. User logs in to Ontocloak

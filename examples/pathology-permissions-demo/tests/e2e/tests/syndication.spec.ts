@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { getToken } from '../helpers/auth';
 
-const AUTHORING_URL = process.env.AUTHORING_URL || 'http://localhost:9081/fhir';
+const AUTHORING_URL = process.env.AUTHORING_URL || 'https://localhost:9081/fhir';
 const PRODUCTION_URL = process.env.PRODUCTION_URL || (
-  process.env.VARIANT === 'atomio' ? 'http://localhost:9085/fhir' : 'http://localhost:9082/fhir'
+  process.env.VARIANT === 'atomio' ? 'https://localhost:9085/fhir' : 'https://localhost:9082/fhir'
 );
 
 test.describe('Syndication — Authoring to Production', () => {

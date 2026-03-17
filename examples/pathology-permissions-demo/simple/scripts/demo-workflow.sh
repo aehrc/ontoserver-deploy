@@ -15,9 +15,9 @@
 
 set -euo pipefail
 
-ONTOCLOAK_URL="http://localhost:9090"
-AUTHORING_URL="http://localhost:9081"
-PRODUCTION_URL="http://localhost:9082"
+ONTOCLOAK_URL="https://localhost:9090"
+AUTHORING_URL="https://localhost:9081"
+PRODUCTION_URL="https://localhost:9082"
 REALM="pathology-demo"
 
 RED='\033[0;31m'
@@ -50,7 +50,7 @@ pause() {
 
 get_token() {
     local username="$1"
-    curl -sf -X POST \
+    curl -sf -k -X POST \
         "${ONTOCLOAK_URL}/auth/realms/${REALM}/protocol/openid-connect/token" \
         -d "grant_type=password" \
         -d "client_id=demo-cli" \
@@ -103,7 +103,7 @@ if [ "$demo_choice" = "m" ] || [ "$demo_choice" = "M" ]; then
     echo ""
     echo "    docs/walkthrough-simple.md"
     echo ""
-    echo "  Web tools (add ?iss=http://localhost:<port>):"
+    echo "  Web tools (add ?iss=https://localhost:<port>):"
     echo "    Shrimp:      https://ontoserver.csiro.au/shrimp"
     echo "    Snapper:     https://ontoserver.csiro.au/snapper"
     echo "    OntoCommand: https://ontoserver.csiro.au/ui"
@@ -130,14 +130,14 @@ explain "Anyone can see resources labeled with '*.read' (the national valueset).
 explain "Let's search for ValueSets without authenticating:"
 echo ""
 
-run_cmd "curl -s '${PRODUCTION_URL}/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset' | jq '.total, .entry[0].resource.title'"
+run_cmd "curl -sk '${PRODUCTION_URL}/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset' | jq '.total, .entry[0].resource.title'"
 
 explain ""
 explain "The national pathology valueset is visible to everyone."
 explain "But community-specific resources are NOT visible anonymously:"
 echo ""
 
-run_cmd "curl -s '${PRODUCTION_URL}/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes' | jq '.total'"
+run_cmd "curl -sk '${PRODUCTION_URL}/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes' | jq '.total'"
 
 explain ""
 explain "Without authentication, the Alpha CodeSystem is not visible (total: 0)."
@@ -157,7 +157,7 @@ ALPHA_TOKEN=$(get_token "alpha-author")
 explain "Token obtained for alpha-author. Searching for CodeSystems..."
 echo ""
 
-run_cmd "curl -s -H 'Authorization: Bearer ${ALPHA_TOKEN}' '${AUTHORING_URL}/fhir/CodeSystem' | jq '[.entry[].resource | {url: .url, title: .title}]'"
+run_cmd "curl -sk -H 'Authorization: Bearer ${ALPHA_TOKEN}' '${AUTHORING_URL}/fhir/CodeSystem' | jq '[.entry[].resource | {url: .url, title: .title}]'"
 
 explain ""
 explain "Alpha-author can see ONLY the Pathology Alpha CodeSystem."
@@ -171,7 +171,7 @@ step "Pathology Alpha author CANNOT see Beta's resources"
 explain "Let's specifically search for Beta's CodeSystem as alpha-author:"
 echo ""
 
-run_cmd "curl -s -H 'Authorization: Bearer ${ALPHA_TOKEN}' '${AUTHORING_URL}/fhir/CodeSystem?url=http://pathology-beta.example.com/CodeSystem/pathology-codes' | jq '.total'"
+run_cmd "curl -sk -H 'Authorization: Bearer ${ALPHA_TOKEN}' '${AUTHORING_URL}/fhir/CodeSystem?url=http://pathology-beta.example.com/CodeSystem/pathology-codes' | jq '.total'"
 
 explain ""
 explain "Result: 0 - Alpha-author cannot see Beta's resources."
@@ -188,7 +188,7 @@ explain "API-level FHIR_READ access. Since alpha-author has FHIR_READ"
 explain "(via the Author composite role), they can see it."
 echo ""
 
-run_cmd "curl -s -H 'Authorization: Bearer ${ALPHA_TOKEN}' '${AUTHORING_URL}/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset' | jq '.total, .entry[0].resource.title'"
+run_cmd "curl -sk -H 'Authorization: Bearer ${ALPHA_TOKEN}' '${AUTHORING_URL}/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset' | jq '.total, .entry[0].resource.title'"
 
 explain ""
 explain "Alpha-author can see the national valueset but cannot modify it"
@@ -206,7 +206,7 @@ BETA_TOKEN=$(get_token "beta-author")
 explain "Token obtained for beta-author. Searching for CodeSystems..."
 echo ""
 
-run_cmd "curl -s -H 'Authorization: Bearer ${BETA_TOKEN}' '${AUTHORING_URL}/fhir/CodeSystem' | jq '[.entry[].resource | {url: .url, title: .title}]'"
+run_cmd "curl -sk -H 'Authorization: Bearer ${BETA_TOKEN}' '${AUTHORING_URL}/fhir/CodeSystem' | jq '[.entry[].resource | {url: .url, title: .title}]'"
 
 explain ""
 explain "Beta-author sees ONLY the Pathology Beta CodeSystem."
@@ -222,7 +222,7 @@ explain "via the 'All communities authors' group. They see everything."
 echo ""
 
 ADMIN_TOKEN=$(get_token "admin")
-run_cmd "curl -s -H 'Authorization: Bearer ${ADMIN_TOKEN}' '${AUTHORING_URL}/fhir/CodeSystem' | jq '[.entry[].resource | {url: .url, title: .title}]'"
+run_cmd "curl -sk -H 'Authorization: Bearer ${ADMIN_TOKEN}' '${AUTHORING_URL}/fhir/CodeSystem' | jq '[.entry[].resource | {url: .url, title: .title}]'"
 
 explain ""
 explain "Admin can see all three CodeSystems (Alpha, Beta, Gamma)."
@@ -240,13 +240,13 @@ echo ""
 VIEWER_TOKEN=$(get_token "alpha-viewer")
 
 explain "Let's verify they can read the Alpha CodeSystem:"
-run_cmd "curl -s -H 'Authorization: Bearer ${VIEWER_TOKEN}' '${AUTHORING_URL}/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes' | jq '.total'"
+run_cmd "curl -sk -H 'Authorization: Bearer ${VIEWER_TOKEN}' '${AUTHORING_URL}/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes' | jq '.total'"
 
 explain ""
 explain "Now let's try to UPDATE the Alpha CodeSystem as a viewer:"
 echo ""
 
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
+HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -X PUT \
     "${AUTHORING_URL}/fhir/CodeSystem/alpha-pathology-codes" \
     -H "Authorization: Bearer ${VIEWER_TOKEN}" \
     -H "Content-Type: application/fhir+json" \
@@ -271,7 +271,7 @@ echo ""
 ALPHA_TOKEN=$(get_token "alpha-author")
 
 # Read current CodeSystem to use as a base
-CURRENT_CS=$(curl -s -H "Authorization: Bearer ${ALPHA_TOKEN}" \
+CURRENT_CS=$(curl -sk -H "Authorization: Bearer ${ALPHA_TOKEN}" \
     "${AUTHORING_URL}/fhir/CodeSystem/alpha-pathology-codes")
 
 # Create a new version: new resource ID, bumped version, added concept
@@ -283,7 +283,7 @@ NEW_CS=$(echo "$CURRENT_CS" | jq '
     | del(.meta.versionId, .meta.lastUpdated)
 ')
 
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
+HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -X PUT \
     "${AUTHORING_URL}/fhir/CodeSystem/alpha-pathology-codes-v1-1-0" \
     -H "Authorization: Bearer ${ALPHA_TOKEN}" \
     -H "Content-Type: application/fhir+json" \
@@ -307,7 +307,7 @@ explain "Each provider maintains a ConceptMap that maps their local codes"
 explain "to the national standard reference set. Let's view Alpha's map:"
 echo ""
 
-run_cmd "curl -s -H 'Authorization: Bearer ${ALPHA_TOKEN}' '${AUTHORING_URL}/fhir/ConceptMap/alpha-pathology-to-national' | jq '{title: .title, source: .sourceUri, target: .targetUri, mappings: [.group[0].element[:3][] | {local_code: .code, national_code: .target[0].code, national_display: .target[0].display, equivalence: .target[0].equivalence}]}'"
+run_cmd "curl -sk -H 'Authorization: Bearer ${ALPHA_TOKEN}' '${AUTHORING_URL}/fhir/ConceptMap/alpha-pathology-to-national' | jq '{title: .title, source: .sourceUri, target: .targetUri, mappings: [.group[0].element[:3][] | {local_code: .code, national_code: .target[0].code, national_display: .target[0].display, equivalence: .target[0].equivalence}]}'"
 
 explain ""
 explain "This shows how Alpha's local codes (FBC, BGL, HBA1C) map to the national standard."
@@ -326,7 +326,7 @@ explain ""
 explain "Let's check if the national valueset has synced to production:"
 echo ""
 
-run_cmd "curl -s '${PRODUCTION_URL}/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset' | jq '.total, .entry[0].resource.title'"
+run_cmd "curl -sk '${PRODUCTION_URL}/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset' | jq '.total, .entry[0].resource.title'"
 
 explain ""
 explain "The national valueset is available on production."
@@ -334,7 +334,7 @@ explain "Community resources will also sync once they're picked up by the"
 explain "production server's scheduled poll."
 echo ""
 explain "You can check the authoring syndication feed directly:"
-run_cmd "curl -s '${AUTHORING_URL}/synd/syndication.xml' | head -30"
+run_cmd "curl -sk '${AUTHORING_URL}/synd/syndication.xml' | head -30"
 
 pause
 
@@ -387,7 +387,7 @@ echo "  5. CSV PIPELINE: External code systems can be maintained"
 echo "     in version-controlled CSV and transformed to FHIR"
 echo ""
 echo "  Next steps:"
-echo "    - Open Snapper at http://localhost:9081/snapper"
+echo "    - Open Snapper at https://localhost:9081/snapper"
 echo "      and log in as different users to see the UI experience"
 echo "    - Try the Atomio variant for release candidate management"
 echo "      (see docs/walkthrough-atomio.md)"

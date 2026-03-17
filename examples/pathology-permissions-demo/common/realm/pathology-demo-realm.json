@@ -124,7 +124,7 @@
           ],
           "client": {
             "authoring-server": ["authoring-serverAPI_READ", "authoring-serverAPI_WRITE", "authoring-serverFHIR_READ", "authoring-serverFHIR_WRITE", "authoring-serverSYND_READ", "authoring-serverSYND_WRITE"],
-            "production-server": ["production-serverFHIR_READ", "production-serverSYND_READ"],
+            "production-server": ["production-serverAPI_READ", "production-serverAPI_WRITE", "production-serverFHIR_READ", "production-serverSYND_READ"],
             "atomio-server": ["atomio-serverFHIR_READ", "atomio-serverFHIR_WRITE", "atomio-serverSYND_READ", "atomio-serverSYND_WRITE"]
           }
         }
@@ -186,6 +186,14 @@
         {
           "name": "production-serverSYND_READ",
           "description": "Read access to the production syndication endpoint (audience-prefixed for token scoping)"
+        },
+        {
+          "name": "production-serverAPI_READ",
+          "description": "Read access to the production admin API (audience-prefixed for token scoping)"
+        },
+        {
+          "name": "production-serverAPI_WRITE",
+          "description": "Write access to the production admin API — includes triggering preload/syndication (audience-prefixed for token scoping)"
         }
       ],
       "atomio-server": [

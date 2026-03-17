@@ -60,6 +60,20 @@ Adds release candidate creation, UAT testing, promotion/rollback, and the CSV-to
 - `bash`, `curl`, `jq`, `python3` installed locally
 - Node.js and npm (for visual walkthroughs only)
 
+### HTTPS and Self-Signed Certificates
+
+All services are accessed via HTTPS with self-signed certificates. On first visit, your browser will show a certificate warning -- accept/trust it to proceed. You will need to do this once for each port (9081, 9082, etc.).
+
+For `curl`, use the `-k` flag to skip certificate verification:
+
+```bash
+curl -k https://localhost:9081/fhir/metadata
+```
+
+### Linux and macOS
+
+Install the prerequisites via your package manager (e.g. `apt`, `brew`, `dnf`). For the visual walkthrough, Playwright may require additional system libraries — run `npx playwright install-deps` if browser launch fails.
+
 ### Windows Users
 
 The demo scripts are written in bash and require a Unix-like shell. On Windows, use one of:
@@ -105,11 +119,11 @@ Run `./demo.sh` with no arguments to see full usage and available URLs.
 ```
 
 After setup, open:
-- **Ontocloak Admin**: http://localhost:9090/auth/admin (admin/admin)
-- **Shrimp** (authoring): https://ontoserver.csiro.au/shrimp?iss=http://localhost:9081/fhir
-- **Shrimp** (production): https://ontoserver.csiro.au/shrimp?iss=http://localhost:9082/fhir
-- **Snapper** (authoring): https://ontoserver.csiro.au/snapper?iss=http://localhost:9081/fhir
-- **Ontoserver Dashboard**: https://ontoserver.csiro.au/ui?iss=http://localhost:9081/fhir
+- **Ontocloak Admin**: https://localhost:9090/auth/admin (admin/admin)
+- **Shrimp** (authoring): https://ontoserver.csiro.au/shrimp?iss=https://localhost:9081/fhir
+- **Shrimp** (production): https://ontoserver.csiro.au/shrimp?iss=https://localhost:9082/fhir
+- **Snapper** (authoring): https://ontoserver.csiro.au/snapper?iss=https://localhost:9081/fhir
+- **Ontoserver Dashboard**: https://ontoserver.csiro.au/ui?iss=https://localhost:9081/fhir
 
 ### Atomio Example
 
@@ -118,11 +132,11 @@ After setup, open:
 ```
 
 After setup, additionally open:
-- **Atomio API**: http://localhost:9083/swagger-ui.html
-- **Atomio UI**: https://ontoserver.csiro.au/atomio/?iss=http://localhost:9083
-- **Shrimp** (UAT): https://ontoserver.csiro.au/shrimp?iss=http://localhost:9084/fhir
-- **Shrimp** (production): https://ontoserver.csiro.au/shrimp?iss=http://localhost:9085/fhir
-- **Snapper** (authoring): https://ontoserver.csiro.au/snapper?iss=http://localhost:9081/fhir
+- **Atomio API**: https://localhost:9083/swagger-ui.html
+- **Atomio UI**: https://ontoserver.csiro.au/atomio/?iss=https://localhost:9083
+- **Shrimp** (UAT): https://ontoserver.csiro.au/shrimp?iss=https://localhost:9084/fhir
+- **Shrimp** (production): https://ontoserver.csiro.au/shrimp?iss=https://localhost:9085/fhir
+- **Snapper** (authoring): https://ontoserver.csiro.au/snapper?iss=https://localhost:9081/fhir
 
 ### Visual Walkthrough
 
@@ -179,11 +193,13 @@ You can also check service health at any time:
 
 ## Port Reference
 
-| Port | Service | Variant |
-|------|---------|---------|
-| 9090 | Ontocloak (authorization) | Both |
-| 9081 | Authoring Ontoserver | Both |
-| 9082 | Production Ontoserver | Simple |
-| 9083 | Atomio | Atomio |
-| 9084 | UAT Ontoserver | Atomio |
-| 9085 | Production Ontoserver | Atomio |
+All services use HTTPS with self-signed certificates.
+
+| Port | Service | Variant | URL |
+|------|---------|---------|-----|
+| 9090 | Ontocloak (authorization) | Both | `https://localhost:9090` |
+| 9081 | Authoring Ontoserver | Both | `https://localhost:9081` |
+| 9082 | Production Ontoserver | Simple | `https://localhost:9082` |
+| 9083 | Atomio | Atomio | `https://localhost:9083` |
+| 9084 | UAT Ontoserver | Atomio | `https://localhost:9084` |
+| 9085 | Production Ontoserver | Atomio | `https://localhost:9085` |

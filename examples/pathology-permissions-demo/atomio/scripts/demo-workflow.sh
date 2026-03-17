@@ -14,11 +14,11 @@
 
 set -euo pipefail
 
-ONTOCLOAK_URL="http://localhost:9090"
-AUTHORING_URL="http://localhost:9081"
-ATOMIO_URL="http://localhost:9083"
-UAT_URL="http://localhost:9084"
-PRODUCTION_URL="http://localhost:9085"
+ONTOCLOAK_URL="https://localhost:9090"
+AUTHORING_URL="https://localhost:9081"
+ATOMIO_URL="https://localhost:9083"
+UAT_URL="https://localhost:9084"
+PRODUCTION_URL="https://localhost:9085"
 REALM="pathology-demo"
 
 CYAN='\033[0;36m'
@@ -43,7 +43,7 @@ pause() { echo ""; echo -e "${YELLOW}Press Enter to continue...${NC}"; read -r; 
 run_cmd() { echo -e "${GREEN}\$ $*${NC}"; eval "$@" 2>&1 || true; echo ""; }
 
 get_token() {
-    curl -sf -X POST \
+    curl -sf -k -X POST \
         "${ONTOCLOAK_URL}/auth/realms/${REALM}/protocol/openid-connect/token" \
         -d "grant_type=password&client_id=demo-cli&username=${1}&password=demo" \
         | jq -r '.access_token'
@@ -85,7 +85,7 @@ if [ "$demo_choice" = "m" ] || [ "$demo_choice" = "M" ]; then
     echo ""
     echo "    docs/walkthrough-atomio.md"
     echo ""
-    echo "  Web tools (add ?iss=http://localhost:<port>):"
+    echo "  Web tools (add ?iss=https://localhost:<port>):"
     echo "    Shrimp:      https://ontoserver.csiro.au/shrimp"
     echo "    Snapper:     https://ontoserver.csiro.au/snapper"
     echo "    OntoCommand: https://ontoserver.csiro.au/ui"
@@ -115,10 +115,10 @@ explain "Aliases provide stable URLs that point to specific feeds."
 echo ""
 
 explain "Current feeds:"
-run_cmd "curl -s '${ATOMIO_URL}/feed' | jq '.[] | {name: .name, title: .title}'"
+run_cmd "curl -sk '${ATOMIO_URL}/feed' | jq '.[] | {name: .name, title: .title}'"
 
 explain "Current aliases:"
-run_cmd "curl -s '${ATOMIO_URL}/alias' | jq '.[] | {alias: .aliasName, feed: .feedName}'"
+run_cmd "curl -sk '${ATOMIO_URL}/alias' | jq '.[] | {alias: .aliasName, feed: .feedName}'"
 
 explain "The 'uat' and 'production' aliases both point to 'release-1-0'."
 explain "UAT and Production Ontoserver instances sync from these aliases."
@@ -132,10 +132,10 @@ explain "Both environments sync from Atomio. Let's check what's available:"
 echo ""
 
 explain "UAT - National ValueSet:"
-run_cmd "curl -s '${UAT_URL}/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset' | jq '.total'"
+run_cmd "curl -sk '${UAT_URL}/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset' | jq '.total'"
 
 explain "Production - National ValueSet:"
-run_cmd "curl -s '${PRODUCTION_URL}/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset' | jq '.total'"
+run_cmd "curl -sk '${PRODUCTION_URL}/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset' | jq '.total'"
 
 explain ""
 explain "Both environments have the national valueset from the release."
@@ -156,7 +156,7 @@ echo ""
 ALPHA_TOKEN=$(get_token "alpha-author")
 
 # Read current CodeSystem to use as a base
-CURRENT_CS=$(curl -s -H "Authorization: Bearer ${ALPHA_TOKEN}" \
+CURRENT_CS=$(curl -sk -H "Authorization: Bearer ${ALPHA_TOKEN}" \
     "${AUTHORING_URL}/fhir/CodeSystem/alpha-pathology-codes")
 
 # Create a new version: new resource ID, bumped version, added concept
@@ -168,7 +168,7 @@ NEW_CS=$(echo "$CURRENT_CS" | jq '
     | del(.meta.versionId, .meta.lastUpdated)
 ')
 
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
+HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -X PUT \
     "${AUTHORING_URL}/fhir/CodeSystem/alpha-pathology-codes-v1-1-0" \
     -H "Authorization: Bearer ${ALPHA_TOKEN}" \
     -H "Content-Type: application/fhir+json" \
@@ -191,10 +191,10 @@ explain "authoring server's syndication feed into Atomio."
 echo ""
 
 explain "Cloning authoring feed into 'release-2-0':"
-run_cmd "curl -s -o /dev/null -w 'HTTP %{http_code}\n' -X POST '${ATOMIO_URL}/feed/\$clone?name=release-2-0&url=http://authoring-ontoserver:8080/synd/syndication.xml'"
+run_cmd "curl -sk -o /dev/null -w 'HTTP %{http_code}\n' -X POST '${ATOMIO_URL}/feed/\$clone?name=release-2-0&url=http://authoring-ontoserver:8080/synd/syndication.xml'"
 
 explain "New feed contents:"
-run_cmd "curl -s '${ATOMIO_URL}/feed/release-2-0' | jq '{name: .name, entries: (.entries // [] | length)}'"
+run_cmd "curl -sk '${ATOMIO_URL}/feed/release-2-0' | jq '{name: .name, entries: (.entries // [] | length)}'"
 
 explain ""
 explain "release-2-0 is now a snapshot of the current authoring content,"
@@ -209,10 +209,10 @@ explain "The 'uat' alias is updated to point to the new release."
 explain "The UAT Ontoserver will pick up the changes on its next sync."
 echo ""
 
-run_cmd "curl -s -o /dev/null -w 'HTTP %{http_code}\n' -X PUT '${ATOMIO_URL}/alias/uat' -H 'Content-Type: application/json' -d '{\"aliasName\": \"uat\", \"feedName\": \"release-2-0\"}'"
+run_cmd "curl -sk -o /dev/null -w 'HTTP %{http_code}\n' -X PUT '${ATOMIO_URL}/alias/uat' -H 'Content-Type: application/json' -d '{\"aliasName\": \"uat\", \"feedName\": \"release-2-0\"}'"
 
 explain "Current aliases:"
-run_cmd "curl -s '${ATOMIO_URL}/alias' | jq '.[] | {alias: .aliasName, feed: .feedName}'"
+run_cmd "curl -sk '${ATOMIO_URL}/alias' | jq '.[] | {alias: .aliasName, feed: .feedName}'"
 
 explain ""
 explain "UAT now points to release-2-0 (with the new content)."
@@ -231,7 +231,7 @@ explain "Production is still on release-1-0. Let's verify:"
 echo ""
 
 explain "Checking production Ontoserver for Alpha CodeSystem version:"
-run_cmd "curl -s '${PRODUCTION_URL}/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes' | jq '.entry[0].resource.version // \"not found\"'"
+run_cmd "curl -sk '${PRODUCTION_URL}/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes' | jq '.entry[0].resource.version // \"not found\"'"
 
 explain ""
 explain "Production has the original version. The new Troponin concept"
@@ -245,10 +245,10 @@ step "Promote to production after UAT testing"
 explain "After UAT testing is complete, promote to production:"
 echo ""
 
-run_cmd "curl -s -o /dev/null -w 'HTTP %{http_code}\n' -X PUT '${ATOMIO_URL}/alias/production' -H 'Content-Type: application/json' -d '{\"aliasName\": \"production\", \"feedName\": \"release-2-0\"}'"
+run_cmd "curl -sk -o /dev/null -w 'HTTP %{http_code}\n' -X PUT '${ATOMIO_URL}/alias/production' -H 'Content-Type: application/json' -d '{\"aliasName\": \"production\", \"feedName\": \"release-2-0\"}'"
 
 explain "Updated aliases:"
-run_cmd "curl -s '${ATOMIO_URL}/alias' | jq '.[] | {alias: .aliasName, feed: .feedName}'"
+run_cmd "curl -sk '${ATOMIO_URL}/alias' | jq '.[] | {alias: .aliasName, feed: .feedName}'"
 
 explain ""
 explain "Both UAT and Production now point to release-2-0."
@@ -269,7 +269,7 @@ explain "candidates, or the authoring Ontoserver can sync from it."
 echo ""
 
 explain "Current Atomio feeds:"
-run_cmd "curl -s '${ATOMIO_URL}/feed' | jq '.[] | {name: .name, title: .title}'"
+run_cmd "curl -sk '${ATOMIO_URL}/feed' | jq '.[] | {name: .name, title: .title}'"
 
 explain ""
 explain "In a real deployment, a CI/CD pipeline would:"
@@ -288,9 +288,9 @@ explain "issues in production, you can revert to release-1-0:"
 echo ""
 
 explain "Rollback production to release-1-0:"
-run_cmd "curl -s -o /dev/null -w 'HTTP %{http_code}\n' -X PUT '${ATOMIO_URL}/alias/production' -H 'Content-Type: application/json' -d '{\"aliasName\": \"production\", \"feedName\": \"release-1-0\"}'"
+run_cmd "curl -sk -o /dev/null -w 'HTTP %{http_code}\n' -X PUT '${ATOMIO_URL}/alias/production' -H 'Content-Type: application/json' -d '{\"aliasName\": \"production\", \"feedName\": \"release-1-0\"}'"
 
-run_cmd "curl -s '${ATOMIO_URL}/alias' | jq '.[] | {alias: .aliasName, feed: .feedName}'"
+run_cmd "curl -sk '${ATOMIO_URL}/alias' | jq '.[] | {alias: .aliasName, feed: .feedName}'"
 
 explain ""
 explain "Production is back on release-1-0. UAT can continue testing"
@@ -298,7 +298,7 @@ explain "release-2-0 independently."
 echo ""
 
 explain "Restoring production to release-2-0 for the demo:"
-curl -sf -o /dev/null -X PUT "${ATOMIO_URL}/alias/production" \
+curl -sf -k -o /dev/null -X PUT "${ATOMIO_URL}/alias/production" \
     -H "Content-Type: application/json" \
     -d '{"aliasName": "production", "feedName": "release-2-0"}' 2>/dev/null || true
 

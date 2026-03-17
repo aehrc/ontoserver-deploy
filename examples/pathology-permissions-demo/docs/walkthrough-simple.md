@@ -42,8 +42,8 @@ These cloud-hosted tools connect to your local servers via the `?iss=` parameter
 | **OntoCommand** | Admin dashboard — loaded resources and metadata | `https://ontoserver.csiro.au/ui` |
 
 Server connections:
-- **Authoring**: append `?iss=http://localhost:9081`
-- **Production**: append `?iss=http://localhost:9082`
+- **Authoring**: append `?iss=https://localhost:9081`
+- **Production**: append `?iss=https://localhost:9082`
 
 Demo users (all passwords: **`demo`**):
 `admin`, `alpha-viewer`, `alpha-author`, `alpha-approver`, `beta-viewer`, `beta-author`, `beta-approver`, `national-admin`
@@ -57,7 +57,7 @@ Without logging in, only resources with `*.read` security labels (shared nationa
 **Using Shrimp:**
 
 1. Open Shrimp pointed at production (no login required):
-   `https://ontoserver.csiro.au/shrimp?iss=http://localhost:9082`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9082`
 2. The **CodeSystems** list is empty — all CodeSystems have community labels
 3. Switch to **ValueSets** — you'll see the **National Pathology Reference Set** (`*.read` label)
 
@@ -67,12 +67,12 @@ Without logging in, only resources with `*.read` security labels (shared nationa
 
 ```bash
 # National valueset is visible anonymously on production (has *.read label)
-curl -s http://localhost:9082/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset \
+curl -sk https://localhost:9082/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset \
   | jq '.total, .entry[0].resource.title'
 # Output: 1, "National Pathology Reference Set"
 
 # Alpha's CodeSystem is NOT visible anonymously (has ALPHA.read label)
-curl -s http://localhost:9081/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes \
+curl -sk https://localhost:9081/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes \
   | jq '.total'
 # Output: 0
 ```
@@ -82,7 +82,7 @@ curl -s http://localhost:9081/fhir/CodeSystem?url=http://pathology-alpha.example
 **Using Shrimp:**
 
 1. Open Shrimp pointed at authoring:
-   `https://ontoserver.csiro.au/shrimp?iss=http://localhost:9081`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9081`
 2. Click **Login** and authenticate as **alpha-author** / **demo**
 3. Browse **CodeSystems** — you now see:
    - **Pathology Alpha Local Order Codes** (has `ALPHA.read` label)
@@ -94,25 +94,25 @@ curl -s http://localhost:9081/fhir/CodeSystem?url=http://pathology-alpha.example
 **Using curl:**
 
 ```bash
-ALPHA_TOKEN=$(curl -s -X POST \
-  http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
+ALPHA_TOKEN=$(curl -sk -X POST \
+  https://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
   -d "grant_type=password&client_id=demo-cli&username=alpha-author&password=demo" \
   | jq -r '.access_token')
 
 # Alpha sees only their CodeSystem
-curl -s -H "Authorization: Bearer $ALPHA_TOKEN" \
-  http://localhost:9081/fhir/CodeSystem \
+curl -sk -H "Authorization: Bearer $ALPHA_TOKEN" \
+  https://localhost:9081/fhir/CodeSystem \
   | jq '[.entry[].resource | {url: .url, title: .title}]'
 
 # Alpha cannot see Beta's resources
-curl -s -H "Authorization: Bearer $ALPHA_TOKEN" \
-  http://localhost:9081/fhir/CodeSystem?url=http://pathology-beta.example.com/CodeSystem/pathology-codes \
+curl -sk -H "Authorization: Bearer $ALPHA_TOKEN" \
+  https://localhost:9081/fhir/CodeSystem?url=http://pathology-beta.example.com/CodeSystem/pathology-codes \
   | jq '.total'
 # Output: 0
 
 # Alpha CAN see the national valueset (*.read)
-curl -s -H "Authorization: Bearer $ALPHA_TOKEN" \
-  http://localhost:9081/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset \
+curl -sk -H "Authorization: Bearer $ALPHA_TOKEN" \
+  https://localhost:9081/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset \
   | jq '.total'
 # Output: 1
 ```
@@ -133,23 +133,23 @@ curl -s -H "Authorization: Bearer $ALPHA_TOKEN" \
 
 ```bash
 # Beta author sees only Beta resources
-BETA_TOKEN=$(curl -s -X POST \
-  http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
+BETA_TOKEN=$(curl -sk -X POST \
+  https://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
   -d "grant_type=password&client_id=demo-cli&username=beta-author&password=demo" \
   | jq -r '.access_token')
 
-curl -s -H "Authorization: Bearer $BETA_TOKEN" \
-  http://localhost:9081/fhir/CodeSystem \
+curl -sk -H "Authorization: Bearer $BETA_TOKEN" \
+  https://localhost:9081/fhir/CodeSystem \
   | jq '[.entry[].resource | {url: .url, title: .title}]'
 
 # Admin sees everything
-ADMIN_TOKEN=$(curl -s -X POST \
-  http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
+ADMIN_TOKEN=$(curl -sk -X POST \
+  https://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
   -d "grant_type=password&client_id=demo-cli&username=admin&password=demo" \
   | jq -r '.access_token')
 
-curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
-  http://localhost:9081/fhir/CodeSystem \
+curl -sk -H "Authorization: Bearer $ADMIN_TOKEN" \
+  https://localhost:9081/fhir/CodeSystem \
   | jq '[.entry[].resource | {url: .url, title: .title}]'
 ```
 
@@ -160,7 +160,7 @@ curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
 **Using Snapper:**
 
 1. Open Snapper pointed at authoring:
-   `https://ontoserver.csiro.au/snapper?iss=http://localhost:9081`
+   `https://ontoserver.csiro.au/snapper?iss=https://localhost:9081`
 2. Log in as **alpha-viewer** / **demo**
 3. Open the **Alpha CodeSystem** — you can **browse** it
 4. Try to **edit** a concept (e.g., change a display name) — **Save fails** with 403
@@ -172,20 +172,20 @@ curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
 **Using curl:**
 
 ```bash
-VIEWER_TOKEN=$(curl -s -X POST \
-  http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
+VIEWER_TOKEN=$(curl -sk -X POST \
+  https://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
   -d "grant_type=password&client_id=demo-cli&username=alpha-viewer&password=demo" \
   | jq -r '.access_token')
 
 # Viewer can read Alpha's CodeSystem
-curl -s -H "Authorization: Bearer $VIEWER_TOKEN" \
-  http://localhost:9081/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes \
+curl -sk -H "Authorization: Bearer $VIEWER_TOKEN" \
+  https://localhost:9081/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes \
   | jq '.total'
 # Output: 1
 
 # But cannot update it (gets 403)
-curl -s -o /dev/null -w "%{http_code}" -X PUT \
-  http://localhost:9081/fhir/CodeSystem/alpha-pathology-codes \
+curl -sk -o /dev/null -w "%{http_code}" -X PUT \
+  https://localhost:9081/fhir/CodeSystem/alpha-pathology-codes \
   -H "Authorization: Bearer $VIEWER_TOKEN" \
   -H "Content-Type: application/fhir+json" \
   -d '{"resourceType":"CodeSystem","id":"alpha-pathology-codes","url":"http://pathology-alpha.example.com/CodeSystem/pathology-codes","status":"active","content":"complete","concept":[{"code":"TEST","display":"Test"}]}'
@@ -200,13 +200,13 @@ Published (syndicated) resources are protected by the `secureSyndicated` setting
 
 ```bash
 # Try to modify the published CodeSystem 1.0.0 as alpha-author
-CURRENT=$(curl -s -H "Authorization: Bearer $ALPHA_TOKEN" \
-  http://localhost:9081/fhir/CodeSystem/alpha-pathology-codes)
+CURRENT=$(curl -sk -H "Authorization: Bearer $ALPHA_TOKEN" \
+  https://localhost:9081/fhir/CodeSystem/alpha-pathology-codes)
 
 MODIFIED=$(echo "$CURRENT" | jq '.description = .description + " (modified)"')
 
-curl -s -o /dev/null -w "%{http_code}" -X PUT \
-  http://localhost:9081/fhir/CodeSystem/alpha-pathology-codes \
+curl -sk -o /dev/null -w "%{http_code}" -X PUT \
+  https://localhost:9081/fhir/CodeSystem/alpha-pathology-codes \
   -H "Authorization: Bearer $ALPHA_TOKEN" \
   -H "Content-Type: application/fhir+json" \
   -d "$MODIFIED"
@@ -223,8 +223,8 @@ Since published resources are locked, authors create new business versions inste
 
 ```bash
 # Get the published 1.0.0 as a starting point
-CURRENT=$(curl -s -H "Authorization: Bearer $ALPHA_TOKEN" \
-  http://localhost:9081/fhir/CodeSystem/alpha-pathology-codes)
+CURRENT=$(curl -sk -H "Authorization: Bearer $ALPHA_TOKEN" \
+  https://localhost:9081/fhir/CodeSystem/alpha-pathology-codes)
 
 # Create a new version: new id, version 1.1.0, add D-Dimer concept
 NEW_VERSION=$(echo "$CURRENT" | jq '
@@ -235,8 +235,8 @@ NEW_VERSION=$(echo "$CURRENT" | jq '
   | del(.meta.versionId, .meta.lastUpdated)
 ')
 
-curl -s -o /dev/null -w "%{http_code}" -X PUT \
-  http://localhost:9081/fhir/CodeSystem/alpha-pathology-codes-v1-1-0 \
+curl -sk -o /dev/null -w "%{http_code}" -X PUT \
+  https://localhost:9081/fhir/CodeSystem/alpha-pathology-codes-v1-1-0 \
   -H "Authorization: Bearer $ALPHA_TOKEN" \
   -H "Content-Type: application/fhir+json" \
   -d "$NEW_VERSION"
@@ -252,14 +252,14 @@ The approver has `SYND_WRITE` permission and can set syndication status to appro
 **Using curl:**
 
 ```bash
-APPROVER_TOKEN=$(curl -s -X POST \
-  http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
+APPROVER_TOKEN=$(curl -sk -X POST \
+  https://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
   -d "grant_type=password&client_id=demo-cli&username=alpha-approver&password=demo" \
   | jq -r '.access_token')
 
 # Set syndication status on the new version
-curl -s -o /dev/null -w "%{http_code}" -X POST \
-  "http://localhost:9081/synd/setSyndicationStatus?resourceType=CodeSystem&id=alpha-pathology-codes-v1-1-0&syndicate=true" \
+curl -sk -o /dev/null -w "%{http_code}" -X POST \
+  "https://localhost:9081/synd/setSyndicationStatus?resourceType=CodeSystem&id=alpha-pathology-codes-v1-1-0&syndicate=true" \
   -H "Authorization: Bearer $APPROVER_TOKEN"
 # Output: 200
 ```
@@ -274,8 +274,8 @@ An author from one community cannot modify another community's resources — eve
 
 ```bash
 # Alpha author tries to modify Beta's CodeSystem — gets 403
-curl -s -o /dev/null -w "%{http_code}" -X PUT \
-  http://localhost:9081/fhir/CodeSystem/beta-pathology-codes \
+curl -sk -o /dev/null -w "%{http_code}" -X PUT \
+  https://localhost:9081/fhir/CodeSystem/beta-pathology-codes \
   -H "Authorization: Bearer $ALPHA_TOKEN" \
   -H "Content-Type: application/fhir+json" \
   -d '{"resourceType":"CodeSystem","id":"beta-pathology-codes","url":"http://pathology-beta.example.com/CodeSystem/pathology-codes","status":"active","content":"complete","concept":[{"code":"HACK","display":"Hacked"}]}'
@@ -298,8 +298,8 @@ curl -s -o /dev/null -w "%{http_code}" -X PUT \
 **Using curl:**
 
 ```bash
-curl -s -H "Authorization: Bearer $ALPHA_TOKEN" \
-  http://localhost:9081/fhir/ConceptMap/alpha-pathology-to-national \
+curl -sk -H "Authorization: Bearer $ALPHA_TOKEN" \
+  https://localhost:9081/fhir/ConceptMap/alpha-pathology-to-national \
   | jq '{
     title: .title,
     source: .sourceUri,
@@ -319,16 +319,16 @@ curl -s -H "Authorization: Bearer $ALPHA_TOKEN" \
 **Using OntoCommand:**
 
 1. Open OntoCommand pointed at authoring:
-   `https://ontoserver.csiro.au/ui?iss=http://localhost:9081`
+   `https://ontoserver.csiro.au/ui?iss=https://localhost:9081`
 2. Log in as **admin** — see all loaded resources and their metadata
 3. Open OntoCommand pointed at production:
-   `https://ontoserver.csiro.au/ui?iss=http://localhost:9082`
+   `https://ontoserver.csiro.au/ui?iss=https://localhost:9082`
 4. Compare — production has the **same resources** (synced every 2 minutes)
 
 **Using Shrimp:**
 
 1. Open Shrimp pointed at production:
-   `https://ontoserver.csiro.au/shrimp?iss=http://localhost:9082`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9082`
 2. Log in as **alpha-author** — see the same Alpha resources that were on authoring
 3. Security labels are **preserved** through syndication — end users still only see what their token allows
 
@@ -336,18 +336,18 @@ curl -s -H "Authorization: Bearer $ALPHA_TOKEN" \
 
 ```bash
 # Check national valueset on production
-curl -s http://localhost:9082/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset \
+curl -sk https://localhost:9082/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset \
   | jq '.total'
 # Output: 1
 
 # Authenticated Alpha user sees their resources on production too
-ALPHA_PROD_TOKEN=$(curl -s -X POST \
-  http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
+ALPHA_PROD_TOKEN=$(curl -sk -X POST \
+  https://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
   -d "grant_type=password&client_id=demo-cli&username=alpha-viewer&password=demo" \
   | jq -r '.access_token')
 
-curl -s -H "Authorization: Bearer $ALPHA_PROD_TOKEN" \
-  http://localhost:9082/fhir/CodeSystem \
+curl -sk -H "Authorization: Bearer $ALPHA_PROD_TOKEN" \
+  https://localhost:9082/fhir/CodeSystem \
   | jq '[.entry[].resource | {url: .url, title: .title}]'
 ```
 
@@ -465,7 +465,7 @@ docker compose logs production-ontoserver
 ### Token errors?
 
 ```bash
-curl -s http://localhost:9090/auth/health/ready
+curl -sk https://localhost:9090/auth/health/ready
 ```
 
 ### Resources not visible?

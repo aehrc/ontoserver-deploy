@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const ATOMIO_URL = process.env.ATOMIO_URL || 'http://localhost:9083';
+const ATOMIO_URL = process.env.ATOMIO_URL || 'https://localhost:9083';
 const AUTHORING_INTERNAL_URL = 'http://authoring-ontoserver:8080';
 
 // Unique feed name for this test run to avoid conflicts

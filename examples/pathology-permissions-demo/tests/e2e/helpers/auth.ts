@@ -46,10 +46,10 @@ export async function getToken(
   username: string,
   password: string = 'demo',
 ): Promise<string> {
-  const ontocloakUrl = process.env.ONTOCLOAK_URL || 'http://localhost:9090';
+  const ontocloakUrl = process.env.ONTOCLOAK_URL || 'https://localhost:9090';
   const realm = 'pathology-demo';
 
-  const context = await playwrightRequest.newContext();
+  const context = await playwrightRequest.newContext({ ignoreHTTPSErrors: true });
   try {
     const response = await context.post(
       `${ontocloakUrl}/auth/realms/${realm}/protocol/openid-connect/token`,

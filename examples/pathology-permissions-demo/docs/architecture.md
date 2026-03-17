@@ -117,11 +117,11 @@ graph TD
 ```
 
 **Browser access:**
-- `http://localhost:9090/auth` - Ontocloak admin console
-- `https://ontoserver.csiro.au/snapper?iss=http://localhost:9081` - Authoring Snapper
-- `https://ontoserver.csiro.au/snapper?iss=http://localhost:9082` - Production Snapper
-- `https://ontoserver.csiro.au/ui?iss=http://localhost:9081` - Authoring dashboard
-- `https://ontoserver.csiro.au/ui?iss=http://localhost:9082` - Production dashboard
+- `https://localhost:9090/auth` - Ontocloak admin console
+- `https://ontoserver.csiro.au/snapper?iss=https://localhost:9081` - Authoring Snapper
+- `https://ontoserver.csiro.au/snapper?iss=https://localhost:9082` - Production Snapper
+- `https://ontoserver.csiro.au/ui?iss=https://localhost:9081` - Authoring dashboard
+- `https://ontoserver.csiro.au/ui?iss=https://localhost:9082` - Production dashboard
 
 ### Atomio Variant
 

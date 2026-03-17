@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { getToken } from '../helpers/auth';
 
-const AUTHORING_URL = process.env.AUTHORING_URL || 'http://localhost:9081/fhir';
+const AUTHORING_URL = process.env.AUTHORING_URL || 'https://localhost:9081/fhir';
 
 const GAMMA_CS_URL = 'http://pathology-gamma.example.com/CodeSystem/pathology-codes';
 

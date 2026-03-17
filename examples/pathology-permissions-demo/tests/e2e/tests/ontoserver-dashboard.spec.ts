@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { getToken, openDashboard } from '../helpers/auth';
 
-const AUTHORING_URL = process.env.AUTHORING_URL || 'http://localhost:9081/fhir';
+const AUTHORING_URL = process.env.AUTHORING_URL || 'https://localhost:9081/fhir';
 const PRODUCTION_URL = process.env.PRODUCTION_URL || (
-  process.env.VARIANT === 'atomio' ? 'http://localhost:9085/fhir' : 'http://localhost:9082/fhir'
+  process.env.VARIANT === 'atomio' ? 'https://localhost:9085/fhir' : 'https://localhost:9082/fhir'
 );
-const UAT_URL = process.env.UAT_URL || 'http://localhost:9084/fhir';
+const UAT_URL = process.env.UAT_URL || 'https://localhost:9084/fhir';
 
 test.describe('Ontoserver Dashboard', () => {
   test('loads dashboard for authoring server', async ({ page }) => {

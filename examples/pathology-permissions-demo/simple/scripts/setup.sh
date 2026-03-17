@@ -25,9 +25,9 @@
 #   ./scripts/setup.sh
 #
 # After setup completes, access:
-#   - Ontocloak admin:     http://localhost:9090/auth/admin  (admin/admin)
-#   - Authoring Snapper:   http://localhost:9081/snapper
-#   - Production Snapper:  http://localhost:9082/snapper
+#   - Ontocloak admin:     https://localhost:9090/auth/admin  (admin/admin)
+#   - Authoring Snapper:   https://localhost:9081/snapper
+#   - Production Snapper:  https://localhost:9082/snapper
 #   - Demo users:          All use password "demo"
 
 set -euo pipefail
@@ -36,9 +36,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMMON_DIR="$(cd "${PROJECT_DIR}/../common" && pwd)"
 
-ONTOCLOAK_URL="http://localhost:9090"
-AUTHORING_URL="http://localhost:9081"
-PRODUCTION_URL="http://localhost:9082"
+ONTOCLOAK_URL="https://localhost:9090"
+AUTHORING_URL="https://localhost:9081"
+PRODUCTION_URL="https://localhost:9082"
 REALM="pathology-demo"
 
 # Colors for output
@@ -77,7 +77,7 @@ wait_for_service() {
     log "Waiting for ${name}..."
     local elapsed=0
     while [ "$elapsed" -lt "$timeout" ]; do
-        if curl -sf -o /dev/null --max-time 5 "$url" 2>/dev/null; then
+        if curl -sf -k -o /dev/null --max-time 5 "$url" 2>/dev/null; then
             success "${name} is ready (${elapsed}s)"
             return 0
         fi
@@ -92,7 +92,7 @@ wait_for_service() {
 
 # Get an admin access token from Ontocloak
 get_admin_token() {
-    curl -sf -X POST \
+    curl -sf -k -X POST \
         "${ONTOCLOAK_URL}/auth/realms/master/protocol/openid-connect/token" \
         -d "grant_type=password" \
         -d "client_id=admin-cli" \
@@ -104,7 +104,7 @@ get_admin_token() {
 get_user_token() {
     local username="$1"
     local password="${2:-demo}"
-    curl -sf -X POST \
+    curl -sf -k -X POST \
         "${ONTOCLOAK_URL}/auth/realms/${REALM}/protocol/openid-connect/token" \
         -d "grant_type=password" \
         -d "client_id=demo-cli" \
@@ -119,7 +119,7 @@ extract_rsa_key() {
     token=$(get_admin_token)
 
     local rsa_pub
-    rsa_pub=$(curl -sf -H "Authorization: Bearer ${token}" \
+    rsa_pub=$(curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/keys" \
         | jq -r '.keys[] | select(.type=="RSA" and .algorithm=="RS256") | .publicKey')
 
@@ -149,7 +149,7 @@ create_community() {
     log "Creating community: ${name} (label: ${label})..."
 
     local response
-    response=$(curl -sf -w "\n%{http_code}" -X POST \
+    response=$(curl -sf -k -w "\n%{http_code}" -X POST \
         "${ONTOCLOAK_URL}/auth/realms/${REALM}/communities" \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/json" \
@@ -178,7 +178,7 @@ get_group_id() {
     search_term=$(echo "$group_path" | awk -F'/' '{print $NF}' | sed 's/ /%20/g')
 
     # Search for the group
-    curl -sf -H "Authorization: Bearer ${token}" \
+    curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/groups?search=${search_term}" \
         | jq -r ".. | objects | select(.path==\"${group_path}\") | .id" | head -1
 }
@@ -189,7 +189,7 @@ get_user_id() {
     local token
     token=$(get_admin_token)
 
-    curl -sf -H "Authorization: Bearer ${token}" \
+    curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/users?username=${username}&exact=true" \
         | jq -r '.[0].id'
 }
@@ -215,7 +215,7 @@ add_user_to_group() {
         return
     fi
 
-    curl -sf -X PUT \
+    curl -sf -k -X PUT \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/users/${user_id}/groups/${group_id}" \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/json" \
@@ -236,7 +236,7 @@ load_resource() {
     log "Loading ${resource_type}/${resource_id}..."
 
     local http_code
-    http_code=$(curl -sf -o /dev/null -w "%{http_code}" -X PUT \
+    http_code=$(curl -sf -k -o /dev/null -w "%{http_code}" -X PUT \
         "${AUTHORING_URL}/fhir/${resource_type}/${resource_id}" \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/fhir+json" \
@@ -258,7 +258,7 @@ assign_realm_role() {
 
     # Get the role representation
     local role_json
-    role_json=$(curl -sf -H "Authorization: Bearer ${token}" \
+    role_json=$(curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/roles/${role_name}" 2>/dev/null) || true
 
     if [ -z "$role_json" ] || [ "$role_json" = "null" ]; then
@@ -266,7 +266,7 @@ assign_realm_role() {
         return
     fi
 
-    curl -sf -X POST \
+    curl -sf -k -X POST \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/users/${user_id}/role-mappings/realm" \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/json" \
@@ -283,7 +283,7 @@ assign_client_role() {
 
     # Get the client's internal UUID
     local client_uuid
-    client_uuid=$(curl -sf -H "Authorization: Bearer ${token}" \
+    client_uuid=$(curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients?clientId=${client_id_name}" \
         | jq -r '.[0].id')
 
@@ -294,7 +294,7 @@ assign_client_role() {
 
     # Get the role representation
     local role_json
-    role_json=$(curl -sf -H "Authorization: Bearer ${token}" \
+    role_json=$(curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients/${client_uuid}/roles/${role_name}" 2>/dev/null) || true
 
     if [ -z "$role_json" ] || [ "$role_json" = "null" ]; then
@@ -302,7 +302,7 @@ assign_client_role() {
         return
     fi
 
-    curl -sf -X POST \
+    curl -sf -k -X POST \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/users/${user_id}/role-mappings/clients/${client_uuid}" \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/json" \
@@ -317,7 +317,7 @@ configure_syndication_consumer() {
 
     # Get the syndication-consumer client UUID
     local client_uuid
-    client_uuid=$(curl -sf -H "Authorization: Bearer ${token}" \
+    client_uuid=$(curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients?clientId=syndication-consumer" \
         | jq -r '.[0].id')
 
@@ -328,7 +328,7 @@ configure_syndication_consumer() {
 
     # Get the service account user
     local sa_user
-    sa_user=$(curl -sf -H "Authorization: Bearer ${token}" \
+    sa_user=$(curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients/${client_uuid}/service-account-user")
     local sa_user_id
     sa_user_id=$(echo "$sa_user" | jq -r '.id')
@@ -509,17 +509,17 @@ main() {
     local master_token
     master_token=$(get_admin_token)
     local rm_client_id
-    rm_client_id=$(curl -sf "http://localhost:9090/auth/admin/realms/${REALM}/clients?clientId=realm-management" \
+    rm_client_id=$(curl -sf -k "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients?clientId=realm-management" \
         -H "Authorization: Bearer ${master_token}" | jq -r '.[0].id')
     if [ -n "$rm_client_id" ] && [ "$rm_client_id" != "null" ]; then
         local rm_json
-        rm_json=$(curl -sf "http://localhost:9090/auth/admin/realms/${REALM}/clients/${rm_client_id}" \
+        rm_json=$(curl -sf -k "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients/${rm_client_id}" \
             -H "Authorization: Bearer ${master_token}")
         local rm_updated
         rm_updated=$(echo "$rm_json" | jq '.authorizationServicesEnabled = true | .serviceAccountsEnabled = true | .bearerOnly = false')
         local rm_status
-        rm_status=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
-            "http://localhost:9090/auth/admin/realms/${REALM}/clients/${rm_client_id}" \
+        rm_status=$(curl -s -k -o /dev/null -w "%{http_code}" -X PUT \
+            "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients/${rm_client_id}" \
             -H "Authorization: Bearer ${master_token}" \
             -H "Content-Type: application/json" \
             -d "$rm_updated")
@@ -666,7 +666,7 @@ main() {
             local resourceType="${rt_id%%/*}"
             local id="${rt_id##*/}"
             local http_code
-            http_code=$(curl -sf -o /dev/null -w "%{http_code}" -X POST \
+            http_code=$(curl -sf -k -o /dev/null -w "%{http_code}" -X POST \
                 "${AUTHORING_URL}/synd/setSyndicationStatus?resourceType=${resourceType}&id=${id}&syndicate=true" \
                 -H "Authorization: Bearer ${admin_token}") || true
             if [ "$http_code" = "200" ] || [ "$http_code" = "204" ]; then
@@ -732,7 +732,7 @@ main() {
     echo "  2) Manual walkthrough — follow the docs at your own pace:"
     echo "       docs/walkthrough-simple.md"
     echo ""
-    echo "     Web tools (append ?iss=http://localhost:<port>):"
+    echo "     Web tools (append ?iss=https://localhost:<port>):"
     echo "       Shrimp:      https://ontoserver.csiro.au/shrimp"
     echo "       Snapper:     https://ontoserver.csiro.au/snapper"
     echo "       OntoCommand: https://ontoserver.csiro.au/ui"

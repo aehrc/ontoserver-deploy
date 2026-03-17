@@ -22,6 +22,8 @@ volumes:
   authoring-onto-data:
   production-pgdata:
   production-onto-data:
+  caddy-data:
+  caddy-config:
 
 services:
   # ============================================================================
@@ -70,8 +72,6 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin
     volumes:
       - ../common/realm:/opt/keycloak/data/import:ro
-    ports:
-      - "9090:8080"
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
       interval: 15s
@@ -141,8 +141,8 @@ services:
 
       # SMART-on-FHIR endpoints (browser-accessible URLs for Snapper login)
       conformance.security.kinds: SMART-on-FHIR
-      conformance.security.authorize: http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/auth
-      conformance.security.token: http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token
+      conformance.security.authorize: https://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/auth
+      conformance.security.token: https://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token
 
       # Syndication - publish approved FHIR resources for downstream consumption.
       # "selected" means only resources with syndication status = true are published.
@@ -170,8 +170,6 @@ services:
     volumes:
       - authoring-onto-data:/var/onto
       - ../common/preload:/data/preload:ro
-    ports:
-      - "9081:8080"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO /dev/null http://localhost:8080/fhir/metadata || exit 1"]
       interval: 15s
@@ -229,7 +227,7 @@ services:
       spring.datasource.password: ontoserver
 
       # FHIR endpoint configuration
-      ontoserver.fhir.base: http://localhost:9082/fhir
+      ontoserver.fhir.base: https://localhost:9082/fhir
 
       # Read-only mode - rejects all write operations except syndication ingestion
       ontoserver.deployment.readOnly: "true"
@@ -243,8 +241,8 @@ services:
 
       # SMART-on-FHIR endpoints for Snapper (same Ontocloak realm)
       conformance.security.kinds: SMART-on-FHIR
-      conformance.security.authorize: http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/auth
-      conformance.security.token: http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token
+      conformance.security.authorize: https://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/auth
+      conformance.security.token: https://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token
 
       # Syndicate from authoring server's feed.
       # The syndication-consumer service account authenticates via OAuth2 client
@@ -278,11 +276,37 @@ services:
     volumes:
       - production-onto-data:/var/onto
       - ../common/preload:/data/preload:ro
-    ports:
-      - "9082:8080"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO /dev/null http://localhost:8080/fhir/metadata || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 20
       start_period: 120s
+
+  # ============================================================================
+  # CADDY - HTTPS Reverse Proxy
+  # ============================================================================
+  # Terminates TLS with self-signed certificates so that cloud-hosted web UIs
+  # (Shrimp, Snapper, OntoCommand, Atomio UI) at https://ontoserver.csiro.au
+  # can connect to local servers without mixed-content blocking.
+  #
+  # Browser will show a certificate warning on first visit — accept it.
+  # Use curl -k or wget --no-check-certificate for CLI access.
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    depends_on:
+      ontocloak:
+        condition: service_healthy
+      authoring-ontoserver:
+        condition: service_healthy
+      production-ontoserver:
+        condition: service_healthy
+    ports:
+      - "9081:9081"
+      - "9082:9082"
+      - "9090:9090"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config

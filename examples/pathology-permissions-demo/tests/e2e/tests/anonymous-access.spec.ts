@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 const PRODUCTION_URL = process.env.PRODUCTION_URL || (
-  process.env.VARIANT === 'atomio' ? 'http://localhost:9085' : 'http://localhost:9082'
+  process.env.VARIANT === 'atomio' ? 'https://localhost:9085' : 'https://localhost:9082'
 );
 
 test.describe('Anonymous Access — Community Filtering', () => {

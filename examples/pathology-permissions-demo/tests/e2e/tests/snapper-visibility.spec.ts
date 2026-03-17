@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { openSnapper, loginViaKeycloak, waitForSnapperReady } from '../helpers/auth';
 
-const AUTHORING_URL = process.env.AUTHORING_URL || 'http://localhost:9081/fhir';
+const AUTHORING_URL = process.env.AUTHORING_URL || 'https://localhost:9081/fhir';
 
 test.describe('Snapper Resource Visibility', () => {
   test('alpha-author sees Alpha CodeSystem but not Beta', async ({ page }) => {

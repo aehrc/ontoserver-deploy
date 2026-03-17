@@ -16,11 +16,11 @@
 #   ./scripts/setup.sh
 #
 # After setup completes, access:
-#   - Ontocloak admin:     http://localhost:9090/auth/admin  (admin/admin)
-#   - Authoring Snapper:   http://localhost:9081/snapper
-#   - Atomio API:          http://localhost:9083/swagger-ui.html
-#   - UAT Snapper:         http://localhost:9084/snapper
-#   - Production Snapper:  http://localhost:9085/snapper
+#   - Ontocloak admin:     https://localhost:9090/auth/admin  (admin/admin)
+#   - Authoring Snapper:   https://localhost:9081/snapper
+#   - Atomio API:          https://localhost:9083/swagger-ui.html
+#   - UAT Snapper:         https://localhost:9084/snapper
+#   - Production Snapper:  https://localhost:9085/snapper
 #   - Demo users:          All use password "demo"
 
 set -euo pipefail
@@ -29,11 +29,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMMON_DIR="$(cd "${PROJECT_DIR}/../common" && pwd)"
 
-ONTOCLOAK_URL="http://localhost:9090"
-AUTHORING_URL="http://localhost:9081"
-ATOMIO_URL="http://localhost:9083"
-UAT_URL="http://localhost:9084"
-PRODUCTION_URL="http://localhost:9085"
+ONTOCLOAK_URL="https://localhost:9090"
+AUTHORING_URL="https://localhost:9081"
+ATOMIO_URL="https://localhost:9083"
+UAT_URL="https://localhost:9084"
+PRODUCTION_URL="https://localhost:9085"
 REALM="pathology-demo"
 
 RED='\033[0;31m'
@@ -53,7 +53,7 @@ wait_for_service() {
     log "Waiting for ${name}..."
     local elapsed=0
     while [ "$elapsed" -lt "$timeout" ]; do
-        if curl -sf -o /dev/null --max-time 5 "$url" 2>/dev/null; then
+        if curl -sf -k -o /dev/null --max-time 5 "$url" 2>/dev/null; then
             success "${name} is ready (${elapsed}s)"
             return 0
         fi
@@ -65,7 +65,7 @@ wait_for_service() {
 }
 
 get_admin_token() {
-    curl -sf -X POST \
+    curl -sf -k -X POST \
         "${ONTOCLOAK_URL}/auth/realms/master/protocol/openid-connect/token" \
         -d "grant_type=password&client_id=admin-cli&username=admin&password=admin" \
         | jq -r '.access_token'
@@ -73,7 +73,7 @@ get_admin_token() {
 
 get_user_token() {
     local username="$1"
-    curl -sf -X POST \
+    curl -sf -k -X POST \
         "${ONTOCLOAK_URL}/auth/realms/${REALM}/protocol/openid-connect/token" \
         -d "grant_type=password&client_id=demo-cli&username=${username}&password=demo" \
         | jq -r '.access_token'
@@ -84,7 +84,7 @@ get_group_id() {
     local token search_term
     token=$(get_admin_token)
     search_term=$(echo "$group_path" | awk -F'/' '{print $NF}' | sed 's/ /%20/g')
-    curl -sf -H "Authorization: Bearer ${token}" \
+    curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/groups?search=${search_term}" \
         | jq -r ".. | objects | select(.path==\"${group_path}\") | .id" | head -1
 }
@@ -93,7 +93,7 @@ get_user_id() {
     local username="$1"
     local token
     token=$(get_admin_token)
-    curl -sf -H "Authorization: Bearer ${token}" \
+    curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/users?username=${username}&exact=true" \
         | jq -r '.[0].id'
 }
@@ -108,7 +108,7 @@ add_user_to_group() {
         warn "  Skipping ${username} --> ${group_path} (not found)"
         return
     fi
-    curl -sf -X PUT \
+    curl -sf -k -X PUT \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/users/${user_id}/groups/${group_id}" \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/json" -d "{}" || true
@@ -122,7 +122,7 @@ create_community() {
     token=$(get_user_token "admin")
     log "Creating community: ${name} (label: ${label})..."
     local http_code
-    http_code=$(curl -sf -o /dev/null -w "%{http_code}" -X POST \
+    http_code=$(curl -sf -k -o /dev/null -w "%{http_code}" -X POST \
         "${ONTOCLOAK_URL}/auth/realms/${REALM}/communities" \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/json" \
@@ -141,7 +141,7 @@ load_resource() {
     ri=$(jq -r '.id' "$file")
     log "Loading ${rt}/${ri}..."
     local http_code
-    http_code=$(curl -sf -o /dev/null -w "%{http_code}" -X PUT \
+    http_code=$(curl -sf -k -o /dev/null -w "%{http_code}" -X PUT \
         "${AUTHORING_URL}/fhir/${rt}/${ri}" \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/fhir+json" \
@@ -159,12 +159,12 @@ assign_realm_role() {
     local token
     token=$(get_admin_token)
     local role_json
-    role_json=$(curl -sf -H "Authorization: Bearer ${token}" \
+    role_json=$(curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/roles/${role_name}" 2>/dev/null) || true
     if [ -z "$role_json" ] || [ "$role_json" = "null" ]; then
         warn "  Role '${role_name}' not found"; return
     fi
-    curl -sf -X POST \
+    curl -sf -k -X POST \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/users/${user_id}/role-mappings/realm" \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/json" \
@@ -177,19 +177,19 @@ assign_client_role() {
     local token
     token=$(get_admin_token)
     local client_uuid
-    client_uuid=$(curl -sf -H "Authorization: Bearer ${token}" \
+    client_uuid=$(curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients?clientId=${client_id_name}" \
         | jq -r '.[0].id')
     if [ -z "$client_uuid" ] || [ "$client_uuid" = "null" ]; then
         warn "  Client '${client_id_name}' not found"; return
     fi
     local role_json
-    role_json=$(curl -sf -H "Authorization: Bearer ${token}" \
+    role_json=$(curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients/${client_uuid}/roles/${role_name}" 2>/dev/null) || true
     if [ -z "$role_json" ] || [ "$role_json" = "null" ]; then
         warn "  Client role '${role_name}' on '${client_id_name}' not found"; return
     fi
-    curl -sf -X POST \
+    curl -sf -k -X POST \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/users/${user_id}/role-mappings/clients/${client_uuid}" \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/json" \
@@ -202,14 +202,14 @@ configure_syndication_consumer() {
     local token
     token=$(get_admin_token)
     local client_uuid
-    client_uuid=$(curl -sf -H "Authorization: Bearer ${token}" \
+    client_uuid=$(curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients?clientId=syndication-consumer" \
         | jq -r '.[0].id')
     if [ -z "$client_uuid" ] || [ "$client_uuid" = "null" ]; then
         warn "syndication-consumer client not found. Skipping."; return
     fi
     local sa_user_id
-    sa_user_id=$(curl -sf -H "Authorization: Bearer ${token}" \
+    sa_user_id=$(curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients/${client_uuid}/service-account-user" \
         | jq -r '.id')
     if [ -z "$sa_user_id" ] || [ "$sa_user_id" = "null" ]; then
@@ -368,7 +368,7 @@ main() {
     log "STEP 2: Extracting RSA public key..."
     local token rsa_pub
     token=$(get_admin_token)
-    rsa_pub=$(curl -sf -H "Authorization: Bearer ${token}" \
+    rsa_pub=$(curl -sf -k -H "Authorization: Bearer ${token}" \
         "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/keys" \
         | jq -r '.keys[] | select(.type=="RSA" and .algorithm=="RS256") | .publicKey')
     [ -z "$rsa_pub" ] || [ "$rsa_pub" = "null" ] && error "Failed to extract RSA key"
@@ -401,16 +401,16 @@ main() {
     local master_token
     master_token=$(get_admin_token)
     local rm_client_id
-    rm_client_id=$(curl -sf "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients?clientId=realm-management" \
+    rm_client_id=$(curl -sf -k "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients?clientId=realm-management" \
         -H "Authorization: Bearer ${master_token}" | jq -r '.[0].id')
     if [ -n "$rm_client_id" ] && [ "$rm_client_id" != "null" ]; then
         local rm_json
-        rm_json=$(curl -sf "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients/${rm_client_id}" \
+        rm_json=$(curl -sf -k "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients/${rm_client_id}" \
             -H "Authorization: Bearer ${master_token}")
         local rm_updated
         rm_updated=$(echo "$rm_json" | jq '.authorizationServicesEnabled = true | .serviceAccountsEnabled = true | .bearerOnly = false')
         local rm_status
-        rm_status=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
+        rm_status=$(curl -s -k -o /dev/null -w "%{http_code}" -X PUT \
             "${ONTOCLOAK_URL}/auth/admin/realms/${REALM}/clients/${rm_client_id}" \
             -H "Authorization: Bearer ${master_token}" \
             -H "Content-Type: application/json" \
@@ -539,7 +539,7 @@ main() {
             local resourceType="${rt_id%%/*}"
             local id="${rt_id##*/}"
             local http_code
-            http_code=$(curl -sf -o /dev/null -w "%{http_code}" -X POST \
+            http_code=$(curl -sf -k -o /dev/null -w "%{http_code}" -X POST \
                 "${AUTHORING_URL}/synd/setSyndicationStatus?resourceType=${resourceType}&id=${id}&syndicate=true" \
                 -H "Authorization: Bearer ${admin_token}") || true
             if [ "$http_code" = "200" ] || [ "$http_code" = "204" ]; then
@@ -565,7 +565,7 @@ main() {
     # Atomio feed names must match ^[A-Za-z0-9-_]+$ (no dots allowed).
     log "Creating release candidate 'release-1-0' from authoring feed..."
     local clone_code
-    clone_code=$(curl -sf -o /dev/null -w "%{http_code}" -X POST \
+    clone_code=$(curl -sf -k -o /dev/null -w "%{http_code}" -X POST \
         "${ATOMIO_URL}/feed/\$clone?name=release-1-0&url=http://authoring-ontoserver:8080/synd/syndication.xml" \
         -H "Content-Type: application/json" 2>&1) || true
 
@@ -575,7 +575,7 @@ main() {
         warn "Clone returned HTTP ${clone_code}"
         # Try creating the feed manually if clone fails
         log "Attempting to create feed manually..."
-        curl -sf -o /dev/null -X POST "${ATOMIO_URL}/feed" \
+        curl -sf -k -o /dev/null -X POST "${ATOMIO_URL}/feed" \
             -H "Content-Type: application/json" \
             -d '{"name": "release-1-0", "title": "Release Candidate 1.0"}' || true
     fi
@@ -583,7 +583,7 @@ main() {
     # Create 'uat' alias pointing to release-1-0
     # Atomio alias API uses aliasName/feedName fields (not name/feed)
     log "Creating 'uat' alias..."
-    curl -sf -o /dev/null -X POST "${ATOMIO_URL}/alias" \
+    curl -sf -k -o /dev/null -X POST "${ATOMIO_URL}/alias" \
         -H "Content-Type: application/json" \
         -d '{"aliasName": "uat", "feedName": "release-1-0"}' 2>/dev/null || \
         warn "Failed to create 'uat' alias (may already exist)"
@@ -591,7 +591,7 @@ main() {
 
     # Create 'production' alias pointing to release-1-0
     log "Creating 'production' alias..."
-    curl -sf -o /dev/null -X POST "${ATOMIO_URL}/alias" \
+    curl -sf -k -o /dev/null -X POST "${ATOMIO_URL}/alias" \
         -H "Content-Type: application/json" \
         -d '{"aliasName": "production", "feedName": "release-1-0"}' 2>/dev/null || \
         warn "Failed to create 'production' alias (may already exist)"
@@ -599,7 +599,7 @@ main() {
 
     # Create a dedicated feed for Gamma's CSV-sourced content
     log "Creating 'gamma-content' feed for CSV pipeline..."
-    curl -sf -o /dev/null -X POST "${ATOMIO_URL}/feed" \
+    curl -sf -k -o /dev/null -X POST "${ATOMIO_URL}/feed" \
         -H "Content-Type: application/json" \
         -d '{"name": "gamma-content", "title": "Pathology Gamma - CSV-Sourced Content"}' 2>/dev/null || \
         warn "Failed to create 'gamma-content' feed (may already exist)"
@@ -649,7 +649,7 @@ main() {
     echo "  2) Manual walkthrough — follow the docs at your own pace:"
     echo "       docs/walkthrough-atomio.md"
     echo ""
-    echo "     Web tools (append ?iss=http://localhost:<port>):"
+    echo "     Web tools (append ?iss=https://localhost:<port>):"
     echo "       Shrimp:      https://ontoserver.csiro.au/shrimp"
     echo "       Snapper:     https://ontoserver.csiro.au/snapper"
     echo "       OntoCommand: https://ontoserver.csiro.au/ui"
