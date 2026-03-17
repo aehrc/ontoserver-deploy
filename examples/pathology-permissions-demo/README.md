@@ -105,11 +105,11 @@ Run `./demo.sh` with no arguments to see full usage and available URLs.
 ```
 
 After setup, open:
-- **Authoring Snapper**: http://localhost:9081/snapper
-- **Production Snapper**: http://localhost:9082/snapper
 - **Ontocloak Admin**: http://localhost:9090/auth/admin (admin/admin)
-- **Snapper** (cloud-hosted): https://ontoserver.csiro.au/snapper?iss=http://localhost:9081
-- **Ontoserver Dashboard**: https://ontoserver.csiro.au/ui?iss=http://localhost:9081
+- **Shrimp** (authoring): https://ontoserver.csiro.au/shrimp?fhir=http://localhost:9081/fhir
+- **Shrimp** (production): https://ontoserver.csiro.au/shrimp?fhir=http://localhost:9082/fhir
+- **Snapper** (authoring): https://ontoserver.csiro.au/snapper?iss=http://localhost:9081/fhir
+- **Ontoserver Dashboard**: https://ontoserver.csiro.au/ui?iss=http://localhost:9081/fhir
 
 ### Atomio Example
 
@@ -119,10 +119,10 @@ After setup, open:
 
 After setup, additionally open:
 - **Atomio API**: http://localhost:9083/swagger-ui.html
-- **UAT Snapper**: http://localhost:9084/snapper
-- **Production Snapper**: http://localhost:9085/snapper
 - **Atomio UI**: https://ontoserver.csiro.au/atomio/?iss=http://localhost:9083
-- **Ontoserver Dashboard** (UAT): https://ontoserver.csiro.au/ui?iss=http://localhost:9084
+- **Shrimp** (UAT): https://ontoserver.csiro.au/shrimp?fhir=http://localhost:9084/fhir
+- **Shrimp** (production): https://ontoserver.csiro.au/shrimp?fhir=http://localhost:9085/fhir
+- **Snapper** (authoring): https://ontoserver.csiro.au/snapper?iss=http://localhost:9081/fhir
 
 ### Visual Walkthrough
 
