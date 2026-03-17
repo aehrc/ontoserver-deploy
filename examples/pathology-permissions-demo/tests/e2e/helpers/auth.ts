@@ -108,8 +108,9 @@ export async function loginViaKeycloak(
     const modalLogin = page.locator('.modal-footer button.btn-success');
     await modalLogin.waitFor({ state: 'visible', timeout: 5_000 });
     await modalLogin.click();
-  } else if (await atomioLogin.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await atomioLogin.first().click();
+  } else if (await atomioLogin.last().isVisible({ timeout: 3_000 }).catch(() => false)) {
+    // Use last() — the top-right header Login button renders after the left nav one
+    await atomioLogin.last().click();
   } else {
     throw new Error('No login button found on page');
   }

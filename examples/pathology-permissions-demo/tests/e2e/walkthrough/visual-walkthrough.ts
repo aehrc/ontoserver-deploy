@@ -489,12 +489,15 @@ async function openAtomioAndLogin(page: Page): Promise<void> {
   await openAtomioUI(page, ATOMIO_URL);
   await page.waitForTimeout(3_000);
 
-  // Click Login if visible — SSO will auto-complete after first login
-  const loginBtn = page.getByRole('button', { name: 'Login' }).or(
-    page.getByRole('link', { name: 'Login' }),
-  );
-  if (await loginBtn.first().isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await loginBtn.first().click();
+  // Click the Login button in the top-right header (not the left nav menu)
+  const headerLoginBtn = page.locator('header button, [class*="header"] button, [class*="toolbar"] button, [class*="appbar"] button')
+    .filter({ hasText: /^Login$/i });
+  const anyLoginBtn = page.getByRole('button', { name: 'Login' });
+  const loginTarget = await headerLoginBtn.isVisible({ timeout: 2_000 }).catch(() => false)
+    ? headerLoginBtn
+    : anyLoginBtn.last(); // last() = top-right button (left nav renders first in DOM)
+  if (await loginTarget.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await loginTarget.click();
     // SSO auto-completes — wait for redirect back
     await page.waitForURL(/ontoserver\.csiro\.au\/atomio/, { timeout: 15_000 }).catch(() => {});
     await page.waitForLoadState('domcontentloaded');
