@@ -135,7 +135,7 @@ After setup, additionally open:
 - **Atomio API**: https://localhost:9083/swagger-ui/index.html
 - **Atomio UI**: https://localhost:9083 (redirects to the cloud-hosted Atomio UI)
 - **Shrimp** (UAT): https://ontoserver.csiro.au/shrimp?iss=https://localhost:9084/fhir&clientId=shrimp
-- **Shrimp** (production): https://ontoserver.csiro.au/shrimp?iss=https://localhost:9085/fhir&clientId=shrimp
+- **Shrimp** (production): https://ontoserver.csiro.au/shrimp?iss=https://localhost:9082/fhir&clientId=shrimp
 - **Snapper** (authoring): https://ontoserver.csiro.au/snapper?iss=https://localhost:9081/fhir&clientId=snapper
 
 ### Visual Walkthrough
@@ -199,7 +199,6 @@ All services use HTTPS with self-signed certificates.
 |------|---------|---------|-----|
 | 9090 | Ontocloak (authorization) | Both | `https://localhost:9090` |
 | 9081 | Authoring Ontoserver | Both | `https://localhost:9081` |
-| 9082 | Production Ontoserver | Simple | `https://localhost:9082` |
+| 9082 | Production Ontoserver | Both | `https://localhost:9082` |
 | 9083 | Atomio | Atomio | `https://localhost:9083` |
 | 9084 | UAT Ontoserver | Atomio | `https://localhost:9084` |
-| 9085 | Production Ontoserver | Atomio | `https://localhost:9085` |

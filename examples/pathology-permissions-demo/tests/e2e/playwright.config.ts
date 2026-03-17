@@ -21,7 +21,18 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: [
+            '--ignore-certificate-errors',
+            // Disable web security so cloud-hosted SPAs (ontoserver.csiro.au)
+            // can fetch() from localhost (bypasses CORS + Private Network Access)
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins,site-per-process',
+          ],
+        },
+      },
     },
   ],
 });

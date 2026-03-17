@@ -42,8 +42,8 @@ if [ -n "$vs_body" ] && [ "$vs_body" != "null" ]; then
     concept_count=$(echo "$vs_body" | jq '.compose.include[0].concept | length' 2>/dev/null || echo "0")
     assert_gt "National valueset has multiple national concepts" "$concept_count" 10
 
-    has_fbc=$(echo "$vs_body" | jq 'any(.compose.include[0].concept[]; .code == "26604007")' 2>/dev/null || echo "false")
-    assert_eq "National valueset includes FBC (26604007)" "true" "$has_fbc"
+    has_cbc=$(echo "$vs_body" | jq 'any(.compose.include[0].concept[]; .code == "NAT-CBC")' 2>/dev/null || echo "false")
+    assert_eq "National valueset includes CBC (NAT-CBC)" "true" "$has_cbc"
 else
     skip "National valueset content check (could not read resource)"
 fi

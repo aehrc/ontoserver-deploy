@@ -33,9 +33,9 @@ Configuration highlights:
 - `atom.syndication.publish.enabled=true` - Publishes content for downstream consumption
 - `atom.syndication.publish.fhir.enabled=selected` - Only resources with syndication status = true appear in the feed. New resources are draft by default and must be explicitly approved.
 - `atom.syndication.publish.fhir.secureSyndicated=true` - Modifying a syndicated resource requires `SYND_WRITE` permission (the Approver role). Authors with only `FHIR_WRITE` get 403 Forbidden. This prevents accidental changes to production-published content.
-- `ontoserver.security.readOnly.synd=true` - Makes the syndication feed XML (metadata) publicly readable without requiring `SYND_READ`/`FHIR_WRITE` authority. This is needed because downstream syndication consumers (production, Atomio) authenticate with `authoring-serverFHIR_READ` + `PERM_READ` only. The FHIR resources referenced in feed entries still require proper OAuth authentication.
+- `ontoserver.security.readOnly.synd=true` - Makes the syndication feed XML (metadata) publicly readable without requiring `SYND_READ`/`FHIR_WRITE` authority. This is needed because downstream syndication consumers (production, Atomio) authenticate with `https://localhost:9081/fhirFHIR_READ` + `PERM_READ` only. The FHIR resources referenced in feed entries still require proper OAuth authentication.
 
-> **Note:** Because `readOnly.synd=true` is set, the `syndication-consumer` service account does not need `authoring-serverSYND_READ`. If `readOnly.synd` were `false` (the default), the consumer would also require `SYND_READ` authority to access the syndication feed metadata.
+> **Note:** Because `readOnly.synd=true` is set, the `syndication-consumer` service account does not need `https://localhost:9081/fhirSYND_READ`. If `readOnly.synd` were `false` (the default), the consumer would also require `SYND_READ` authority to access the syndication feed metadata.
 
 The authoring server validates JWT tokens from Ontocloak using the realm's RSA public key. Each FHIR resource can carry security labels in `meta.security` that control access:
 
@@ -133,7 +133,7 @@ graph TD
         AO[Authoring Ontoserver<br/>read/write<br/>:9081]
         AT[Atomio<br/>Feed Management<br/>:9083]
         UAT[UAT Ontoserver<br/>read-only<br/>:9084]
-        PO[Production Ontoserver<br/>read-only<br/>:9085]
+        PO[Production Ontoserver<br/>read-only<br/>:9082]
     end
 
     Browser([Browser / Snapper]) -->|SMART-on-FHIR| OC
@@ -181,7 +181,7 @@ graph LR
 
 Ontoserver uses a two-layer security model:
 
-1. **API-level**: Role-based access control via audience-prefixed authorities (e.g., `authoring-serverFHIR_READ`, `production-serverFHIR_READ`, `authoring-serverSYND_READ`)
+1. **API-level**: Role-based access control via audience-prefixed authorities (e.g., `https://localhost:9081/fhirFHIR_READ`, `https://localhost:9082/fhirFHIR_READ`, `https://localhost:9081/fhirSYND_READ`)
 2. **Resource-level**: FHIR security labels on individual resources
 
 When `ontoserver.security.enabled=fine`, both layers are enforced.
@@ -192,8 +192,8 @@ Resources carry security labels in `meta.security` using codes from `http://onto
 
 | Label Pattern | Meaning |
 |--------------|---------|
-| `*.read` | Anyone with API-level FHIR_READ (e.g., `authoring-serverFHIR_READ`) can read |
-| `*.write` | Anyone with API-level FHIR_WRITE (e.g., `authoring-serverFHIR_WRITE`) can write |
+| `*.read` | Anyone with API-level FHIR_READ (e.g., `https://localhost:9081/fhirFHIR_READ`) can read |
+| `*.write` | Anyone with API-level FHIR_WRITE (e.g., `https://localhost:9081/fhirFHIR_WRITE`) can write |
 | `ALPHA.read` | Requires `PERM_ALPHA_READ` (or `PERM_READ`) to read |
 | `ALPHA.write` | Requires `PERM_ALPHA_WRITE` (or `PERM_WRITE`) to write |
 
@@ -206,11 +206,11 @@ sequenceDiagram
     participant OS as Ontoserver
 
     U->>OC: 1. Login (username/password)
-    OC-->>U: 2. JWT token containing<br/>authorities: [authoring-serverFHIR_READ,<br/>authoring-serverFHIR_WRITE,<br/>PERM_ALPHA_READ, PERM_ALPHA_WRITE]<br/>audience: authoring-server
+    OC-->>U: 2. JWT token containing<br/>authorities: [https://localhost:9081/fhirFHIR_READ,<br/>https://localhost:9081/fhirFHIR_WRITE,<br/>PERM_ALPHA_READ, PERM_ALPHA_WRITE]<br/>audience: https://localhost:9081/fhir
 
     U->>OS: 3. FHIR request + JWT token
     Note over OS: 4. Validate token (RSA public key)
-    Note over OS: 5. Check API-level:<br/>Does token have authoring-serverFHIR_READ/WRITE?
+    Note over OS: 5. Check API-level:<br/>Does token have https://localhost:9081/fhirFHIR_READ/WRITE?
     Note over OS: 6. Check resource-level:<br/>Does token have matching PERM_*<br/>for the resource's security labels?
     OS-->>U: 7. Response (filtered results)
 ```

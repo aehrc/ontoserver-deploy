@@ -57,10 +57,10 @@ assert_eq "Admin can see Gamma CodeSystem" "1" "$count"
 # ---- Total CodeSystem counts ----
 
 alpha_total=$(fhir_search_count "$AUTHORING_URL" "CodeSystem" "$ALPHA_AUTHOR_TOKEN")
-assert_eq "Alpha author sees exactly 1 CodeSystem total" "1" "$alpha_total"
+assert_eq "Alpha author sees exactly 2 CodeSystems (own + national)" "2" "$alpha_total"
 
 beta_total=$(fhir_search_count "$AUTHORING_URL" "CodeSystem" "$BETA_AUTHOR_TOKEN")
-assert_eq "Beta author sees exactly 1 CodeSystem total" "1" "$beta_total"
+assert_eq "Beta author sees exactly 2 CodeSystems (own + national)" "2" "$beta_total"
 
 admin_total=$(fhir_search_count "$AUTHORING_URL" "CodeSystem" "$ADMIN_TOKEN")
 assert_gt "Admin sees 3+ CodeSystems total" "$admin_total" 2

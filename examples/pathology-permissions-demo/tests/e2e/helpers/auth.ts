@@ -167,6 +167,11 @@ export async function logout(page: Page): Promise<void> {
     try { sessionStorage.clear(); } catch {}
     try { localStorage.clear(); } catch {}
   });
+
+  // Reload to force the SPA to reflect the cleared session
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(2_000);
 }
 
 // ---------------------------------------------------------------------------
@@ -265,7 +270,7 @@ export async function openDashboard(page: Page, fhirServerUrl: string): Promise<
   if (page.url().includes('/ui/login')) {
     const urlField = page.getByLabel('Terminology Server URL');
     await urlField.fill(fhirServerUrl);
-    await page.getByRole('button', { name: 'Connect' }).click();
+    await page.getByRole('button', { name: 'Connect' }).first().click();
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(5_000);
   }

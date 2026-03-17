@@ -6,27 +6,38 @@
 	auto_https disable_redirects
 }
 
+# Private Network Access header allows cloud-hosted SPAs (ontoserver.csiro.au)
+# to make fetch() requests to localhost without Chrome blocking them.
+(pna) {
+	header Access-Control-Allow-Private-Network "true"
+}
+
 https://localhost:9081 {
 	tls internal
+	import pna
 	reverse_proxy authoring-ontoserver:8080
 }
 
 https://localhost:9083 {
 	tls internal
+	import pna
 	reverse_proxy atomio:8080
 }
 
 https://localhost:9084 {
 	tls internal
+	import pna
 	reverse_proxy uat-ontoserver:8080
 }
 
-https://localhost:9085 {
+https://localhost:9082 {
 	tls internal
+	import pna
 	reverse_proxy production-ontoserver:8080
 }
 
 https://localhost:9090 {
 	tls internal
+	import pna
 	reverse_proxy ontocloak:8080
 }

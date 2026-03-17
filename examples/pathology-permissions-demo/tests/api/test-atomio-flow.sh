@@ -38,9 +38,9 @@ ADMIN_TOKEN=$(get_token "admin")
 ALPHA_CS_URL="http://pathology-alpha.example.com/CodeSystem/pathology-codes"
 
 # Record original alias targets so we can restore them
-ORIGINAL_UAT_FEED=$(curl -sf "${ATOMIO_URL}/alias" 2>/dev/null \
+ORIGINAL_UAT_FEED=$(curl -sfk "${ATOMIO_URL}/alias" 2>/dev/null \
     | jq -r '.[] | select(.aliasName == "uat") | .feedName' 2>/dev/null)
-ORIGINAL_PROD_FEED=$(curl -sf "${ATOMIO_URL}/alias" 2>/dev/null \
+ORIGINAL_PROD_FEED=$(curl -sfk "${ATOMIO_URL}/alias" 2>/dev/null \
     | jq -r '.[] | select(.aliasName == "production") | .feedName' 2>/dev/null)
 
 if [ -z "$ORIGINAL_UAT_FEED" ] || [ -z "$ORIGINAL_PROD_FEED" ]; then
@@ -100,7 +100,7 @@ echo -e "  ${CYAN}--- Phase 2: Clone authoring feed to Atomio ---${NC}"
 
 RELEASE_FEED="flow-test-release-$$"
 
-status=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+status=$(curl -sk -o /dev/null -w "%{http_code}" -X POST \
     "${ATOMIO_URL}/feed/\$clone?name=${RELEASE_FEED}&url=http://authoring-ontoserver:8080/synd/syndication.xml" \
     -H "Content-Type: application/json" 2>/dev/null)
 if [ "$status" = "201" ] || [ "$status" = "200" ]; then
@@ -108,7 +108,7 @@ if [ "$status" = "201" ] || [ "$status" = "200" ]; then
 else
     assert "Clone authoring feed (expected 201, got $status)" 1
     # Clean up test resource and bail
-    curl -sf -o /dev/null -X DELETE \
+    curl -sfk -o /dev/null -X DELETE \
         -H "Authorization: Bearer ${ALPHA_AUTHOR_TOKEN}" \
         "${AUTHORING_URL}/fhir/CodeSystem/${TEST_CS_ID}" 2>/dev/null || true
     print_summary
@@ -116,7 +116,7 @@ else
 fi
 
 # Verify the release feed exists
-feed_exists=$(curl -sf "${ATOMIO_URL}/feed" 2>/dev/null \
+feed_exists=$(curl -sfk "${ATOMIO_URL}/feed" 2>/dev/null \
     | jq --arg f "$RELEASE_FEED" 'any(.[]; .name == $f)' 2>/dev/null || echo "false")
 assert_eq "Release feed '${RELEASE_FEED}' exists in Atomio" "true" "$feed_exists"
 
@@ -127,13 +127,13 @@ assert_eq "Release feed '${RELEASE_FEED}' exists in Atomio" "true" "$feed_exists
 echo ""
 echo -e "  ${CYAN}--- Phase 3: Promote release to UAT ---${NC}"
 
-status=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "${ATOMIO_URL}/alias/uat" \
+status=$(curl -sk -o /dev/null -w "%{http_code}" -X PUT "${ATOMIO_URL}/alias/uat" \
     -H "Content-Type: application/json" \
     -d "{\"aliasName\": \"uat\", \"feedName\": \"${RELEASE_FEED}\"}" 2>/dev/null)
 assert_http "Promoted '${RELEASE_FEED}' to UAT alias" "200" "$status"
 
 # Verify alias target updated
-uat_target=$(curl -sf "${ATOMIO_URL}/alias" 2>/dev/null \
+uat_target=$(curl -sfk "${ATOMIO_URL}/alias" 2>/dev/null \
     | jq -r '.[] | select(.aliasName == "uat") | .feedName' 2>/dev/null)
 assert_eq "UAT alias points to '${RELEASE_FEED}'" "$RELEASE_FEED" "$uat_target"
 
@@ -179,12 +179,12 @@ fi
 echo ""
 echo -e "  ${CYAN}--- Phase 5: Promote release to production ---${NC}"
 
-status=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "${ATOMIO_URL}/alias/production" \
+status=$(curl -sk -o /dev/null -w "%{http_code}" -X PUT "${ATOMIO_URL}/alias/production" \
     -H "Content-Type: application/json" \
     -d "{\"aliasName\": \"production\", \"feedName\": \"${RELEASE_FEED}\"}" 2>/dev/null)
 assert_http "Promoted '${RELEASE_FEED}' to production alias" "200" "$status"
 
-prod_target=$(curl -sf "${ATOMIO_URL}/alias" 2>/dev/null \
+prod_target=$(curl -sfk "${ATOMIO_URL}/alias" 2>/dev/null \
     | jq -r '.[] | select(.aliasName == "production") | .feedName' 2>/dev/null)
 assert_eq "Production alias points to '${RELEASE_FEED}'" "$RELEASE_FEED" "$prod_target"
 
@@ -243,12 +243,12 @@ assert_eq "Anonymous CAN see national valueset on production" "1" "$count"
 echo ""
 echo -e "  ${CYAN}--- Phase 7: Rollback aliases ---${NC}"
 
-status=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "${ATOMIO_URL}/alias/uat" \
+status=$(curl -sk -o /dev/null -w "%{http_code}" -X PUT "${ATOMIO_URL}/alias/uat" \
     -H "Content-Type: application/json" \
     -d "{\"aliasName\": \"uat\", \"feedName\": \"${ORIGINAL_UAT_FEED}\"}" 2>/dev/null)
 assert_http "Rolled back UAT alias to '${ORIGINAL_UAT_FEED}'" "200" "$status"
 
-status=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "${ATOMIO_URL}/alias/production" \
+status=$(curl -sk -o /dev/null -w "%{http_code}" -X PUT "${ATOMIO_URL}/alias/production" \
     -H "Content-Type: application/json" \
     -d "{\"aliasName\": \"production\", \"feedName\": \"${ORIGINAL_PROD_FEED}\"}" 2>/dev/null)
 assert_http "Rolled back production alias to '${ORIGINAL_PROD_FEED}'" "200" "$status"
@@ -262,7 +262,7 @@ echo -e "  ${CYAN}--- Phase 8: Delete test CodeSystem & cleanup ---${NC}"
 
 # Refresh token (original may have expired during syndication waits)
 ALPHA_AUTHOR_TOKEN=$(get_token "alpha-author")
-status=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+status=$(curl -sk -o /dev/null -w "%{http_code}" -X DELETE \
     -H "Authorization: Bearer ${ALPHA_AUTHOR_TOKEN}" \
     "${AUTHORING_URL}/fhir/CodeSystem/${TEST_CS_ID}" 2>/dev/null)
 if [ "$status" = "200" ] || [ "$status" = "204" ]; then
@@ -272,6 +272,6 @@ else
 fi
 
 # Clean up the test release feed
-curl -sf -o /dev/null -X DELETE "${ATOMIO_URL}/feed/${RELEASE_FEED}" 2>/dev/null || true
+curl -sfk -o /dev/null -X DELETE "${ATOMIO_URL}/feed/${RELEASE_FEED}" 2>/dev/null || true
 
 print_summary

@@ -122,7 +122,6 @@ Not every team will author content directly in FHIR. Many pathology providers ha
 
 ---
 layout: center
-class: bg-navy
 ---
 
 # What We Need
@@ -358,17 +357,17 @@ alpha-author is in two groups. The Alpha authors group gives community permissio
 
 ```json {maxHeight:'160px'}
 {
-  "aud": ["authoring-server", "production-server"],
+  "aud": ["https://localhost:9081/fhir", "https://localhost:9082/fhir"],
   "authorities": [
-    "authoring-serverFHIR_READ", "authoring-serverFHIR_WRITE",
-    "production-serverFHIR_READ",
+    "https://localhost:9081/fhirFHIR_READ", "https://localhost:9081/fhirFHIR_WRITE",
+    "https://localhost:9082/fhirFHIR_READ",
     "PERM_ALPHA_READ", "PERM_ALPHA_WRITE"
   ],
   "preferred_username": "alpha-author"
 }
 ```
 
-- **API roles are audience-prefixed**: `authoring-serverFHIR_READ` scopes to a specific server
+- **API roles are audience-prefixed**: `https://localhost:9081/fhirFHIR_READ` scopes to a specific server
 - **Community permissions are NOT prefixed**: `PERM_ALPHA_READ` applies everywhere
 - **Single token, multiple audiences** — SSO across all servers
 
@@ -428,17 +427,14 @@ SMART scopes are default scopes on shrimp and snapper but gated by role scope ma
 
 # Role Hierarchy
 
-```mermaid
-graph BT
-    C["Consumer<br/>FHIR_READ"] --> A["Author<br/>+ FHIR_WRITE"]
-    A --> AP["Approver<br/>+ SYND_READ + SYND_WRITE"]
-    AP --> FA["Full Administrator<br/>+ API_READ + API_WRITE<br/>+ All Communities"]
-```
+Roles are **composites** — each builds on the previous. Assigned via **group membership**.
 
-- Roles are **composites** — each builds on the previous
-- Users get roles through **group membership**: `/System/Consumers`, `/System/Authors`, `/System/Approvers`
-- `/System/Consumers` is the **default group** — all new users start here
-- **Community groups** (e.g., "Pathology Alpha authors") are created by the Ontocloak Communities API at runtime
+| Group | Grants | Note |
+|-------|--------|------|
+| `/System/Consumers` | FHIR_READ | **Default group** — all new users |
+| `/System/Authors` | + FHIR_WRITE | Can create/edit drafts |
+| `/System/Approvers` | + SYND_READ/WRITE | Can publish to feed |
+| Community groups | PERM_X_READ/WRITE | Created by Ontocloak API |
 
 <!--
 Roles are composites — each builds on the previous. Users get roles through group membership. The setup script assigns users to system groups, and the Ontocloak Communities API creates community-specific groups. Consumer is the default group so all new users get read-only access automatically.
@@ -516,7 +512,7 @@ The simple variant has two Ontoserver instances: one for authoring with read-wri
 graph LR
     Auth["Authoring Ontoserver :9081"] -->|"clone"| At["Atomio :9083"]
     At -->|"uat alias"| UAT["UAT Ontoserver :9084"]
-    At -->|"prod alias"| Prod["Production Ontoserver :9085"]
+    At -->|"prod alias"| Prod["Production Ontoserver :9082"]
 ```
 
 - **Release candidate management** via Atomio
@@ -587,20 +583,22 @@ The upload target depends on where content review happens. If teams review in th
 
 # Demo Users
 
-| User | Sees | Edits | Syndication | Authoring | Production |
-|------|------|-------|-------------|-----------|------------|
-| `admin` | Everything | Everything | Full | R+W | R+W |
-| `alpha-viewer` | Alpha + national | — | — | R | R |
-| `alpha-author` | Alpha + national | Alpha (drafts) | — | R+W | R |
-| `alpha-approver` | Alpha + national | Alpha (all) | SYND_WRITE | R+W | R |
-| `beta-viewer` | Beta + national | — | — | R | R |
-| `beta-author` | Beta + national | Beta (drafts) | — | R+W | R |
-| `beta-approver` | Beta + national | Beta (all) | SYND_WRITE | R+W | R |
+Each community (Alpha, Beta) has three users. All passwords: **`demo`**
 
-All passwords: **`demo`**
+| Role | Visibility | Writes | Syndication |
+|------|-----------|--------|-------------|
+| `{community}-viewer` | Own + national | — | — |
+| `{community}-author` | Own + national | Drafts only | — |
+| `{community}-approver` | Own + national | All | SYND_WRITE |
+| `admin` | Everything | Everything | Full |
 
-- **Authors** can create/edit draft resources but **cannot modify** published (syndicated) resources
-- **Approvers** have `SYND_WRITE` — can modify syndicated resources and set syndication status
+<div class="text-sm">
+
+- **Authors** can create/edit drafts but **cannot modify** published resources
+- **Approvers** gate production — only they can set syndication status
+- Users: `alpha-viewer`, `alpha-author`, `alpha-approver`, `beta-viewer`, `beta-author`, `beta-approver`, `admin`
+
+</div>
 
 <!--
 The key distinction between Author and Approver is SYND_WRITE. Authors can create new content but cannot change what's already published. Approvers gate what reaches production by controlling syndication status.

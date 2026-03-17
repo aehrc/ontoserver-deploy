@@ -77,25 +77,27 @@
       },
       {
         "name": "Consumer",
-        "description": "Read-only access to authoring, production, and atomio FHIR endpoints",
+        "description": "Read-only access to authoring, production, UAT, and atomio FHIR endpoints",
         "composite": true,
         "composites": {
           "client": {
-            "authoring-server": ["authoring-serverFHIR_READ"],
-            "production-server": ["production-serverFHIR_READ"],
-            "atomio-server": ["FHIR_READ"]
+            "authoring-server": ["https://localhost:9081/fhirFHIR_READ"],
+            "production-server": ["https://localhost:9082/fhirFHIR_READ"],
+            "uat-server": ["https://localhost:9084/fhirFHIR_READ"],
+            "atomio-server": ["https://localhost:9083SYND_READ"]
           }
         }
       },
       {
         "name": "Author",
-        "description": "Read/write access to authoring FHIR, read access to production and atomio",
+        "description": "Read/write access to authoring FHIR, read access to production, UAT, and atomio",
         "composite": true,
         "composites": {
           "client": {
-            "authoring-server": ["authoring-serverFHIR_READ", "authoring-serverFHIR_WRITE"],
-            "production-server": ["production-serverFHIR_READ"],
-            "atomio-server": ["FHIR_READ", "FHIR_WRITE"]
+            "authoring-server": ["https://localhost:9081/fhirFHIR_READ", "https://localhost:9081/fhirFHIR_WRITE"],
+            "production-server": ["https://localhost:9082/fhirFHIR_READ"],
+            "uat-server": ["https://localhost:9084/fhirFHIR_READ"],
+            "atomio-server": ["https://localhost:9083SYND_READ"]
           }
         }
       },
@@ -106,8 +108,8 @@
         "composites": {
           "realm": ["Author"],
           "client": {
-            "authoring-server": ["authoring-serverSYND_READ", "authoring-serverSYND_WRITE"],
-            "atomio-server": ["SYND_READ", "SYND_WRITE"]
+            "authoring-server": ["https://localhost:9081/fhirSYND_READ", "https://localhost:9081/fhirSYND_WRITE"],
+            "atomio-server": ["https://localhost:9083SYND_READ", "https://localhost:9083SYND_WRITE"]
           }
         }
       },
@@ -123,9 +125,10 @@
             "Approver"
           ],
           "client": {
-            "authoring-server": ["authoring-serverAPI_READ", "authoring-serverAPI_WRITE", "authoring-serverFHIR_READ", "authoring-serverFHIR_WRITE", "authoring-serverSYND_READ", "authoring-serverSYND_WRITE"],
-            "production-server": ["production-serverAPI_READ", "production-serverAPI_WRITE", "production-serverFHIR_READ", "production-serverSYND_READ"],
-            "atomio-server": ["FHIR_READ", "FHIR_WRITE", "SYND_READ", "SYND_WRITE"]
+            "authoring-server": ["https://localhost:9081/fhirAPI_READ", "https://localhost:9081/fhirAPI_WRITE", "https://localhost:9081/fhirFHIR_READ", "https://localhost:9081/fhirFHIR_WRITE", "https://localhost:9081/fhirSYND_READ", "https://localhost:9081/fhirSYND_WRITE"],
+            "production-server": ["https://localhost:9082/fhirAPI_READ", "https://localhost:9082/fhirAPI_WRITE", "https://localhost:9082/fhirFHIR_READ", "https://localhost:9082/fhirSYND_READ"],
+            "uat-server": ["https://localhost:9084/fhirAPI_READ", "https://localhost:9084/fhirAPI_WRITE", "https://localhost:9084/fhirFHIR_READ", "https://localhost:9084/fhirSYND_READ"],
+            "atomio-server": ["https://localhost:9083SYND_READ", "https://localhost:9083SYND_WRITE", "https://localhost:9083API_READ", "https://localhost:9083API_WRITE"]
           }
         }
       },
@@ -154,64 +157,82 @@
     "client": {
       "authoring-server": [
         {
-          "name": "authoring-serverFHIR_READ",
+          "name": "https://localhost:9081/fhirFHIR_READ",
           "description": "Read access to the authoring FHIR endpoint (audience-prefixed for token scoping)"
         },
         {
-          "name": "authoring-serverFHIR_WRITE",
+          "name": "https://localhost:9081/fhirFHIR_WRITE",
           "description": "Write access to the authoring FHIR endpoint (audience-prefixed for token scoping)"
         },
         {
-          "name": "authoring-serverAPI_READ",
+          "name": "https://localhost:9081/fhirAPI_READ",
           "description": "Read access to the authoring admin API (audience-prefixed for token scoping)"
         },
         {
-          "name": "authoring-serverAPI_WRITE",
+          "name": "https://localhost:9081/fhirAPI_WRITE",
           "description": "Write access to the authoring admin API (audience-prefixed for token scoping)"
         },
         {
-          "name": "authoring-serverSYND_READ",
+          "name": "https://localhost:9081/fhirSYND_READ",
           "description": "Read access to the authoring syndication endpoint (audience-prefixed for token scoping)"
         },
         {
-          "name": "authoring-serverSYND_WRITE",
+          "name": "https://localhost:9081/fhirSYND_WRITE",
           "description": "Write access to the authoring syndication endpoint (audience-prefixed for token scoping)"
         }
       ],
       "production-server": [
         {
-          "name": "production-serverFHIR_READ",
+          "name": "https://localhost:9082/fhirFHIR_READ",
           "description": "Read access to the production FHIR endpoint (audience-prefixed for token scoping)"
         },
         {
-          "name": "production-serverSYND_READ",
+          "name": "https://localhost:9082/fhirSYND_READ",
           "description": "Read access to the production syndication endpoint (audience-prefixed for token scoping)"
         },
         {
-          "name": "production-serverAPI_READ",
+          "name": "https://localhost:9082/fhirAPI_READ",
           "description": "Read access to the production admin API (audience-prefixed for token scoping)"
         },
         {
-          "name": "production-serverAPI_WRITE",
+          "name": "https://localhost:9082/fhirAPI_WRITE",
           "description": "Write access to the production admin API — includes triggering preload/syndication (audience-prefixed for token scoping)"
+        }
+      ],
+      "uat-server": [
+        {
+          "name": "https://localhost:9084/fhirFHIR_READ",
+          "description": "Read access to the UAT FHIR endpoint (audience-prefixed for token scoping)"
+        },
+        {
+          "name": "https://localhost:9084/fhirSYND_READ",
+          "description": "Read access to the UAT syndication endpoint (audience-prefixed for token scoping)"
+        },
+        {
+          "name": "https://localhost:9084/fhirAPI_READ",
+          "description": "Read access to the UAT admin API (audience-prefixed for token scoping)"
+        },
+        {
+          "name": "https://localhost:9084/fhirAPI_WRITE",
+          "description": "Write access to the UAT admin API (audience-prefixed for token scoping)"
         }
       ],
       "atomio-server": [
         {
-          "name": "FHIR_READ",
-          "description": "Read access to the Atomio FHIR/feed endpoint (audience-prefixed for token scoping)"
-        },
-        {
-          "name": "FHIR_WRITE",
-          "description": "Write access to the Atomio FHIR/feed endpoint (audience-prefixed for token scoping)"
-        },
-        {
-          "name": "SYND_READ",
+          "name": "https://localhost:9083SYND_READ",
           "description": "Read access to the Atomio syndication endpoint (audience-prefixed for token scoping)"
         },
         {
-          "name": "SYND_WRITE",
+          "name": "https://localhost:9083SYND_WRITE",
           "description": "Write/publish access to the Atomio syndication endpoint (audience-prefixed for token scoping)"
+        },
+        {
+          "name": "https://localhost:9083API_READ",
+          "description": "Read access to the Atomio admin API (audience-prefixed for token scoping)"
+        },
+        {
+          "name": "https://localhost:9083API_WRITE",
+          "description": "Write access to the Atomio admin API (audience-prefixed for token scoping)"
         }
       ]
     }
@@ -366,6 +387,18 @@
       "optionalClientScopes": []
     },
     {
+      "clientId": "uat-server",
+      "name": "UAT Ontoserver",
+      "description": "Resource server representing the UAT Ontoserver instance",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [],
+      "optionalClientScopes": []
+    },
+    {
       "clientId": "atomio-server",
       "name": "Atomio Server",
       "description": "Resource server representing the Atomio syndication server",
@@ -391,6 +424,7 @@
       "defaultClientScopes": [
         "authoring-server",
         "production-server",
+        "uat-server",
         "atomio-server",
         "user-realm-roles-authorities",
         "openid",
@@ -416,6 +450,7 @@
       "fullScopeAllowed": true,
       "defaultClientScopes": [
         "authoring-server",
+        "atomio-server",
         "user-realm-roles-authorities",
         "openid"
       ],
@@ -440,6 +475,7 @@
       "defaultClientScopes": [
         "authoring-server",
         "production-server",
+        "uat-server",
         "user-realm-roles-authorities",
         "system/*.read",
         "system/*.write",
@@ -475,6 +511,7 @@
       "defaultClientScopes": [
         "authoring-server",
         "production-server",
+        "uat-server",
         "user-realm-roles-authorities",
         "system/*.read",
         "system/*.write",
@@ -511,6 +548,7 @@
         "atomio-server",
         "authoring-server",
         "production-server",
+        "uat-server",
         "user-realm-roles-authorities",
         "openid",
         "profile",
@@ -537,6 +575,7 @@
       "defaultClientScopes": [
         "authoring-server",
         "production-server",
+        "uat-server",
         "user-realm-roles-authorities",
         "system/*.read",
         "system/*.write",
@@ -572,7 +611,7 @@
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.client.audience": "authoring-server",
+            "included.custom.audience": "https://localhost:9081/fhir",
             "id.token.claim": "false",
             "access.token.claim": "true"
           }
@@ -610,7 +649,7 @@
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.client.audience": "production-server",
+            "included.custom.audience": "https://localhost:9082/fhir",
             "id.token.claim": "false",
             "access.token.claim": "true"
           }
@@ -628,6 +667,44 @@
             "claim.name": "authorities",
             "jsonType.label": "String",
             "usermodel.clientRoleMapping.clientId": "production-server"
+          }
+        }
+      ]
+    },
+    {
+      "name": "uat-server",
+      "description": "Maps uat-server client roles to the access token authorities claim",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Access to UAT terminology server"
+      },
+      "protocolMappers": [
+        {
+          "name": "uat-server-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "https://localhost:9084/fhir",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "uat-server-client-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "authorities",
+            "jsonType.label": "String",
+            "usermodel.clientRoleMapping.clientId": "uat-server"
           }
         }
       ]
@@ -909,29 +986,39 @@
     "authoring-server": [
       {
         "clientScope": "system/*.read",
-        "roles": ["authoring-serverFHIR_READ"]
+        "roles": ["https://localhost:9081/fhirFHIR_READ"]
       },
       {
         "clientScope": "system/*.write",
-        "roles": ["authoring-serverFHIR_WRITE"]
+        "roles": ["https://localhost:9081/fhirFHIR_WRITE"]
       },
       {
         "clientScope": "onto/synd.read",
-        "roles": ["authoring-serverSYND_READ"]
+        "roles": ["https://localhost:9081/fhirSYND_READ"]
       },
       {
         "clientScope": "onto/synd.write",
-        "roles": ["authoring-serverSYND_WRITE"]
+        "roles": ["https://localhost:9081/fhirSYND_WRITE"]
       }
     ],
     "production-server": [
       {
         "clientScope": "system/*.read",
-        "roles": ["production-serverFHIR_READ"]
+        "roles": ["https://localhost:9082/fhirFHIR_READ"]
       },
       {
         "clientScope": "onto/synd.read",
-        "roles": ["production-serverSYND_READ"]
+        "roles": ["https://localhost:9082/fhirSYND_READ"]
+      }
+    ],
+    "uat-server": [
+      {
+        "clientScope": "system/*.read",
+        "roles": ["https://localhost:9084/fhirFHIR_READ"]
+      },
+      {
+        "clientScope": "onto/synd.read",
+        "roles": ["https://localhost:9084/fhirSYND_READ"]
       }
     ]
   },

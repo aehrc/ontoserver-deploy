@@ -76,9 +76,9 @@ When `ontoserver.security.enabled=true`, Ontoserver enforces role-based access c
 | Admin | `/api` | `API_READ` | `API_WRITE` |
 | Syndication | `/synd` | `SYND_READ` | `SYND_WRITE` |
 
-Roles are carried in JWT tokens issued by Ontocloak, in the `authorities` claim. When using audience-prefixed authorities (recommended for multi-server deployments), each role name is prefixed with the target server's audience, e.g., `authoring-serverFHIR_READ` or `production-serverFHIR_READ`. This ensures that a token's permissions are scoped to the correct resource server.
+Roles are carried in JWT tokens issued by Ontocloak, in the `authorities` claim. When using audience-prefixed authorities (recommended for multi-server deployments), each role name is prefixed with the target server's FHIR endpoint URL, e.g., `https://localhost:9081/fhirFHIR_READ` or `https://localhost:9082/fhirFHIR_READ`. This ensures that a token's permissions are scoped to the correct resource server.
 
-> **Demo note:** This demo uses human-readable client IDs (e.g. `authoring-server`, `production-server`) as audience values to make it easy to tell which server a role targets. In a production deployment, the SMART-on-FHIR specification requires the `aud` claim to be the **URL of the FHIR endpoint** (e.g. `https://terminology.example.com/fhir`). Ontoserver and Atomio both support URL-based audiences.
+> **Audience values:** The SMART-on-FHIR specification requires the `aud` claim to be the **URL of the FHIR endpoint** (e.g. `https://localhost:9081/fhir`). This demo uses URL-based audiences in both the `aud` claim and as the role name prefix (e.g. `https://localhost:9081/fhirFHIR_READ`). The audience mapper in each client scope emits the server's FHIR URL.
 
 ### Resource-Level Security (Fine-Grained Mode)
 
@@ -113,7 +113,7 @@ Each resource can have labels in its `meta.security` element:
 
 For a **read** request:
 1. If the resource has a `{category}.read` label → user needs `PERM_{CATEGORY}_READ` (or `PERM_READ` for wildcard)
-2. If the resource has `*.read` → only needs `FHIR_READ` (e.g., `authoring-serverFHIR_READ` with audience-prefixed authorities)
+2. If the resource has `*.read` → only needs `FHIR_READ` (e.g., `https://localhost:9081/fhirFHIR_READ` with audience-prefixed authorities)
 3. If the resource has no security labels → only needs `FHIR_READ`
 4. If a resource has multiple read labels → user needs to match **at least one**
 
@@ -146,14 +146,14 @@ User "alpha-author"
   │     └── has realm role PERM_ALPHA_WRITE
   ├── member of group "System/Authors"
   │     └── has realm role Author
-  │           └── includes client role authoring-server:authoring-serverFHIR_READ
-  │           └── includes client role authoring-server:authoring-serverFHIR_WRITE
-  │           └── includes client role production-server:production-serverFHIR_READ
+  │           └── includes client role authoring-server:https://localhost:9081/fhirFHIR_READ
+  │           └── includes client role authoring-server:https://localhost:9081/fhirFHIR_WRITE
+  │           └── includes client role production-server:https://localhost:9082/fhirFHIR_READ
   │
   └── JWT token contains:
-        authorities: [authoring-serverFHIR_READ, authoring-serverFHIR_WRITE,
-                      production-serverFHIR_READ, PERM_ALPHA_READ, PERM_ALPHA_WRITE, Author]
-        audience: [authoring-server, production-server]
+        authorities: [https://localhost:9081/fhirFHIR_READ, https://localhost:9081/fhirFHIR_WRITE,
+                      https://localhost:9082/fhirFHIR_READ, PERM_ALPHA_READ, PERM_ALPHA_WRITE, Author]
+        audience: [https://localhost:9081/fhir, https://localhost:9082/fhir]
 ```
 
 ### System Roles vs Community Roles
@@ -370,10 +370,10 @@ The `iss` (issuer) query parameter tells Snapper which FHIR server to connect to
 The JWT access token contains audience-prefixed authorities that scope permissions to each resource server:
 ```json
 {
-  "aud": ["authoring-server", "production-server"],
+  "aud": ["https://localhost:9081/fhir", "https://localhost:9082/fhir"],
   "authorities": [
-    "authoring-serverFHIR_READ", "authoring-serverFHIR_WRITE",
-    "production-serverFHIR_READ",
+    "https://localhost:9081/fhirFHIR_READ", "https://localhost:9081/fhirFHIR_WRITE",
+    "https://localhost:9082/fhirFHIR_READ",
     "PERM_ALPHA_READ", "PERM_ALPHA_WRITE"
   ],
   "preferred_username": "alpha-author",
@@ -381,7 +381,7 @@ The JWT access token contains audience-prefixed authorities that scope permissio
 }
 ```
 
-The audience prefix (`authoring-server`, `production-server`) on each API role ensures that a token's permissions are correctly scoped. Community permission roles (`PERM_*`) remain unprefixed since they apply across all servers.
+The role name prefix (`https://localhost:9081/fhir`, `https://localhost:9082/fhir`) on each API role ensures that a token's permissions are correctly scoped to the matching server. The `aud` claim contains the same FHIR endpoint URLs for SMART-on-FHIR compliance. Community permission roles (`PERM_*`) remain unprefixed since they apply across all servers.
 
 Ontoserver validates the token using the RSA public key from Ontocloak and checks:
 1. Token signature (RSA verification)
@@ -400,9 +400,10 @@ The realm contains seven clients in three categories:
 **Resource servers** (bearer-only):
 - `authoring-server` — represents the authoring Ontoserver instance
 - `production-server` — represents the production Ontoserver instance
+- `uat-server` — represents the UAT Ontoserver instance (atomio variant only)
 - `atomio-server` — represents the Atomio instance
 
-These clients never accept user logins directly. They exist to define an audience and a namespace for client roles. When a token includes `authoring-server` in its `aud` claim and `authoring-serverFHIR_READ` in its `authorities` claim, those values come from the audience mapper and role mapper associated with the `authoring-server` client.
+These clients never accept user logins directly. They exist to define a namespace for client roles and an audience value for SMART-on-FHIR compliance. When a token includes `https://localhost:9081/fhir` in its `aud` claim and `https://localhost:9081/fhirFHIR_READ` in its `authorities` claim, the audience URL comes from the custom audience mapper and the role from the client role mapper on the `authoring-server` client.
 
 **Browser UIs** (public, authorization code flow):
 - `shrimp` — the cloud-hosted FHIR terminology browser
@@ -426,13 +427,14 @@ This is a confidential client with a client secret that uses the client credenti
 Client scopes control which claims appear in the JWT. The realm defines several custom scopes that map Keycloak roles into the `authorities` and `aud` claims that Ontoserver expects:
 
 - **`authoring-server`** scope: contains two protocol mappers:
-  - An **audience mapper** that adds `authoring-server` to the `aud` claim
-  - A **client role mapper** that takes the client roles defined on the `authoring-server` client (e.g., `authoring-serverFHIR_READ`, `authoring-serverFHIR_WRITE`) and writes them into the `authorities` claim
-- **`production-server`** scope: same pattern — audience mapper for `production-server` and client role mapper for its roles
-- **`atomio-server`** scope: same pattern for the Atomio resource server
+  - A **custom audience mapper** that adds `https://localhost:9081/fhir` to the `aud` claim (the server's FHIR endpoint URL, per SMART-on-FHIR convention)
+  - A **client role mapper** that takes the client roles defined on the `authoring-server` client (e.g., `https://localhost:9081/fhirFHIR_READ`, `https://localhost:9081/fhirFHIR_WRITE`) and writes them into the `authorities` claim
+- **`production-server`** scope: same pattern — custom audience mapper for `https://localhost:9082/fhir` and client role mapper for its roles
+- **`uat-server`** scope: same pattern — custom audience mapper for `https://localhost:9084/fhir` and client role mapper for its roles
+- **`atomio-server`** scope: same pattern — custom audience mapper for `https://localhost:9083` and client role mapper for its roles
 - **`user-realm-roles-authorities`** scope: maps **realm roles** (such as community permissions like `PERM_ALPHA_READ`, `PERM_BETA_WRITE`) into the `authorities` claim
 
-The combination of these scopes means a single JWT token can contain both **audience-prefixed API roles** (e.g., `authoring-serverFHIR_READ`) from the client role mappers and **unprefixed community permissions** (e.g., `PERM_ALPHA_READ`) from the realm role mapper. This is how one token authorises access to multiple resource servers while carrying community-specific permissions that apply across all servers.
+The combination of these scopes means a single JWT token can contain both **audience-prefixed API roles** (e.g., `https://localhost:9081/fhirFHIR_READ`) from the client role mappers and **unprefixed community permissions** (e.g., `PERM_ALPHA_READ`) from the realm role mapper. This is how one token authorises access to multiple resource servers while carrying community-specific permissions that apply across all servers.
 
 ### SMART-on-FHIR Scopes and Role Scope Mappings
 
@@ -450,10 +452,10 @@ SMART-on-FHIR scopes control what operations a client application is permitted t
 
 | SMART Scope | Required Client Role |
 |-------------|---------------------|
-| `system/*.read` | `authoring-serverFHIR_READ` |
-| `system/*.write` | `authoring-serverFHIR_WRITE` |
-| `onto/synd.read` | `authoring-serverSYND_READ` |
-| `onto/synd.write` | `authoring-serverSYND_WRITE` |
+| `system/*.read` | `https://localhost:9081/fhirFHIR_READ` |
+| `system/*.write` | `https://localhost:9081/fhirFHIR_WRITE` |
+| `onto/synd.read` | `https://localhost:9081/fhirSYND_READ` |
+| `onto/synd.write` | `https://localhost:9081/fhirSYND_WRITE` |
 
 The same pattern applies for production-server roles.
 

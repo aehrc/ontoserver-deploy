@@ -20,12 +20,12 @@ NATIONAL_VS_URL="http://example.org/ValueSet/national-pathology-refset"
 # can fetch it with read-only credentials. The FHIR resources in feed entries
 # still require proper OAuth authentication.
 
-status=$(curl -s -o /dev/null -w "%{http_code}" "${AUTHORING_URL}/synd/syndication.xml" 2>/dev/null)
+status=$(curl -sk -o /dev/null -w "%{http_code}" "${AUTHORING_URL}/synd/syndication.xml" 2>/dev/null)
 assert_http "Authoring syndication feed is accessible (readOnly.synd=true)" "200" "$status"
 
 # ---- Syndication feed is valid Atom XML ----
 
-feed_content=$(curl -sf "${AUTHORING_URL}/synd/syndication.xml" 2>/dev/null || true)
+feed_content=$(curl -sfk "${AUTHORING_URL}/synd/syndication.xml" 2>/dev/null || true)
 if [ -n "$feed_content" ]; then
     has_feed_tag=$(echo "$feed_content" | grep -c '<feed' || true)
     assert_gt "Syndication feed contains <feed> element" "$has_feed_tag" 0

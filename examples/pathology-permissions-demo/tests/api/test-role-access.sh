@@ -32,20 +32,30 @@ assert_http "Alpha viewer CANNOT write Alpha CodeSystem" "403" "$status"
 
 # ---- Author: read + write access to own community ----
 
-# Read current resource to preserve it
+# The existing CodeSystems are syndicated (secureSyndicated=true), so regular
+# authors cannot modify them without SYND_WRITE. Test write access by creating
+# a new (non-syndicated) resource instead.
+TEST_WRITE_ID="alpha-role-test-$$"
+WRITE_BODY='{"resourceType":"CodeSystem","id":"'"${TEST_WRITE_ID}"'","url":"http://pathology-alpha.example.com/CodeSystem/role-test","status":"draft","content":"complete","concept":[{"code":"ROLE-TEST","display":"Role Test Concept"}],"meta":{"security":[{"code":"ALPHA.read"},{"code":"ALPHA.write"}]}}'
+status=$(fhir_put_status "$AUTHORING_URL" "CodeSystem/${TEST_WRITE_ID}" "$ALPHA_AUTHOR_TOKEN" "$WRITE_BODY")
+if [ "$status" = "200" ] || [ "$status" = "201" ]; then
+    assert "Alpha author CAN create new CodeSystem in own community [HTTP $status]" 0
+    # Clean up
+    curl -sfk -o /dev/null -X DELETE \
+        -H "Authorization: Bearer ${ALPHA_AUTHOR_TOKEN}" \
+        "${AUTHORING_URL}/fhir/CodeSystem/${TEST_WRITE_ID}" 2>/dev/null || true
+else
+    assert "Alpha author CAN create new CodeSystem (expected 200/201, got $status)" 1
+fi
+
+# Syndicated resources require SYND_WRITE (which authors don't have)
 CURRENT_CS=$(fhir_get "$AUTHORING_URL" "CodeSystem/alpha-pathology-codes" "$ALPHA_AUTHOR_TOKEN")
 if [ -n "$CURRENT_CS" ] && [ "$CURRENT_CS" != "null" ]; then
-    # Add a test concept and update the count to match
-    MODIFIED=$(echo "$CURRENT_CS" | jq '.concept += [{"code":"TEST_ROLE","display":"Role Test Concept"}] | if .count then .count += 1 else . end')
+    MODIFIED=$(echo "$CURRENT_CS" | jq '.concept += [{"code":"TEST_ROLE","display":"Role Test Concept"}]')
     status=$(fhir_put_status "$AUTHORING_URL" "CodeSystem/alpha-pathology-codes" "$ALPHA_AUTHOR_TOKEN" "$MODIFIED")
-    assert_http "Alpha author CAN write Alpha CodeSystem" "200" "$status"
-
-    # Revert the change (restore the original resource)
-    REVERTED=$(echo "$CURRENT_CS" | jq '.')
-    status=$(fhir_put_status "$AUTHORING_URL" "CodeSystem/alpha-pathology-codes" "$ALPHA_AUTHOR_TOKEN" "$REVERTED")
-    assert_http "Alpha author can revert Alpha CodeSystem" "200" "$status"
+    assert_http "Alpha author CANNOT modify syndicated CodeSystem (secureSyndicated)" "403" "$status"
 else
-    skip "Alpha author write test (could not read current resource)"
+    skip "Alpha author syndicated write test (could not read current resource)"
 fi
 
 # ---- Author: no write access to other community ----
@@ -61,7 +71,7 @@ fi
 
 # ---- Approver: has syndication access ----
 
-status=$(curl -s -o /dev/null -w "%{http_code}" \
+status=$(curl -sk -o /dev/null -w "%{http_code}" \
     -H "Authorization: Bearer ${ALPHA_APPROVER_TOKEN}" \
     "${AUTHORING_URL}/synd/syndication.xml" 2>/dev/null)
 assert_http "Alpha approver can read syndication feed" "200" "$status"
@@ -71,14 +81,14 @@ assert_http "Alpha approver can read syndication feed" "200" "$status"
 # readOnly.synd=true makes the syndication feed XML publicly readable, so
 # all authenticated users (including viewers) can read it. The FHIR resources
 # referenced in the feed still require proper community permissions.
-status=$(curl -s -o /dev/null -w "%{http_code}" \
+status=$(curl -sk -o /dev/null -w "%{http_code}" \
     -H "Authorization: Bearer ${ALPHA_VIEWER_TOKEN}" \
     "${AUTHORING_URL}/synd/syndication.xml" 2>/dev/null)
 assert_http "Alpha viewer can read syndication feed (readOnly.synd=true)" "200" "$status"
 
 # ---- Anonymous: no access to authoring FHIR ----
 
-anon_status=$(curl -s -o /dev/null -w "%{http_code}" "${AUTHORING_URL}/fhir/CodeSystem" 2>/dev/null)
+anon_status=$(curl -sk -o /dev/null -w "%{http_code}" "${AUTHORING_URL}/fhir/CodeSystem" 2>/dev/null)
 if [ "$anon_status" = "401" ] || [ "$anon_status" = "403" ]; then
     assert "Anonymous FHIR access denied on authoring [HTTP $anon_status]" 0
 else
@@ -100,11 +110,11 @@ if command -v base64 &>/dev/null; then
     esac
     PAYLOAD=$(echo "$JWT_PART" | base64 --decode 2>/dev/null || echo "$JWT_PART" | base64 -D 2>/dev/null || true)
     if [ -n "$PAYLOAD" ]; then
-        has_fhir_read=$(echo "$PAYLOAD" | jq 'any(.authorities[]; . == "authoring-serverFHIR_READ")' 2>/dev/null || echo "false")
-        assert_eq "Alpha author token contains authoring-serverFHIR_READ" "true" "$has_fhir_read"
+        has_fhir_read=$(echo "$PAYLOAD" | jq 'any(.authorities[]; . == "https://localhost:9081/fhirFHIR_READ")' 2>/dev/null || echo "false")
+        assert_eq "Alpha author token contains https://localhost:9081/fhirFHIR_READ" "true" "$has_fhir_read"
 
-        has_fhir_write=$(echo "$PAYLOAD" | jq 'any(.authorities[]; . == "authoring-serverFHIR_WRITE")' 2>/dev/null || echo "false")
-        assert_eq "Alpha author token contains authoring-serverFHIR_WRITE" "true" "$has_fhir_write"
+        has_fhir_write=$(echo "$PAYLOAD" | jq 'any(.authorities[]; . == "https://localhost:9081/fhirFHIR_WRITE")' 2>/dev/null || echo "false")
+        assert_eq "Alpha author token contains https://localhost:9081/fhirFHIR_WRITE" "true" "$has_fhir_write"
 
         has_perm_alpha_read=$(echo "$PAYLOAD" | jq 'any(.authorities[]; . == "PERM_ALPHA_READ")' 2>/dev/null || echo "false")
         assert_eq "Alpha author token contains PERM_ALPHA_READ" "true" "$has_perm_alpha_read"

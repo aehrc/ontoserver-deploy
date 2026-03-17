@@ -20,7 +20,7 @@
 #   - Authoring Snapper:   https://localhost:9081/snapper
 #   - Atomio API:          https://localhost:9083/swagger-ui/index.html
 #   - UAT Snapper:         https://localhost:9084/snapper
-#   - Production Snapper:  https://localhost:9085/snapper
+#   - Production Snapper:  https://localhost:9082/snapper
 #   - Demo users:          All use password "demo"
 
 set -euo pipefail
@@ -33,7 +33,7 @@ ONTOCLOAK_URL="https://localhost:9090"
 AUTHORING_URL="https://localhost:9081"
 ATOMIO_URL="https://localhost:9083"
 UAT_URL="https://localhost:9084"
-PRODUCTION_URL="https://localhost:9085"
+PRODUCTION_URL="https://localhost:9082"
 REALM="pathology-demo"
 
 RED='\033[0;31m'
@@ -217,13 +217,13 @@ configure_syndication_consumer() {
     fi
     assign_realm_role "$sa_user_id" "PERM_READ"
     success "  Assigned PERM_READ (all communities read)"
-    assign_client_role "$sa_user_id" "authoring-server" "authoring-serverFHIR_READ"
-    success "  Assigned authoring-serverFHIR_READ on authoring-server"
+    assign_client_role "$sa_user_id" "authoring-server" "https://localhost:9081/fhirFHIR_READ"
+    success "  Assigned https://localhost:9081/fhirFHIR_READ on authoring-server"
 
-    # Note: authoring-serverSYND_READ is NOT assigned here because the authoring
+    # Note: https://localhost:9081/fhirSYND_READ is NOT assigned here because the authoring
     # server has readOnly.synd=true, making the syndication feed XML publicly
     # readable. If readOnly.synd were false (the default), you would also need
-    # to assign authoring-serverSYND_READ to allow the consumer to access the
+    # to assign https://localhost:9081/fhirSYND_READ to allow the consumer to access the
     # syndication feed metadata.
 }
 
@@ -250,12 +250,12 @@ print_manual_instructions() {
     echo "    2. In 'Realm Roles', assign: PERM_READ"
     echo "       (This grants all-communities read access for syndication)"
     echo "    3. In 'Client Roles', select 'authoring-server' and assign:"
-    echo "       authoring-serverFHIR_READ"
+    echo "       https://localhost:9081/fhirFHIR_READ"
     echo ""
-    echo "    Note: authoring-serverSYND_READ is not needed here because"
+    echo "    Note: https://localhost:9081/fhirSYND_READ is not needed here because"
     echo "    readOnly.synd=true is set on the authoring server, making the"
     echo "    syndication feed XML publicly readable. If readOnly.synd were"
-    echo "    false, you would also need to assign authoring-serverSYND_READ."
+    echo "    false, you would also need to assign https://localhost:9081/fhirSYND_READ."
     echo ""
     echo -e "${BLUE}  STEP B: Grant realm-admin to the pathology-demo admin user${NC}"
     echo ""

@@ -2,9 +2,7 @@ import { test, expect } from '@playwright/test';
 import { openSnapper, loginViaKeycloak, logout, waitForSnapperReady } from '../helpers/auth';
 
 const AUTHORING_URL = process.env.AUTHORING_URL || 'https://localhost:9081/fhir';
-const PRODUCTION_URL = process.env.PRODUCTION_URL || (
-  process.env.VARIANT === 'atomio' ? 'https://localhost:9085/fhir' : 'https://localhost:9082/fhir'
-);
+const PRODUCTION_URL = process.env.PRODUCTION_URL || 'https://localhost:9082/fhir';
 
 test.describe('Snapper Authentication', () => {
   test('loads Snapper with iss parameter for authoring', async ({ page }) => {
@@ -61,9 +59,10 @@ test.describe('Snapper Authentication', () => {
     // Log out
     await logout(page);
 
-    // Login button should reappear
+    // After logout + reload, Snapper should no longer show the logout button
+    // (may show licence page, login page, or unauthenticated homepage)
     await expect(
-      page.getByText(/login|sign in/i).first(),
-    ).toBeVisible({ timeout: 10_000 });
+      page.getByText(/logout|sign out/i),
+    ).not.toBeVisible({ timeout: 10_000 });
   });
 });

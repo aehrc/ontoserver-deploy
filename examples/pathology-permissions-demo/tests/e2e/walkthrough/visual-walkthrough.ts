@@ -28,9 +28,7 @@ const variant = variantFlag !== -1 && args[variantFlag + 1] ? args[variantFlag +
 const autoMode = args.includes('--auto');
 
 const AUTHORING_URL = process.env.AUTHORING_URL || 'https://localhost:9081/fhir';
-const PRODUCTION_URL = process.env.PRODUCTION_URL || (
-  variant === 'atomio' ? 'https://localhost:9085/fhir' : 'https://localhost:9082/fhir'
-);
+const PRODUCTION_URL = process.env.PRODUCTION_URL || 'https://localhost:9082/fhir';
 const UAT_URL = process.env.UAT_URL || 'https://localhost:9084/fhir';
 const ATOMIO_URL = process.env.ATOMIO_URL || 'https://localhost:9083';
 const AUTHORING_BASE = AUTHORING_URL.replace(/\/fhir$/, '');
@@ -610,29 +608,20 @@ async function scene10_atomioPromoteUAT(page: Page): Promise<void> {
 
   highlight('"uat" alias now points to release-2-0.');
   highlight('Atomio shows uat → release-2-0, production → release-1-0 (unchanged).');
-  explain('Opening OntoCommand on UAT to trigger syndication via the Preload button...');
-  await pause();
+  explain('Triggering UAT to syndicate now via the Ontoserver redoPreload API...');
 
-  // Open OntoCommand on UAT (navigating to the FHIR root redirects to OntoCommand)
-  await page.goto(UAT_URL);
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(3_000);
-
-  // Log in to OntoCommand
-  await loginViaKeycloak(page, 'admin');
-  await page.waitForTimeout(3_000);
-
-  // Navigate to Syndication and click Preload
-  await page.getByText('Syndication').click();
-  await page.waitForTimeout(2_000);
-  await page.getByRole('button', { name: 'Preload' }).click();
-  await page.waitForTimeout(2_000);
-
-  highlight('Preload triggered — UAT is now syndicating from Atomio.');
-  explain('Waiting for v1.1.0 to appear on UAT...');
-
-  // Wait for v1.1.0 to appear
-  const uatSynced = await waitForResource(UAT_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 60);
+  // Trigger UAT preload via API and wait for v1.1.0.
+  // Ontoserver caches feed responses by URL — the alias URL hasn't changed,
+  // just its content. We trigger preload, wait, then retry to bust the cache.
+  const uatBase = UAT_URL.replace(/\/fhir$/, '');
+  await triggerPreload(uatBase);
+  let uatSynced = await waitForResource(UAT_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 30);
+  if (!uatSynced) {
+    // Cache may be stale — wait for it to expire and retry
+    await new Promise(r => setTimeout(r, 5000));
+    await triggerPreload(uatBase);
+    uatSynced = await waitForResource(UAT_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 60);
+  }
   if (uatSynced) {
     highlight('v1.1.0 is now on UAT!');
   } else {
@@ -720,7 +709,14 @@ async function scene11_atomioPromoteProduction(page: Page): Promise<void> {
   highlight('Preload triggered — production is now syndicating from Atomio.');
   explain('Waiting for v1.1.0 to appear on production...');
 
-  const prodSynced = await waitForResource(PRODUCTION_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 60);
+  const prodBase = PRODUCTION_URL.replace(/\/fhir$/, '');
+  let prodSynced = await waitForResource(PRODUCTION_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 30);
+  if (!prodSynced) {
+    // Cache may be stale — retry
+    await new Promise(r => setTimeout(r, 5000));
+    await triggerPreload(prodBase);
+    prodSynced = await waitForResource(PRODUCTION_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 60);
+  }
   if (prodSynced) {
     highlight('v1.1.0 is now on production!');
   } else {

@@ -1,8 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const PRODUCTION_URL = process.env.PRODUCTION_URL || (
-  process.env.VARIANT === 'atomio' ? 'https://localhost:9085' : 'https://localhost:9082'
-);
+const PRODUCTION_URL = process.env.PRODUCTION_URL || 'https://localhost:9082';
 
 test.describe('Anonymous Access — Community Filtering', () => {
   test('anonymous cannot see Alpha CodeSystem on production', async ({ page }) => {

@@ -146,7 +146,7 @@ echo -e "  ${CYAN}--- Phase 4: Deleting test CodeSystem ---${NC}"
 
 # Refresh token (original may have expired during syndication waits)
 ALPHA_AUTHOR_TOKEN=$(get_token "alpha-author")
-status=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+status=$(curl -sk -o /dev/null -w "%{http_code}" -X DELETE \
     -H "Authorization: Bearer ${ALPHA_AUTHOR_TOKEN}" \
     "${AUTHORING_URL}/fhir/CodeSystem/${TEST_CS_ID}" 2>/dev/null)
 if [ "$status" = "200" ] || [ "$status" = "204" ]; then

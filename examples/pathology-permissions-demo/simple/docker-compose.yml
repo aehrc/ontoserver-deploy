@@ -133,7 +133,7 @@ services:
       # RSA public key from Ontocloak (PEM format via SPRING_APPLICATION_JSON).
       SPRING_APPLICATION_JSON: "${ONTOSERVER_SPRING_JSON}"
       ontoserver.security.enabled: fine
-      ontoserver.security.audience: authoring-server
+      ontoserver.security.audience: https://localhost:9081/fhir
       # Syndication feed XML is read-only accessible (no write credentials needed).
       # This allows downstream consumers (production, Atomio) to fetch the feed
       # with read-only credentials. The FHIR resources in feed entries still require
@@ -236,7 +236,7 @@ services:
       # Security - fine-grained mode so community resource isolation is preserved
       SPRING_APPLICATION_JSON: "${ONTOSERVER_SPRING_JSON}"
       ontoserver.security.enabled: fine
-      ontoserver.security.audience: production-server
+      ontoserver.security.audience: https://localhost:9082/fhir
       # Anonymous read access to FHIR endpoint (national resources visible to all)
       ontoserver.security.readOnly.fhir: "true"
 

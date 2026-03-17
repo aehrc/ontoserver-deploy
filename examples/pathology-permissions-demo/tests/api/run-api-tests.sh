@@ -24,9 +24,9 @@ echo ""
 
 # Configure URLs based on variant
 if [ "$VARIANT" = "atomio" ]; then
-    export PRODUCTION_URL="${PRODUCTION_URL:-http://localhost:9085}"
-    export ATOMIO_URL="${ATOMIO_URL:-http://localhost:9083}"
-    export UAT_URL="${UAT_URL:-http://localhost:9084}"
+    export PRODUCTION_URL="${PRODUCTION_URL:-https://localhost:9082}"
+    export ATOMIO_URL="${ATOMIO_URL:-https://localhost:9083}"
+    export UAT_URL="${UAT_URL:-https://localhost:9084}"
 fi
 
 # Check prerequisites
@@ -53,8 +53,8 @@ run_test() {
     test_name=$(basename "$test_file" .sh)
 
     echo ""
-    bash "$test_file"
-    local result=$?
+    local result=0
+    bash "$test_file" || result=$?
 
     if [ $result -ne 0 ]; then
         EXIT_CODE=1

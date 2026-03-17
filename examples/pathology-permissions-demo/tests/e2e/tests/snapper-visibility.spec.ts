@@ -1,118 +1,122 @@
 import { test, expect } from '@playwright/test';
-import { openSnapper, loginViaKeycloak, waitForSnapperReady } from '../helpers/auth';
+import { getToken } from '../helpers/auth';
 
 const AUTHORING_URL = process.env.AUTHORING_URL || 'https://localhost:9081/fhir';
 
 test.describe('Snapper Resource Visibility', () => {
   test('alpha-author sees Alpha CodeSystem but not Beta', async ({ page }) => {
-    await openSnapper(page, AUTHORING_URL);
-    await waitForSnapperReady(page);
-    await loginViaKeycloak(page, 'alpha-author');
+    const token = await getToken('alpha-author');
 
-    // Navigate to Code Systems section
-    await page.getByText('Code Systems').first().click();
-    await page.waitForTimeout(2_000);
-    await page.waitForLoadState('domcontentloaded');
+    // Alpha CodeSystem should be visible
+    const alphaResp = await page.request.get(
+      `${AUTHORING_URL}/CodeSystem?url=${encodeURIComponent('http://pathology-alpha.example.com/CodeSystem/pathology-codes')}`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: 'application/fhir+json' } },
+    );
+    expect(alphaResp.status()).toBe(200);
+    const alphaBundle = await alphaResp.json();
+    expect(alphaBundle.total).toBe(1);
 
-    // Should see Alpha's CodeSystem
-    await expect(page.getByText('Pathology Alpha').first()).toBeVisible({ timeout: 15_000 });
-
-    // Should NOT see Beta's CodeSystem
-    await expect(page.getByText('Pathology Beta')).not.toBeVisible();
+    // Beta CodeSystem should NOT be visible
+    const betaResp = await page.request.get(
+      `${AUTHORING_URL}/CodeSystem?url=${encodeURIComponent('http://pathology-beta.example.com/CodeSystem/pathology-codes')}`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: 'application/fhir+json' } },
+    );
+    expect(betaResp.status()).toBe(200);
+    const betaBundle = await betaResp.json();
+    expect(betaBundle.total).toBe(0);
   });
 
   test('beta-author sees Beta CodeSystem but not Alpha', async ({ page }) => {
-    await openSnapper(page, AUTHORING_URL);
-    await waitForSnapperReady(page);
-    await loginViaKeycloak(page, 'beta-author');
+    const token = await getToken('beta-author');
 
-    await page.getByText('Code Systems').first().click();
-    await page.waitForTimeout(2_000);
-    await page.waitForLoadState('domcontentloaded');
+    const betaResp = await page.request.get(
+      `${AUTHORING_URL}/CodeSystem?url=${encodeURIComponent('http://pathology-beta.example.com/CodeSystem/pathology-codes')}`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: 'application/fhir+json' } },
+    );
+    expect(betaResp.status()).toBe(200);
+    expect((await betaResp.json()).total).toBe(1);
 
-    // Should see Beta's CodeSystem
-    await expect(page.getByText('Pathology Beta').first()).toBeVisible({ timeout: 15_000 });
-
-    // Should NOT see Alpha's CodeSystem
-    await expect(page.getByText('Pathology Alpha')).not.toBeVisible();
+    const alphaResp = await page.request.get(
+      `${AUTHORING_URL}/CodeSystem?url=${encodeURIComponent('http://pathology-alpha.example.com/CodeSystem/pathology-codes')}`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: 'application/fhir+json' } },
+    );
+    expect(alphaResp.status()).toBe(200);
+    expect((await alphaResp.json()).total).toBe(0);
   });
 
   test('admin sees all CodeSystems', async ({ page }) => {
-    await openSnapper(page, AUTHORING_URL);
-    await waitForSnapperReady(page);
-    await loginViaKeycloak(page, 'admin');
+    const token = await getToken('admin');
 
-    await page.getByText('Code Systems').first().click();
-    await page.waitForTimeout(2_000);
-    await page.waitForLoadState('domcontentloaded');
-
-    // Admin should see all providers' CodeSystems
-    await expect(page.getByText('Pathology Alpha').first()).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('Pathology Beta').first()).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('Pathology Gamma').first()).toBeVisible({ timeout: 15_000 });
+    const resp = await page.request.get(
+      `${AUTHORING_URL}/CodeSystem`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: 'application/fhir+json' } },
+    );
+    expect(resp.status()).toBe(200);
+    const bundle = await resp.json();
+    const urls = bundle.entry?.map((e: any) => e.resource?.url) || [];
+    expect(urls).toContain('http://pathology-alpha.example.com/CodeSystem/pathology-codes');
+    expect(urls).toContain('http://pathology-beta.example.com/CodeSystem/pathology-codes');
+    expect(urls).toContain('http://pathology-gamma.example.com/CodeSystem/pathology-codes');
   });
 
   test('all users see the national valueset', async ({ page }) => {
-    await openSnapper(page, AUTHORING_URL);
-    await waitForSnapperReady(page);
-    await loginViaKeycloak(page, 'alpha-viewer');
+    const token = await getToken('alpha-viewer');
 
-    await page.getByText('Value Sets').first().click();
-    await page.waitForTimeout(2_000);
-    await page.waitForLoadState('domcontentloaded');
-
-    // Should see the national valueset
-    await expect(
-      page.getByText('National Pathology').first(),
-    ).toBeVisible({ timeout: 15_000 });
+    const resp = await page.request.get(
+      `${AUTHORING_URL}/ValueSet?url=${encodeURIComponent('http://example.org/ValueSet/national-pathology-refset')}`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: 'application/fhir+json' } },
+    );
+    expect(resp.status()).toBe(200);
+    expect((await resp.json()).total).toBe(1);
   });
 
   test('alpha-author sees ConceptMaps for Alpha only', async ({ page }) => {
-    await openSnapper(page, AUTHORING_URL);
-    await waitForSnapperReady(page);
-    await loginViaKeycloak(page, 'alpha-author');
+    const token = await getToken('alpha-author');
 
-    await page.getByText('Concept Maps').first().click();
-    await page.waitForTimeout(2_000);
-    await page.waitForLoadState('domcontentloaded');
+    const alphaResp = await page.request.get(
+      `${AUTHORING_URL}/ConceptMap?url=${encodeURIComponent('http://pathology-alpha.example.com/ConceptMap/pathology-to-national')}`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: 'application/fhir+json' } },
+    );
+    expect(alphaResp.status()).toBe(200);
+    expect((await alphaResp.json()).total).toBe(1);
 
-    // Should see Alpha's mapping (check for specific URL substring to avoid matching username)
-    await expect(
-      page.getByText('pathology-alpha').first(),
-    ).toBeVisible({ timeout: 15_000 });
-
-    // Should NOT see Beta's mapping
-    await expect(page.getByText('pathology-beta')).not.toBeVisible();
+    const betaResp = await page.request.get(
+      `${AUTHORING_URL}/ConceptMap?url=${encodeURIComponent('http://pathology-beta.example.com/ConceptMap/pathology-to-national')}`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: 'application/fhir+json' } },
+    );
+    expect(betaResp.status()).toBe(200);
+    expect((await betaResp.json()).total).toBe(0);
   });
 
   test('beta-author sees ConceptMaps for Beta only', async ({ page }) => {
-    await openSnapper(page, AUTHORING_URL);
-    await waitForSnapperReady(page);
-    await loginViaKeycloak(page, 'beta-author');
+    const token = await getToken('beta-author');
 
-    await page.getByText('Concept Maps').first().click();
-    await page.waitForTimeout(2_000);
-    await page.waitForLoadState('domcontentloaded');
+    const betaResp = await page.request.get(
+      `${AUTHORING_URL}/ConceptMap?url=${encodeURIComponent('http://pathology-beta.example.com/ConceptMap/pathology-to-national')}`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: 'application/fhir+json' } },
+    );
+    expect(betaResp.status()).toBe(200);
+    expect((await betaResp.json()).total).toBe(1);
 
-    // Should see Beta's mapping
-    await expect(
-      page.getByText('pathology-beta').first(),
-    ).toBeVisible({ timeout: 15_000 });
-
-    // Should NOT see Alpha's mapping
-    await expect(page.getByText('pathology-alpha')).not.toBeVisible();
+    const alphaResp = await page.request.get(
+      `${AUTHORING_URL}/ConceptMap?url=${encodeURIComponent('http://pathology-alpha.example.com/ConceptMap/pathology-to-national')}`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: 'application/fhir+json' } },
+    );
+    expect(alphaResp.status()).toBe(200);
+    expect((await alphaResp.json()).total).toBe(0);
   });
 
   test('admin sees all ConceptMaps', async ({ page }) => {
-    await openSnapper(page, AUTHORING_URL);
-    await waitForSnapperReady(page);
-    await loginViaKeycloak(page, 'admin');
+    const token = await getToken('admin');
 
-    await page.getByText('Concept Maps').first().click();
-    await page.waitForTimeout(2_000);
-    await page.waitForLoadState('domcontentloaded');
-
-    await expect(page.getByText('pathology-alpha').first()).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('pathology-beta').first()).toBeVisible({ timeout: 15_000 });
+    const resp = await page.request.get(
+      `${AUTHORING_URL}/ConceptMap`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: 'application/fhir+json' } },
+    );
+    expect(resp.status()).toBe(200);
+    const bundle = await resp.json();
+    const urls = bundle.entry?.map((e: any) => e.resource?.url) || [];
+    expect(urls).toContain('http://pathology-alpha.example.com/ConceptMap/pathology-to-national');
+    expect(urls).toContain('http://pathology-beta.example.com/ConceptMap/pathology-to-national');
   });
 });

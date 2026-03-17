@@ -141,7 +141,7 @@ services:
       # RSA public key from Ontocloak (PEM format via SPRING_APPLICATION_JSON).
       SPRING_APPLICATION_JSON: "${ONTOSERVER_SPRING_JSON}"
       ontoserver.security.enabled: fine
-      ontoserver.security.audience: authoring-server
+      ontoserver.security.audience: https://localhost:9081/fhir
       # Syndication feed XML is read-only accessible (no write credentials needed).
       # This allows downstream consumers (production, Atomio) to fetch the feed
       # with read-only credentials. The FHIR resources in feed entries still require
@@ -283,7 +283,7 @@ services:
       # Security - fine-grained mode so community resource isolation is preserved
       SPRING_APPLICATION_JSON: "${ONTOSERVER_SPRING_JSON}"
       ontoserver.security.enabled: fine
-      ontoserver.security.audience: production-server
+      ontoserver.security.audience: https://localhost:9084/fhir
       ontoserver.security.readOnly.fhir: "true"
 
       # SMART-on-FHIR endpoints for Snapper (same Ontocloak realm)
@@ -308,6 +308,13 @@ services:
       authentication.oauth.endpoint.client_id.0: syndication-consumer
       authentication.oauth.endpoint.client_secret.0: syndication-consumer-secret
       authentication.oauth.endpoint.strategy.0: body
+      # Atomio also requires authentication (atomio.security.enabled=true).
+      # Without this, fetching the Atomio alias syndication feed returns 401.
+      authentication.oauth.endpoint.1: http://atomio:8080
+      authentication.oauth.endpoint.token_endpoint.1: http://ontocloak:8080/auth/realms/pathology-demo/protocol/openid-connect/token
+      authentication.oauth.endpoint.client_id.1: syndication-consumer
+      authentication.oauth.endpoint.client_secret.1: syndication-consumer-secret
+      authentication.oauth.endpoint.strategy.1: body
 
       ontoserver.feature.feedFilters: "true"
       JAVA_OPTS: -Xmx4G
@@ -361,13 +368,13 @@ services:
       spring.datasource.url: jdbc:postgresql://production-db:5432/ontoserver
       spring.datasource.username: ontoserver
       spring.datasource.password: ontoserver
-      ontoserver.fhir.base: https://localhost:9085/fhir
+      ontoserver.fhir.base: https://localhost:9082/fhir
       ontoserver.deployment.readOnly: "true"
 
       # Security - fine-grained mode so community resource isolation is preserved
       SPRING_APPLICATION_JSON: "${ONTOSERVER_SPRING_JSON}"
       ontoserver.security.enabled: fine
-      ontoserver.security.audience: production-server
+      ontoserver.security.audience: https://localhost:9082/fhir
       ontoserver.security.readOnly.fhir: "true"
 
       # SMART-on-FHIR endpoints for Snapper (same Ontocloak realm)
@@ -392,6 +399,13 @@ services:
       authentication.oauth.endpoint.client_id.0: syndication-consumer
       authentication.oauth.endpoint.client_secret.0: syndication-consumer-secret
       authentication.oauth.endpoint.strategy.0: body
+      # Atomio also requires authentication (atomio.security.enabled=true).
+      # Without this, fetching the Atomio alias syndication feed returns 401.
+      authentication.oauth.endpoint.1: http://atomio:8080
+      authentication.oauth.endpoint.token_endpoint.1: http://ontocloak:8080/auth/realms/pathology-demo/protocol/openid-connect/token
+      authentication.oauth.endpoint.client_id.1: syndication-consumer
+      authentication.oauth.endpoint.client_secret.1: syndication-consumer-secret
+      authentication.oauth.endpoint.strategy.1: body
 
       ontoserver.feature.feedFilters: "true"
       JAVA_OPTS: -Xmx4G
@@ -425,7 +439,7 @@ services:
       - "9081:9081"
       - "9083:9083"
       - "9084:9084"
-      - "9085:9085"
+      - "9082:9082"
       - "9090:9090"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

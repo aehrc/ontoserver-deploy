@@ -5,12 +5,12 @@
 
 set -euo pipefail
 
-ONTOCLOAK_URL="${ONTOCLOAK_URL:-http://localhost:9090}"
-AUTHORING_URL="${AUTHORING_URL:-http://localhost:9081}"
-PRODUCTION_URL="${PRODUCTION_URL:-http://localhost:9082}"
-ATOMIO_URL="${ATOMIO_URL:-http://localhost:9083}"
-UAT_URL="${UAT_URL:-http://localhost:9084}"
-PRODUCTION_ATOMIO_URL="${PRODUCTION_ATOMIO_URL:-http://localhost:9085}"
+ONTOCLOAK_URL="${ONTOCLOAK_URL:-https://localhost:9090}"
+AUTHORING_URL="${AUTHORING_URL:-https://localhost:9081}"
+PRODUCTION_URL="${PRODUCTION_URL:-https://localhost:9082}"
+ATOMIO_URL="${ATOMIO_URL:-https://localhost:9083}"
+UAT_URL="${UAT_URL:-https://localhost:9084}"
+PRODUCTION_ATOMIO_URL="${PRODUCTION_ATOMIO_URL:-https://localhost:9082}"
 REALM="${REALM:-pathology-demo}"
 
 # Colours
@@ -94,7 +94,7 @@ assert_http() {
 get_token() {
     local username="$1"
     local password="${2:-demo}"
-    curl -sf -X POST \
+    curl -sfk -X POST \
         "${ONTOCLOAK_URL}/auth/realms/${REALM}/protocol/openid-connect/token" \
         -d "grant_type=password" \
         -d "client_id=demo-cli" \
@@ -104,7 +104,7 @@ get_token() {
 
 # Get an admin token for the Keycloak master realm
 get_admin_token() {
-    curl -sf -X POST \
+    curl -sfk -X POST \
         "${ONTOCLOAK_URL}/auth/realms/master/protocol/openid-connect/token" \
         -d "grant_type=password" \
         -d "client_id=admin-cli" \
@@ -119,9 +119,9 @@ fhir_get() {
     local token="${3:-}"
 
     if [ -n "$token" ]; then
-        curl -sf -H "Authorization: Bearer ${token}" "${server_url}/fhir/${path}" 2>/dev/null
+        curl -sfk -H "Authorization: Bearer ${token}" "${server_url}/fhir/${path}" 2>/dev/null
     else
-        curl -sf "${server_url}/fhir/${path}" 2>/dev/null
+        curl -sfk "${server_url}/fhir/${path}" 2>/dev/null
     fi
 }
 
@@ -132,9 +132,9 @@ fhir_get_status() {
     local token="${3:-}"
 
     if [ -n "$token" ]; then
-        curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${token}" "${server_url}/fhir/${path}" 2>/dev/null || echo "000"
+        curl -sk -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${token}" "${server_url}/fhir/${path}" 2>/dev/null || echo "000"
     else
-        curl -s -o /dev/null -w "%{http_code}" "${server_url}/fhir/${path}" 2>/dev/null || echo "000"
+        curl -sk -o /dev/null -w "%{http_code}" "${server_url}/fhir/${path}" 2>/dev/null || echo "000"
     fi
 }
 
@@ -145,7 +145,7 @@ fhir_put_status() {
     local token="$3"
     local body="$4"
 
-    curl -s -o /dev/null -w "%{http_code}" -X PUT \
+    curl -sk -o /dev/null -w "%{http_code}" -X PUT \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/fhir+json" \
         -d "$body" \
@@ -236,7 +236,7 @@ wait_for_version() {
 check_service() {
     local url="$1"
     local name="$2"
-    if curl -sf -o /dev/null --max-time 5 "$url" 2>/dev/null; then
+    if curl -sfk -o /dev/null --max-time 5 "$url" 2>/dev/null; then
         return 0
     else
         echo -e "${RED}ERROR: ${name} is not reachable at ${url}${NC}"

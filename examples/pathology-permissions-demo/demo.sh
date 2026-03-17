@@ -93,7 +93,7 @@ After setup, open in a browser (accept the self-signed certificate warning):
     Atomio UI          https://localhost:9083
     Atomio Swagger     https://localhost:9083/swagger-ui/index.html
     Shrimp (UAT)       https://ontoserver.csiro.au/shrimp?iss=https://localhost:9084/fhir&clientId=shrimp
-    Shrimp (production) https://ontoserver.csiro.au/shrimp?iss=https://localhost:9085/fhir&clientId=shrimp
+    Shrimp (production) https://ontoserver.csiro.au/shrimp?iss=https://localhost:9082/fhir&clientId=shrimp
 
 Demo users (all passwords: demo):
   alpha-viewer, alpha-author, alpha-approver
@@ -288,11 +288,11 @@ cmd_status() {
         fi
 
         local prod_status
-        prod_status=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:9085/fhir/metadata 2>/dev/null || echo "000")
+        prod_status=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:9082/fhir/metadata 2>/dev/null || echo "000")
         if [[ "$prod_status" == "200" ]]; then
-            echo -e "  Production Ontoserver (9085): ${GREEN}healthy${NC}"
+            echo -e "  Production Ontoserver (9082): ${GREEN}healthy${NC}"
         else
-            echo -e "  Production Ontoserver (9085): ${RED}unreachable${NC}"
+            echo -e "  Production Ontoserver (9082): ${RED}unreachable${NC}"
         fi
     fi
 }

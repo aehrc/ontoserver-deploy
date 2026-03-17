@@ -7,7 +7,7 @@ This guide walks through the Atomio variant of the pathology permissions demo, d
 - Docker and Docker Compose running
 - Access to `quay.io/aehrc` container images
 - `curl`, `jq`, `python3` installed
-- Ports 9081, 9083-9085, 9090 available
+- Ports 9081-9084, 9090 available
 
 > **Windows users:** Run inside [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) (Windows Subsystem for Linux). Install Docker Desktop with the WSL2 backend enabled, then run all commands from a WSL2 terminal. The shell scripts, `curl`, `jq`, and `python3` all work natively in WSL2.
 
@@ -46,7 +46,7 @@ Server connections (append the appropriate `clientId` for the tool — `shrimp`,
 - **Authoring**: append `?iss=https://localhost:9081&clientId=<tool>`
 - **Atomio**: open `https://localhost:9083` (redirects to Atomio UI)
 - **UAT**: append `?iss=https://localhost:9084&clientId=<tool>`
-- **Production**: append `?iss=https://localhost:9085&clientId=<tool>`
+- **Production**: append `?iss=https://localhost:9082&clientId=<tool>`
 
 Demo users (all passwords: **`demo`**):
 `admin`, `alpha-viewer`, `alpha-author`, `alpha-approver`, `beta-viewer`, `beta-author`, `beta-approver`, `national-admin`
@@ -90,7 +90,7 @@ Resource-level permissions work identically to the simple variant. The key diffe
 **Using Shrimp:**
 
 1. Open Shrimp pointed at production (no login):
-   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9085&clientId=shrimp`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9082&clientId=shrimp`
 2. The **CodeSystems** list is empty — all CodeSystems have community labels
 3. Switch to **ValueSets** — the **National Pathology Reference Set** is visible (`*.read` label)
 
@@ -98,7 +98,7 @@ Resource-level permissions work identically to the simple variant. The key diffe
 
 ```bash
 # National valueset visible anonymously on production
-curl -sk https://localhost:9085/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset \
+curl -sk https://localhost:9082/fhir/ValueSet?url=http://example.org/ValueSet/national-pathology-refset \
   | jq '.total'
 # Output: 1
 ```
@@ -297,13 +297,13 @@ curl -sk https://localhost:9084/fhir/CodeSystem?url=http://pathology-alpha.examp
 **Using Shrimp:**
 
 1. Open Shrimp pointed at production:
-   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9085&clientId=shrimp`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9082&clientId=shrimp`
 2. Log in as **alpha-author** — the Troponin concept is **not yet present**
 
 **Using curl:**
 
 ```bash
-curl -sk https://localhost:9085/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes \
+curl -sk https://localhost:9082/fhir/CodeSystem?url=http://pathology-alpha.example.com/CodeSystem/pathology-codes \
   | jq '.entry[0].resource.version // "not found"'
 ```
 
@@ -332,14 +332,14 @@ curl -sk https://localhost:9083/alias | jq '.[] | {alias: .aliasName, feed: .fee
 **Trigger syndication (OntoCommand or curl):**
 
 Option A — Using OntoCommand:
-1. Open OntoCommand for production: navigate to `https://localhost:9085/fhir` (redirects to OntoCommand)
+1. Open OntoCommand for production: navigate to `https://localhost:9082/fhir` (redirects to OntoCommand)
 2. Log in as **admin** / **demo**
 3. Click **Syndication** in the left menu
 4. Click the **Preload** button to trigger immediate syndication
 
 Option B — Using curl:
 ```bash
-curl -sk -X POST "https://localhost:9085/synd/redoPreload" \
+curl -sk -X POST "https://localhost:9082/synd/redoPreload" \
   -H "Authorization: Bearer $ADMIN_TOKEN"
 ```
 
@@ -423,7 +423,7 @@ jq '{url: .url, count: .count, security: [.meta.security[].code]}' generated/gam
 1. Open OntoCommand for each environment and compare loaded resources:
    - **Authoring**: `https://ontoserver.csiro.au/ui?iss=https://localhost:9081&clientId=onto-ui`
    - **UAT**: `https://ontoserver.csiro.au/ui?iss=https://localhost:9084&clientId=onto-ui`
-   - **Production**: `https://ontoserver.csiro.au/ui?iss=https://localhost:9085&clientId=onto-ui`
+   - **Production**: `https://ontoserver.csiro.au/ui?iss=https://localhost:9082&clientId=onto-ui`
 2. Log in as **admin** on each to see the full resource inventory
 3. Compare versions — UAT and production reflect whichever Atomio feed their alias points to
 
