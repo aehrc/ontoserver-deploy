@@ -499,15 +499,15 @@ async function openAtomioAndLogin(page: Page): Promise<void> {
   }
 }
 
-/** Helper: trigger Ontoserver preload/syndication via API */
+/** Helper: trigger Ontoserver preload/syndication via /synd/redoPreload API */
 async function triggerPreload(serverBaseUrl: string): Promise<boolean> {
   const token = await getToken('admin');
   const ctx = await playwrightRequest.newContext({ ignoreHTTPSErrors: true });
   try {
-    const resp = await ctx.post(`${serverBaseUrl}/api/preload`, {
+    const resp = await ctx.post(`${serverBaseUrl}/synd/redoPreload`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    return resp.status() === 200;
+    return resp.status() === 200 || resp.status() === 201;
   } catch {
     return false;
   } finally {
@@ -610,10 +610,12 @@ async function scene10_atomioPromoteUAT(page: Page): Promise<void> {
 
   highlight('"uat" alias now points to release-2-0.');
   highlight('Atomio shows uat → release-2-0, production → release-1-0 (unchanged).');
-  explain('UAT Ontoserver polls Atomio every 2 minutes. Waiting for v1.1.0 to appear...');
+  explain('Triggering UAT to syndicate now via the redoPreload API...');
 
-  // Wait for UAT to pick up the new content via scheduled syndication poll
-  const uatSynced = await waitForResource(UAT_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 150);
+  // Trigger UAT preload and wait for v1.1.0
+  const uatBase = UAT_URL.replace(/\/fhir$/, '');
+  await triggerPreload(uatBase);
+  const uatSynced = await waitForResource(UAT_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 60);
   if (uatSynced) {
     highlight('v1.1.0 is now on UAT!');
   } else {
@@ -681,10 +683,12 @@ async function scene11_atomioPromoteProduction(page: Page): Promise<void> {
 
   highlight('"production" alias now points to release-2-0.');
   highlight('Both aliases now point to release-2-0.');
-  explain('Production Ontoserver polls Atomio every 2 minutes. Waiting for v1.1.0...');
+  explain('Triggering production to syndicate now via the redoPreload API...');
 
-  // Wait for production to pick up the new content via scheduled syndication poll
-  const prodSynced = await waitForResource(PRODUCTION_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 150);
+  // Trigger production preload and wait for v1.1.0
+  const prodBase = PRODUCTION_URL.replace(/\/fhir$/, '');
+  await triggerPreload(prodBase);
+  const prodSynced = await waitForResource(PRODUCTION_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 60);
   if (prodSynced) {
     highlight('v1.1.0 is now on production!');
   } else {

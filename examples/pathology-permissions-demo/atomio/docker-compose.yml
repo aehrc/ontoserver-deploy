@@ -297,6 +297,8 @@ services:
       atom.preload.feedLocation.default: ""
 
       # Schedule syndication polling (Spring cron: sec min hour dom month dow).
+      # Schedule syndication polling (Spring cron: sec min hour dom month dow).
+      # Every 2 minutes for demo responsiveness; production would use longer intervals.
       atom.preload.schedule.cron: "0 */2 * * * *"
 
       # OAuth2 client credentials for authenticated syndication.
@@ -379,6 +381,8 @@ services:
       atom.preload.feedLocation.default: ""
 
       # Schedule syndication polling (Spring cron: sec min hour dom month dow).
+      # Schedule syndication polling (Spring cron: sec min hour dom month dow).
+      # Every 2 minutes for demo responsiveness; production would use longer intervals.
       atom.preload.schedule.cron: "0 */2 * * * *"
 
       # OAuth2 client credentials for authenticated syndication.
