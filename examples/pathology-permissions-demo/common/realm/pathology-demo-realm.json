@@ -517,6 +517,41 @@
         "email"
       ],
       "optionalClientScopes": []
+    },
+    {
+      "clientId": "onto-ui",
+      "name": "OntoCommand Dashboard (Cloud-hosted)",
+      "description": "Cloud-hosted OntoCommand dashboard at ontoserver.csiro.au/ui — admin dashboard for browsing loaded resources and server metadata",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": ["https://ontoserver.csiro.au/*"],
+      "webOrigins": ["https://ontoserver.csiro.au"],
+      "attributes": {
+        "exclude.issuer.from.auth.response": "true"
+      },
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "authoring-server",
+        "production-server",
+        "user-realm-roles-authorities",
+        "system/*.read",
+        "system/*.write",
+        "onto/synd.read",
+        "onto/synd.write",
+        "openid",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "user/*.read",
+        "user/*.write",
+        "launch",
+        "fhirUser"
+      ]
     }
   ],
 

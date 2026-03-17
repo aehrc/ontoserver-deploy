@@ -80,20 +80,20 @@ Examples:
   ./demo.sh status simple          Check service health
   ./demo.sh teardown simple        Tear down and remove all data
 
-After setup, open in a browser:
-  Ontocloak Admin    http://localhost:9090/auth/admin  (admin/admin)
-  Authoring Snapper  http://localhost:9081/snapper
-  Authoring Shrimp   https://ontoserver.csiro.au/shrimp?iss=http://localhost:9081
-  OntoCommand        https://ontoserver.csiro.au/ui?iss=http://localhost:9081
+After setup, open in a browser (accept the self-signed certificate warning):
+  Ontocloak Admin    https://localhost:9090/auth/admin  (admin/admin)
+  Shrimp (authoring) https://ontoserver.csiro.au/shrimp?iss=https://localhost:9081/fhir&clientId=shrimp
+  Snapper (authoring) https://ontoserver.csiro.au/snapper?iss=https://localhost:9081/fhir&clientId=snapper
+  OntoCommand        https://ontoserver.csiro.au/ui?iss=https://localhost:9081/fhir&clientId=onto-ui
 
   Simple only:
-    Production         http://localhost:9082/snapper
+    Shrimp (production) https://ontoserver.csiro.au/shrimp?iss=https://localhost:9082/fhir&clientId=shrimp
 
   Atomio only:
-    Atomio Swagger     http://localhost:9083/swagger-ui/index.html
-    Atomio UI          https://ontoserver.csiro.au/atomio/?iss=http://localhost:9083
-    UAT Snapper        http://localhost:9084/snapper
-    Production         http://localhost:9085/snapper
+    Atomio UI          https://localhost:9083
+    Atomio Swagger     https://localhost:9083/swagger-ui/index.html
+    Shrimp (UAT)       https://ontoserver.csiro.au/shrimp?iss=https://localhost:9084/fhir&clientId=shrimp
+    Shrimp (production) https://ontoserver.csiro.au/shrimp?iss=https://localhost:9085/fhir&clientId=shrimp
 
 Demo users (all passwords: demo):
   alpha-viewer, alpha-author, alpha-approver
