@@ -484,6 +484,24 @@ async function scene10_csvContent(page: Page): Promise<void> {
 // Atomio-only scenes: Release pipeline replacing simple syndication
 // ---------------------------------------------------------------------------
 
+/** Helper: open Atomio UI and handle SSO login if needed */
+async function openAtomioAndLogin(page: Page): Promise<void> {
+  await openAtomioUI(page, ATOMIO_URL);
+  await page.waitForTimeout(3_000);
+
+  // Click Login if visible — SSO will auto-complete after first login
+  const loginBtn = page.getByRole('button', { name: 'Login' }).or(
+    page.getByRole('link', { name: 'Login' }),
+  );
+  if (await loginBtn.first().isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await loginBtn.first().click();
+    // SSO auto-completes — wait for redirect back
+    await page.waitForURL(/ontoserver\.csiro\.au\/atomio/, { timeout: 15_000 }).catch(() => {});
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(3_000);
+  }
+}
+
 /** Helper: trigger Ontoserver preload/syndication via API */
 async function triggerPreload(serverBaseUrl: string): Promise<boolean> {
   const token = await getToken('admin');
@@ -531,10 +549,9 @@ async function scene9_atomioReleasePipeline(page: Page): Promise<void> {
   explain('Opening the Atomio UI to clone authoring\'s syndication feed into a new release...');
   await pause();
 
-  // Open Atomio UI and show current feeds
+  // Open Atomio UI and log in as admin
   await logout(page);
-  await openAtomioUI(page, ATOMIO_URL);
-  await page.waitForTimeout(3_000);
+  await openAtomioAndLogin(page);
 
   highlight('Current feeds: release-1-0 (initial) and gamma-content.');
   highlight('Both "uat" and "production" aliases point to release-1-0 (the old content).');
@@ -559,8 +576,7 @@ async function scene9_atomioReleasePipeline(page: Page): Promise<void> {
   }
 
   // Refresh Atomio UI to show the new feed
-  await openAtomioUI(page, ATOMIO_URL);
-  await page.waitForTimeout(3_000);
+  await openAtomioAndLogin(page);
 
   highlight('Three feeds now: release-1-0, release-2-0 (with v1.1.0), and gamma-content.');
   await pause();
@@ -586,8 +602,7 @@ async function scene10_atomioPromoteUAT(page: Page): Promise<void> {
   }
 
   // Refresh Atomio UI to show updated alias
-  await openAtomioUI(page, ATOMIO_URL);
-  await page.waitForTimeout(3_000);
+  await openAtomioAndLogin(page);
 
   highlight('Atomio shows uat → release-2-0, production → release-1-0 (unchanged).');
   explain('Triggering UAT syndication to pick up the new content...');
@@ -660,8 +675,7 @@ async function scene11_atomioPromoteProduction(page: Page): Promise<void> {
   }
 
   // Show updated aliases in Atomio UI
-  await openAtomioUI(page, ATOMIO_URL);
-  await page.waitForTimeout(3_000);
+  await openAtomioAndLogin(page);
 
   highlight('Both aliases now point to release-2-0.');
   explain('Triggering production syndication...');

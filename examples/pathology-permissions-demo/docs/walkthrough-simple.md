@@ -33,7 +33,7 @@ The setup script takes approximately 5 minutes. It starts Ontocloak, extracts RS
 
 ## Web Tools
 
-These cloud-hosted tools connect to your local servers via the `?iss=` parameter:
+These cloud-hosted tools connect to your local servers via the `?iss=` and `&clientId=` parameters:
 
 | Tool | Purpose | URL |
 |------|---------|-----|
@@ -41,9 +41,9 @@ These cloud-hosted tools connect to your local servers via the `?iss=` parameter
 | **Snapper** | Edit CodeSystems, ConceptMaps, ValueSets | `https://ontoserver.csiro.au/snapper` |
 | **OntoCommand** | Admin dashboard — loaded resources and metadata | `https://ontoserver.csiro.au/ui` |
 
-Server connections:
-- **Authoring**: append `?iss=https://localhost:9081`
-- **Production**: append `?iss=https://localhost:9082`
+Server connections (append the appropriate `clientId` for the tool — `shrimp`, `snapper`, or `onto-ui`):
+- **Authoring**: append `?iss=https://localhost:9081&clientId=<tool>`
+- **Production**: append `?iss=https://localhost:9082&clientId=<tool>`
 
 Demo users (all passwords: **`demo`**):
 `admin`, `alpha-viewer`, `alpha-author`, `alpha-approver`, `beta-viewer`, `beta-author`, `beta-approver`, `national-admin`
@@ -57,7 +57,7 @@ Without logging in, only resources with `*.read` security labels (shared nationa
 **Using Shrimp:**
 
 1. Open Shrimp pointed at production (no login required):
-   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9082`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9082&clientId=shrimp`
 2. The **CodeSystems** list is empty — all CodeSystems have community labels
 3. Switch to **ValueSets** — you'll see the **National Pathology Reference Set** (`*.read` label)
 
@@ -82,7 +82,7 @@ curl -sk https://localhost:9081/fhir/CodeSystem?url=http://pathology-alpha.examp
 **Using Shrimp:**
 
 1. Open Shrimp pointed at authoring:
-   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9081`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9081&clientId=shrimp`
 2. Click **Login** and authenticate as **alpha-author** / **demo**
 3. Browse **CodeSystems** — you now see:
    - **Pathology Alpha Local Order Codes** (has `ALPHA.read` label)
@@ -160,7 +160,7 @@ curl -sk -H "Authorization: Bearer $ADMIN_TOKEN" \
 **Using Snapper:**
 
 1. Open Snapper pointed at authoring:
-   `https://ontoserver.csiro.au/snapper?iss=https://localhost:9081`
+   `https://ontoserver.csiro.au/snapper?iss=https://localhost:9081&clientId=snapper`
 2. Log in as **alpha-viewer** / **demo**
 3. Open the **Alpha CodeSystem** — you can **browse** it
 4. Try to **edit** a concept (e.g., change a display name) — **Save fails** with 403
@@ -319,16 +319,16 @@ curl -sk -H "Authorization: Bearer $ALPHA_TOKEN" \
 **Using OntoCommand:**
 
 1. Open OntoCommand pointed at authoring:
-   `https://ontoserver.csiro.au/ui?iss=https://localhost:9081`
+   `https://ontoserver.csiro.au/ui?iss=https://localhost:9081&clientId=onto-ui`
 2. Log in as **admin** — see all loaded resources and their metadata
 3. Open OntoCommand pointed at production:
-   `https://ontoserver.csiro.au/ui?iss=https://localhost:9082`
+   `https://ontoserver.csiro.au/ui?iss=https://localhost:9082&clientId=onto-ui`
 4. Compare — production has the **same resources** (synced every 2 minutes)
 
 **Using Shrimp:**
 
 1. Open Shrimp pointed at production:
-   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9082`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9082&clientId=shrimp`
 2. Log in as **alpha-author** — see the same Alpha resources that were on authoring
 3. Security labels are **preserved** through syndication — end users still only see what their token allows
 

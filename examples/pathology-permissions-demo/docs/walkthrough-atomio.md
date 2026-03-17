@@ -33,7 +33,7 @@ The setup takes approximately 8 minutes. It starts Ontocloak, extracts RSA keys,
 
 ## Web Tools
 
-These cloud-hosted tools connect to your local servers via the `?iss=` parameter:
+These cloud-hosted tools connect to your local servers via the `?iss=` and `&clientId=` parameters:
 
 | Tool | Purpose | URL |
 |------|---------|-----|
@@ -42,11 +42,11 @@ These cloud-hosted tools connect to your local servers via the `?iss=` parameter
 | **OntoCommand** | Admin dashboard — loaded resources and metadata | `https://ontoserver.csiro.au/ui` |
 | **Atomio UI** | Release management — feeds, aliases, promotion | `https://ontoserver.csiro.au/atomio/` |
 
-Server connections:
-- **Authoring**: append `?iss=https://localhost:9081`
+Server connections (append the appropriate `clientId` for the tool — `shrimp`, `snapper`, `onto-ui`, or `atomio-ui`):
+- **Authoring**: append `?iss=https://localhost:9081&clientId=<tool>`
 - **Atomio**: open `https://localhost:9083` (redirects to Atomio UI)
-- **UAT**: append `?iss=https://localhost:9084`
-- **Production**: append `?iss=https://localhost:9085`
+- **UAT**: append `?iss=https://localhost:9084&clientId=<tool>`
+- **Production**: append `?iss=https://localhost:9085&clientId=<tool>`
 
 Demo users (all passwords: **`demo`**):
 `admin`, `alpha-viewer`, `alpha-author`, `alpha-approver`, `beta-viewer`, `beta-author`, `beta-approver`, `national-admin`
@@ -90,7 +90,7 @@ Resource-level permissions work identically to the simple variant. The key diffe
 **Using Shrimp:**
 
 1. Open Shrimp pointed at production (no login):
-   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9085`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9085&clientId=shrimp`
 2. The **CodeSystems** list is empty — all CodeSystems have community labels
 3. Switch to **ValueSets** — the **National Pathology Reference Set** is visible (`*.read` label)
 
@@ -108,7 +108,7 @@ curl -sk https://localhost:9085/fhir/ValueSet?url=http://example.org/ValueSet/na
 **Using Shrimp:**
 
 1. Open Shrimp pointed at authoring:
-   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9081`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9081&clientId=shrimp`
 2. Log in as **alpha-author** / **demo** — see Alpha CodeSystem + national content
 3. **Log out**, log in as **beta-author** / **demo** — see Beta CodeSystem + national content
 4. **Log out**, log in as **admin** / **demo** — see all CodeSystems
@@ -266,7 +266,7 @@ The UAT Ontoserver polls every 2 minutes. After waiting, verify the new content:
 **Using Shrimp:**
 
 1. Open Shrimp pointed at UAT:
-   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9084`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9084&clientId=shrimp`
 2. Log in as **alpha-author** — check that the Troponin concept appears
 
 **Using curl:**
@@ -281,7 +281,7 @@ curl -sk https://localhost:9084/fhir/CodeSystem?url=http://pathology-alpha.examp
 **Using Shrimp:**
 
 1. Open Shrimp pointed at production:
-   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9085`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9085&clientId=shrimp`
 2. Log in as **alpha-author** — the Troponin concept is **not yet present**
 
 **Using curl:**
@@ -391,9 +391,9 @@ jq '{url: .url, count: .count, security: [.meta.security[].code]}' generated/gam
 ### 5.1 Using OntoCommand
 
 1. Open OntoCommand for each environment and compare loaded resources:
-   - **Authoring**: `https://ontoserver.csiro.au/ui?iss=https://localhost:9081`
-   - **UAT**: `https://ontoserver.csiro.au/ui?iss=https://localhost:9084`
-   - **Production**: `https://ontoserver.csiro.au/ui?iss=https://localhost:9085`
+   - **Authoring**: `https://ontoserver.csiro.au/ui?iss=https://localhost:9081&clientId=onto-ui`
+   - **UAT**: `https://ontoserver.csiro.au/ui?iss=https://localhost:9084&clientId=onto-ui`
+   - **Production**: `https://ontoserver.csiro.au/ui?iss=https://localhost:9085&clientId=onto-ui`
 2. Log in as **admin** on each to see the full resource inventory
 3. Compare versions — UAT and production reflect whichever Atomio feed their alias points to
 
@@ -402,7 +402,7 @@ jq '{url: .url, count: .count, security: [.meta.security[].code]}' generated/gam
 **Using Shrimp:**
 
 1. Open Shrimp pointed at UAT:
-   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9084`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9084&clientId=shrimp`
 2. Log in as **alpha-author** — see only Alpha resources + national
 3. **Log out**, log in as **beta-author** — see only Beta resources + national
 

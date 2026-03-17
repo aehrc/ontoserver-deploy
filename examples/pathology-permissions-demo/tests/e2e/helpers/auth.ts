@@ -86,10 +86,15 @@ export async function loginViaKeycloak(
   password: string = 'demo',
   fhirServerUrl?: string,
 ): Promise<void> {
-  // Click the login button — Shrimp uses <a id="fhir-server-login">,
-  // Snapper uses <button id="toggle-login-btn">
+  // Click the login button — each UI has a different element:
+  //   Shrimp:    <a id="fhir-server-login">
+  //   Snapper:   <button id="toggle-login-btn">
+  //   Atomio UI: button/link with text "Login"
   const shrimpLogin = page.locator('#fhir-server-login');
   const snapperLogin = page.locator('#toggle-login-btn');
+  const atomioLogin = page.getByRole('button', { name: 'Login' }).or(
+    page.getByRole('link', { name: 'Login' }),
+  );
 
   const isShrimp = await shrimpLogin.isVisible({ timeout: 3_000 }).catch(() => false);
 
@@ -103,6 +108,8 @@ export async function loginViaKeycloak(
     const modalLogin = page.locator('.modal-footer button.btn-success');
     await modalLogin.waitFor({ state: 'visible', timeout: 5_000 });
     await modalLogin.click();
+  } else if (await atomioLogin.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await atomioLogin.first().click();
   } else {
     throw new Error('No login button found on page');
   }

@@ -671,9 +671,9 @@ The visual walkthrough opens a browser and steps through each demo scenario auto
 | **Snapper** | Edit CodeSystems, ConceptMaps, ValueSets | `https://ontoserver.csiro.au/snapper` |
 | **OntoCommand** | Admin dashboard — loaded resources and metadata | `https://ontoserver.csiro.au/ui` |
 
-Connect to a local server by adding `?iss=http://localhost:<port>`:
-- **Authoring**: `?iss=http://localhost:9081`
-- **Production**: `?iss=http://localhost:9082`
+Connect to a local server by adding `?iss=https://localhost:<port>&clientId=<tool>`:
+- **Authoring**: `?iss=https://localhost:9081&clientId=shrimp` (or `snapper`, `onto-ui`)
+- **Production**: `?iss=https://localhost:9082&clientId=shrimp` (or `snapper`, `onto-ui`)
 
 All demo users have password **`demo`**. Click **Login** to authenticate via Ontocloak.
 
@@ -686,7 +686,7 @@ Shrimp is best for browsing terminology content — it shows CodeSystem hierarch
 # Demo: Anonymous Access (Shrimp)
 
 1. Open **Shrimp** pointed at production (no login):
-   `https://ontoserver.csiro.au/shrimp?iss=http://localhost:9082`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9082&clientId=shrimp`
 
 2. The **CodeSystems** list is empty — all CodeSystems have community labels
 
@@ -703,7 +703,7 @@ Without logging in, only wildcard-labeled resources are visible. The national co
 # Demo: Log In as Alpha Author (Shrimp)
 
 1. In **Shrimp** (authoring), click **Login**
-   `https://ontoserver.csiro.au/shrimp?iss=http://localhost:9081`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9081&clientId=shrimp`
 
 2. Authenticate as **alpha-author** / **demo**
 
@@ -756,7 +756,7 @@ This is the most impactful demo moment. Switching users on the same server and w
 # Demo: Viewer vs Author (Snapper)
 
 1. Open **Snapper** (authoring):
-   `https://ontoserver.csiro.au/snapper?iss=http://localhost:9081`
+   `https://ontoserver.csiro.au/snapper?iss=https://localhost:9081&clientId=snapper`
 
 2. Log in as **alpha-viewer** / **demo**
 
@@ -862,12 +862,12 @@ Snapper is the right tool for viewing ConceptMaps since Shrimp doesn't support t
 # Demo: Syndication to Production
 
 1. Open **OntoCommand** (authoring):
-   `https://ontoserver.csiro.au/ui?iss=http://localhost:9081`
+   `https://ontoserver.csiro.au/ui?iss=https://localhost:9081&clientId=onto-ui`
 
 2. Log in as **admin** — see all loaded resources and their metadata
 
 3. Open **OntoCommand** (production):
-   `https://ontoserver.csiro.au/ui?iss=http://localhost:9082`
+   `https://ontoserver.csiro.au/ui?iss=https://localhost:9082&clientId=onto-ui`
 
 4. Compare — production has the **same resources** (synced every 2 min)
 
@@ -920,7 +920,7 @@ This step is necessarily CLI-based since it's a build pipeline operation. The CS
 After the CSV resources are loaded by the setup script:
 
 1. Open **Shrimp** (authoring):
-   `https://ontoserver.csiro.au/shrimp?iss=http://localhost:9081`
+   `https://ontoserver.csiro.au/shrimp?iss=https://localhost:9081&clientId=shrimp`
 
 2. Log in as **admin** / **demo**
 
@@ -969,7 +969,7 @@ curl -s http://localhost:9083/feed/release-1-0/syndication.xml \
   | head -20
 ```
 
-> Atomio also has a Swagger UI at `http://localhost:9083/swagger-ui/index.html`
+> Atomio also has a Swagger UI at `https://localhost:9083/swagger-ui/index.html`
 
 <!--
 Feeds are immutable snapshots of content. Aliases are named pointers that downstream servers poll. This indirection is what enables promotion and rollback without touching downstream configuration.
@@ -1072,7 +1072,7 @@ Because feeds are immutable snapshots, rollback is just repointing the alias. Th
 
 The hosted Atomio UI provides a graphical interface for release management:
 
-`https://ontoserver.csiro.au/atomio/?iss=http://localhost:9083`
+`https://ontoserver.csiro.au/atomio/?iss=https://localhost:9083&clientId=atomio-ui`
 
 From the UI you can:
 - Browse **feeds** and their entries

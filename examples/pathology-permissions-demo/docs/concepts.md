@@ -353,7 +353,7 @@ This ensures only Pathology Gamma community members can access the generated res
 
 Snapper (Ontoserver's terminology browser/editor) uses the SMART-on-FHIR authorization flow:
 
-1. User opens Snapper at `https://ontoserver.csiro.au/snapper?iss=https://localhost:9081`
+1. User opens Snapper at `https://ontoserver.csiro.au/snapper?iss=https://localhost:9081&clientId=snapper`
 2. Snapper reads Ontoserver's `CapabilityStatement` to find the auth endpoints
 3. Snapper redirects to Ontocloak's authorization endpoint
 4. User logs in to Ontocloak
@@ -361,7 +361,7 @@ Snapper (Ontoserver's terminology browser/editor) uses the SMART-on-FHIR authori
 6. Snapper exchanges the code for an access token
 7. Snapper includes the token in all subsequent FHIR API requests
 
-The `iss` (issuer) query parameter tells Snapper which FHIR server to connect to. The same pattern works for the Ontoserver Dashboard (`https://ontoserver.csiro.au/ui?iss=...`) and the Atomio UI (`https://ontoserver.csiro.au/atomio/?iss=...`).
+The `iss` (issuer) query parameter tells Snapper which FHIR server to connect to. The `clientId` parameter identifies the client application to the authorization server. The same pattern works for the Ontoserver Dashboard (`https://ontoserver.csiro.au/ui?iss=...&clientId=onto-ui`) and the Atomio UI (`https://ontoserver.csiro.au/atomio/?iss=...&clientId=atomio-ui`).
 
 ### Token Contents
 
@@ -407,7 +407,7 @@ These clients never accept user logins directly. They exist to define an audienc
 - `snapper` — the cloud-hosted FHIR terminology editor
 - `atomio-ui` — the cloud-hosted Atomio release management UI
 
-These are public clients (no client secret) that use the standard OAuth2 authorization code flow. They have `exclude.issuer.from.auth.response: "true"` set in their attributes. This prevents Keycloak from injecting an `iss` parameter into the authorization response per RFC 9207, which would conflict with Shrimp's use of `?iss=` to specify the FHIR server endpoint.
+These are public clients (no client secret) that use the standard OAuth2 authorization code flow. They have `exclude.issuer.from.auth.response: "true"` set in their attributes. This prevents Keycloak from injecting an `iss` parameter into the authorization response per RFC 9207, which would conflict with Shrimp's use of `?iss=` (along with `&clientId=`) to specify the FHIR server endpoint and client identity.
 
 **CLI client** (public, direct-access-grants):
 - `demo-cli` — used by the setup scripts and API demos
