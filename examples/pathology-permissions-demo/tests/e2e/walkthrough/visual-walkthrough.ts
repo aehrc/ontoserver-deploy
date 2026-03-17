@@ -489,19 +489,13 @@ async function openAtomioAndLogin(page: Page): Promise<void> {
   await openAtomioUI(page, ATOMIO_URL);
   await page.waitForTimeout(3_000);
 
-  // Click the Login button in the top-right header (not the left nav menu)
-  const headerLoginBtn = page.locator('header button, [class*="header"] button, [class*="toolbar"] button, [class*="appbar"] button')
-    .filter({ hasText: /^Login$/i });
-  const anyLoginBtn = page.getByRole('button', { name: 'Login' });
-  const loginTarget = await headerLoginBtn.isVisible({ timeout: 2_000 }).catch(() => false)
-    ? headerLoginBtn
-    : anyLoginBtn.last(); // last() = top-right button (left nav renders first in DOM)
-  if (await loginTarget.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await loginTarget.click();
-    // SSO auto-completes — wait for redirect back
-    await page.waitForURL(/ontoserver\.csiro\.au\/atomio/, { timeout: 15_000 }).catch(() => {});
-    await page.waitForLoadState('domcontentloaded');
+  // loginViaKeycloak detects the Atomio Login button and handles the full
+  // Keycloak OAuth flow (or SSO auto-completes on subsequent visits)
+  try {
+    await loginViaKeycloak(page, 'admin');
     await page.waitForTimeout(3_000);
+  } catch {
+    // Already logged in via SSO or no login button — continue
   }
 }
 
