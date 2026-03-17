@@ -122,6 +122,10 @@ spec:
             limits:
               cpu: {{ required "ontoserver.resources.ontoserver.limits.cpu is required" .Values.ontoserver.resources.ontoserver.limits.cpu }}
               memory: {{ required "ontoserver.resources.ontoserver.limits.memory is required" .Values.ontoserver.resources.ontoserver.limits.memory }}
+          {{- with .Values.ontoserver.deployment.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           startupProbe:
             exec:
               command:

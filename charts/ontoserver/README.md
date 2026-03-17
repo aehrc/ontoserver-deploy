@@ -280,6 +280,31 @@ The readiness probe calls `/healthcheck.sh` with the flag set in `ontoserver.hea
 
 **`-f` (default)** prevents traffic reaching a pod whose startup preload has definitively failed, without blocking readiness while a preload is still in progress. Use **`-s`** if you want the pod held out of rotation until its startup preload has finished successfully — useful when serving requests against a partially-loaded terminology is undesirable.
 
+### Healthcheck and HTTPS mode (`ONTOSERVER_INSECURE: "false"`)
+
+All three probes (startup, liveness, readiness) call `/healthcheck.sh` inside the container. On first run, the script checks the Spring Boot actuator health endpoint (`http://localhost:18080`) and, if Ontoserver has not yet been initialised (`initialized: false`), triggers initialization by calling the FHIR metadata endpoint on the main server port.
+
+When `ONTOSERVER_INSECURE: "false"`, the main server port is HTTPS on 8443. The script constructs the URL as `https://localhost:8443/fhir/metadata` and fetches it with `wget` — but `wget` inside the container rejects the bundled self-signed certificate, causing the initialization call to fail and the probe to exit non-zero. The pod then restarts in a loop and never becomes healthy.
+
+The workaround is a `postStart` lifecycle hook that patches the `wget` call inside the script to add `--no-check-certificate` before any probe fires. The hook runs before `startupProbe.initialDelaySeconds` elapses, so the patched script is in place when Kubernetes issues the first probe:
+
+```yaml
+ontoserver:
+  deployment:
+    containerPort: 8443
+    lifecycle:
+      postStart:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - sed -i 's|wget -o /dev/null -q -O /dev/null|wget --no-check-certificate -o /dev/null -q -O /dev/null|' /healthcheck.sh
+  config:
+    ONTOSERVER_INSECURE: "false"
+```
+
+This is exactly the configuration used by the `traefik-https-backend` integration test fixture.
+
 ## Amazon EKS
 
 The chart works on EKS with the following configuration differences from the defaults (which are AKS/Azure-oriented).
@@ -492,6 +517,7 @@ The ArgoCD examples use multi-source Applications with both the `ontoserver` and
 | `ontoserver.deployment.image`                                                               | Container image for OntoServer                                                                                                                                                                                                | `quay.io/aehrc/ontoserver:ctsa-6` |
 | `ontoserver.deployment.imagePullPolicy`                                                     | Image pull policy                                                                                                                                                                                                             | `IfNotPresent`                    |
 | `ontoserver.deployment.containerPort`                                                       | Container port Ontoserver listens on. Use 8080 for HTTP (ONTOSERVER_INSECURE=true) or 8443 for HTTPS (ONTOSERVER_INSECURE=false).                                                                                             | `8080`                            |
+| `ontoserver.deployment.lifecycle`                                                           | Container lifecycle hooks (postStart / preStop). Passed through as-is to the container spec.                                                                                                                                  | `{}`                              |
 | `ontoserver.deployment.imagePullSecrets`                                                    | Additional pre-created image pull secrets to attach to the pod (merged with the chart-managed pull secret when imageCredentials are set)                                                                                      | `[]`                              |
 | `ontoserver.deployment.isReadOnly`                                                          | Ontoserver in read‑only mode - keep it true for scaled                                                                                                                                                                        | `true`                            |
 | `ontoserver.deployment.replicas`                                                            | Number of replicas - min 2 for scaled deployment - can be set to 0                                                                                                                                                            | `1`                               |
@@ -845,12 +871,21 @@ For HTTP backends with Traefik, the standard `ontoserver.ingress` is sufficient.
 
 By default (`ONTOSERVER_INSECURE: "true"`) Ontoserver serves plain HTTP on port 8080. Setting `ONTOSERVER_INSECURE: "false"` restores Ontoserver's out-of-box behaviour: HTTPS on port **8443** using its bundled self-signed keystore. You must also set `ontoserver.deployment.containerPort: 8443` so the Kubernetes Service routes traffic to the correct container port.
 
-The client-to-Traefik leg remains plain HTTP via the `web` entrypoint; TLS is only on the Traefik-to-Ontoserver backend leg:
+The client-to-Traefik leg remains plain HTTP via the `web` entrypoint; TLS is only on the Traefik-to-Ontoserver backend leg.
+
+> **Important — probe patch required:** When `ONTOSERVER_INSECURE: "false"`, the container's `/healthcheck.sh` uses `wget` to trigger FHIR initialization via `https://localhost:8443`. Because the certificate is self-signed, `wget` rejects it and the startup probe fails permanently. A `postStart` lifecycle hook is required to patch the script before the first probe fires. See [Healthcheck and HTTPS mode](#healthcheck-and-https-mode-ontoserver_insecure-false) for the full explanation.
 
 ```yaml
 ontoserver:
   deployment:
     containerPort: 8443   # Ontoserver's HTTPS port
+    lifecycle:
+      postStart:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - sed -i 's|wget -o /dev/null -q -O /dev/null|wget --no-check-certificate -o /dev/null -q -O /dev/null|' /healthcheck.sh
   config:
     ONTOSERVER_INSECURE: "false"
 

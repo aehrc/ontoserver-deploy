@@ -160,6 +160,8 @@
                 "unhealthyPodEvictionPolicy": { "type": "string", "default": null }
               }
             },
+            "containerPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "lifecycle":     { "type": "object" },
             "db": {
               "type": "object",
               "properties": {
@@ -443,6 +445,40 @@
             "deniedCIDRs": {
               "type": "array",
               "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "traefik": {
+      "type": "object",
+      "properties": {
+        "ingressRoute": {
+          "type": "object",
+          "properties": {
+            "enabled":                    { "type": "boolean" },
+            "annotations":                { "type": "object" },
+            "entryPoints": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "backendPort":                { "type": ["integer","string"] },
+            "backendScheme":              { "type": "string" },
+            "backendServiceNameOverride": { "type": "string" },
+            "serversTransport": {
+              "type": "object",
+              "properties": {
+                "enabled":             { "type": "boolean" },
+                "insecureSkipVerify":  { "type": "boolean" },
+                "rootCAsSecrets": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "certificatesSecrets": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
             }
           }
         }
