@@ -90,7 +90,7 @@ After setup, open in a browser:
     Production         http://localhost:9082/snapper
 
   Atomio only:
-    Atomio Swagger     http://localhost:9083/swagger-ui.html
+    Atomio Swagger     http://localhost:9083/swagger-ui/index.html
     Atomio UI          https://ontoserver.csiro.au/atomio/?iss=http://localhost:9083
     UAT Snapper        http://localhost:9084/snapper
     Production         http://localhost:9085/snapper

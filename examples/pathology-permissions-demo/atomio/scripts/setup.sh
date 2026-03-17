@@ -18,7 +18,7 @@
 # After setup completes, access:
 #   - Ontocloak admin:     https://localhost:9090/auth/admin  (admin/admin)
 #   - Authoring Snapper:   https://localhost:9081/snapper
-#   - Atomio API:          https://localhost:9083/swagger-ui.html
+#   - Atomio API:          https://localhost:9083/swagger-ui/index.html
 #   - UAT Snapper:         https://localhost:9084/snapper
 #   - Production Snapper:  https://localhost:9085/snapper
 #   - Demo users:          All use password "demo"
@@ -628,7 +628,7 @@ main() {
     echo "  Services:"
     echo "    Ontocloak Admin:     ${ONTOCLOAK_URL}/auth/admin"
     echo "    Authoring Snapper:   ${AUTHORING_URL}/snapper"
-    echo "    Atomio Swagger UI:   ${ATOMIO_URL}/swagger-ui.html"
+    echo "    Atomio Swagger UI:   ${ATOMIO_URL}/swagger-ui/index.html"
     echo "    UAT Snapper:         ${UAT_URL}/snapper"
     echo "    Production Snapper:  ${PRODUCTION_URL}/snapper"
     echo ""

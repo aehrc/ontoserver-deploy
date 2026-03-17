@@ -77,7 +77,7 @@ curl -sk https://localhost:9083/alias | jq '.[] | {alias: .aliasName, feed: .fee
 curl -sk https://localhost:9083/feed/release-1-0/syndication.xml | head -30
 ```
 
-> Atomio also has a Swagger UI at `https://localhost:9083/swagger-ui.html` for interactive API exploration.
+> Atomio also has a Swagger UI at `https://localhost:9083/swagger-ui/index.html` for interactive API exploration.
 
 ## Part 2: Resource Isolation
 

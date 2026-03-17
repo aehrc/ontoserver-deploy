@@ -125,7 +125,7 @@ assert_eq "Atomio has 'gamma-content' feed" "true" "$has_gamma"
 
 # ---- Swagger UI is accessible ----
 
-status=$(curl -s -o /dev/null -w "%{http_code}" "${ATOMIO_URL}/swagger-ui.html" 2>/dev/null)
+status=$(curl -s -o /dev/null -w "%{http_code}" "${ATOMIO_URL}/swagger-ui/index.html" 2>/dev/null)
 if [ "$status" = "200" ] || [ "$status" = "302" ]; then
     assert "Atomio Swagger UI is accessible [HTTP $status]" 0
 else

@@ -969,7 +969,7 @@ curl -s http://localhost:9083/feed/release-1-0/syndication.xml \
   | head -20
 ```
 
-> Atomio also has a Swagger UI at `http://localhost:9083/swagger-ui.html`
+> Atomio also has a Swagger UI at `http://localhost:9083/swagger-ui/index.html`
 
 <!--
 Feeds are immutable snapshots of content. Aliases are named pointers that downstream servers poll. This indirection is what enables promotion and rollback without touching downstream configuration.
