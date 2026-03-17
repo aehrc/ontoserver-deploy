@@ -560,7 +560,7 @@ async function scene9_atomioReleasePipeline(page: Page): Promise<void> {
   await page.waitForTimeout(2_000);
 
   // Dialog: "Clone existing feed" with Name and URL fields
-  const cloneDialog = page.locator('[role="dialog"]');
+  const cloneDialog = page.getByRole('dialog', { name: 'Clone existing feed' });
   await cloneDialog.waitFor({ state: 'visible', timeout: 5_000 });
 
   // Fill form fields — scope to dialog to avoid matching table headers
@@ -593,7 +593,7 @@ async function scene10_atomioPromoteUAT(page: Page): Promise<void> {
   await page.waitForTimeout(2_000);
 
   // Dialog: "Redirect alias to feed" with FeedSelect autocomplete
-  const uatDialog = page.locator('[role="dialog"]');
+  const uatDialog = page.getByRole('dialog', { name: 'Redirect alias to feed' });
   await uatDialog.waitFor({ state: 'visible', timeout: 5_000 });
 
   // Type into the autocomplete to filter and select release-2-0
@@ -667,7 +667,7 @@ async function scene11_atomioPromoteProduction(page: Page): Promise<void> {
   await page.waitForTimeout(2_000);
 
   // Dialog: "Redirect alias to feed" — select release-2-0
-  const prodDialog = page.locator('[role="dialog"]');
+  const prodDialog = page.getByRole('dialog', { name: 'Redirect alias to feed' });
   await prodDialog.waitFor({ state: 'visible', timeout: 5_000 });
   await prodDialog.getByLabel('Feed Name').click();
   await prodDialog.getByLabel('Feed Name').fill('release-2-0');
