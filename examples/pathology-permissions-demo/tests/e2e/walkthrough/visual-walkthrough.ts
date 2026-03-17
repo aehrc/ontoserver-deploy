@@ -263,14 +263,20 @@ async function scene6_authorUploads(page: Page): Promise<void> {
   await snapperImportAndOpenUploadTab(page, 1, 'Pathology Alpha');
 
   highlight('The Upload button is enabled — alpha-author has FHIR_WRITE permission.');
-  highlight('But uploading THIS resource would fail: it\'s syndicated, and the author lacks SYND_WRITE.');
-  explain('Even with write permission, syndicated resources are protected server-side.');
-  explain('The server returns "Operation not permitted" if an author tries to overwrite a published resource.');
-  explain('');
   highlight('The Syndicate button shows "(unauthorised)" — only approvers can syndicate.');
-  explain('This is the governance gate: authors can draft and upload NEW content,');
-  explain('but only approvers (with SYND_WRITE) can publish or overwrite syndicated resources.');
-  explain('Next: the author creates version 1.1.0 with a NEW ID and uploads it.');
+  explain('Let\'s try uploading this syndicated resource to see what happens...');
+  await pause();
+
+  // Click Upload on the syndicated 1.0.0 — should fail with "Operation not permitted"
+  const uploadBtnFirst = page.locator('#split-publish');
+  explain('Clicking Upload Code System on the syndicated 1.0.0...');
+  await uploadBtnFirst.click();
+  await page.waitForTimeout(3_000);
+
+  highlight('The server rejects it: "Operation not permitted: The user is not authorised to perform this action."');
+  highlight('Even with FHIR_WRITE, syndicated resources are protected — the author lacks SYND_WRITE.');
+  explain('This is the governance gate: authors can write NEW content but cannot overwrite published resources.');
+  explain('Next: the author creates version 1.1.0 with a new ID.');
   await pause();
 
   // Edit the resource: change version to 1.1.0
@@ -444,16 +450,26 @@ async function scene9_syndication(page: Page): Promise<void> {
 
 async function scene10_csvContent(page: Page): Promise<void> {
   step('CSV-to-FHIR Pipeline — Gamma Content');
-  explain('Opening Shrimp as admin to show the CSV-generated Gamma content.');
+  explain('Switching Shrimp to the authoring server (still logged in as admin via SSO).');
   explain('Pathology Gamma maintains codes in CSV files under version control.');
   explain('The csv-transform.py script converts them to FHIR with GAMMA security labels.');
   await pause();
 
+  // We're already on Shrimp as admin from scene 9 (production).
+  // Switch to authoring — SSO session persists but Shrimp still shows
+  // the login button. Click it to trigger OAuth; Keycloak auto-completes
+  // via SSO without showing the login form.
   await openShrimp(page, AUTHORING_URL);
   await waitForShrimpReady(page);
 
-  await loginViaKeycloak(page, 'admin', 'demo', AUTHORING_URL);
-  await waitForShrimpReady(page);
+  const loginBtn = page.locator('#fhir-server-login');
+  if (await loginBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await loginBtn.click();
+    // SSO auto-completes — just wait for Shrimp to come back
+    await page.waitForURL(/ontoserver\.csiro\.au/, { timeout: 15_000 }).catch(() => {});
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(3_000);
+  }
 
   await page.getByRole('link', { name: 'Terminology' }).click();
   await page.waitForTimeout(2_000);

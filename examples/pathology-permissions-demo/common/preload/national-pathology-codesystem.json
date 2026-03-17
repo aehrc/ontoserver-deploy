@@ -17,7 +17,7 @@
   "version": "1.0.0",
   "name": "NationalPathologyCodes",
   "title": "National Pathology Standard Codes",
-  "valueSet": "http://example.org/CodeSystem/national-pathology-codes",
+  "valueSet": "http://example.org/ValueSet/national-pathology-codes",
   "status": "active",
   "experimental": false,
   "date": "2024-01-01",

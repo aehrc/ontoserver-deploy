@@ -14,6 +14,7 @@
     ]
   },
   "url": "http://pathology-alpha.example.com/CodeSystem/pathology-codes",
+  "valueSet": "http://pathology-alpha.example.com/ValueSet/pathology-codes",
   "version": "1.0.0",
   "name": "PathologyAlphaPathologyCodes",
   "title": "Pathology Alpha - Local Pathology Order Codes",

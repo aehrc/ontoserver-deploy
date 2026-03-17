@@ -86,6 +86,7 @@ def build_codesystem(concepts, args):
         "id": args.codesystem_id,
         "meta": {"security": build_security_labels(args.security_label)},
         "url": args.codesystem_url,
+        "valueSet": args.codesystem_url.replace("/CodeSystem/", "/ValueSet/"),
         "version": args.version,
         "name": args.codesystem_name,
         "title": f"{args.publisher} - Local Pathology Order Codes",

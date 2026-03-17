@@ -173,7 +173,7 @@ services:
     ports:
       - "9081:8080"
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/fhir/metadata > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO /dev/null http://localhost:8080/fhir/metadata || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 20
@@ -313,7 +313,7 @@ services:
     ports:
       - "9084:8080"
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/fhir/metadata > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO /dev/null http://localhost:8080/fhir/metadata || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 20
@@ -397,7 +397,7 @@ services:
     ports:
       - "9085:8080"
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/fhir/metadata > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO /dev/null http://localhost:8080/fhir/metadata || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 20
