@@ -28,21 +28,26 @@ The chart supports four deployment combinations controlled by `ontoserver.deploy
 
 ### Supported configurations
 
-The combination of `kind`, `type`, database, and storage determines whether a setup is viable:
-
-| `kind` | `type` | Database | Storage | Supported? |
+| `kind` | `type` | Database | Storage | Notes |
 |---|---|---|---|---|
-| `Deployment` | `single` | Sidecar (`db.enabled: true`) | `ReadWriteOnce` | Yes |
-| `Deployment` | `single` | External | Any / none | Yes |
-| `Deployment` | `scaled` | Sidecar | — | **No** — hard rejected by the chart |
-| `Deployment` | `scaled` | External | `ReadWriteOnce` | **No** — all pods share one PVC; only one can mount it |
-| `Deployment` | `scaled` | External | `ReadWriteMany` | **No** — all pods share the same directory; Lucene `write.lock` conflicts corrupt indexes |
-| `Deployment` | `scaled` | External | None (ephemeral) | Yes — each pod uses its own local ephemeral storage; indexes rebuilt from syndication feeds |
-| `StatefulSet` | `single` | Sidecar | `ReadWriteOnce` | Yes |
-| `StatefulSet` | `single` | External | Any / none | Yes |
-| `StatefulSet` | `scaled` | Sidecar | — | **No** — hard rejected by the chart |
-| `StatefulSet` | `scaled` | External | `ReadWriteOnce` | Yes — each pod gets its own PVC via `volumeClaimTemplates` |
-| `StatefulSet` | `scaled` | External | `ReadWriteMany` | **No** — all pods share the same directory; Lucene `write.lock` conflicts corrupt indexes |
+| `Deployment` | `single` | Sidecar (`db.enabled: true`) | `ReadWriteOnce` | |
+| `Deployment` | `single` | External | Any / none | |
+| `Deployment` | `scaled` | External | None (ephemeral) | Each pod uses its own local ephemeral storage; indexes rebuilt from syndication feeds |
+| `StatefulSet` | `single` | Sidecar | `ReadWriteOnce` | |
+| `StatefulSet` | `single` | External | Any / none | |
+| `StatefulSet` | `scaled` | External | `ReadWriteOnce` | Each pod gets its own PVC via `volumeClaimTemplates` |
+
+### Unsupported configurations
+
+> These combinations are either rejected by the chart at render time or will fail at runtime.
+
+| `kind` | `type` | Database | Storage | Reason |
+|---|---|---|---|---|
+| `Deployment` | `scaled` | Sidecar | — | Hard rejected by the chart — scaled deployments require an external database |
+| `Deployment` | `scaled` | External | `ReadWriteOnce` | All pods share one PVC; only one pod can mount it |
+| `Deployment` | `scaled` | External | `ReadWriteMany` | All pods share the same directory; Lucene `write.lock` conflicts corrupt indexes |
+| `StatefulSet` | `scaled` | Sidecar | — | Hard rejected by the chart — scaled deployments require an external database |
+| `StatefulSet` | `scaled` | External | `ReadWriteMany` | All pods share the same directory; Lucene `write.lock` conflicts corrupt indexes |
 
 **Why shared storage always fails for scaled deployments:** Ontoserver uses stateless clustering — each pod maintains its own local Lucene index cache, rebuilt on demand from syndication feeds. Indexes are not designed to be shared across processes. Lucene's `IndexWriter` acquires an exclusive `write.lock` file; concurrent access from multiple pods to the same index directory will either fail with `LockObtainFailedException` or silently corrupt the index. Any shared PVC (RWO mounted by one pod, or RWX mounted by all) violates this constraint. The correct patterns are `StatefulSet` with per-pod `ReadWriteOnce` PVCs, or `Deployment` with no persistence (ephemeral local storage per pod).
 

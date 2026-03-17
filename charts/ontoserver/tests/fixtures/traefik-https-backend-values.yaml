@@ -11,9 +11,10 @@ ontoserver:
   serverName: ontoserver.traefik-test.local
   deployment:
     containerPort: 8443
-    # healthcheck.sh uses plain `wget` which rejects self-signed TLS certs.
-    # Patch the initialization wget call to skip certificate verification before
-    # any probe fires (postStart runs before startupProbe's initialDelaySeconds).
+    # Older Ontoserver images omit --no-check-certificate from the initialization
+    # wget call in healthcheck.sh, causing it to reject the self-signed TLS cert.
+    # This postStart hook patches the file for those images. It is safe (no-op) when
+    # the image already contains the fix — sed exits 0 even when the pattern is absent.
     lifecycle:
       postStart:
         exec:
