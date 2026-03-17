@@ -57,8 +57,24 @@ Adds release candidate creation, UAT testing, promotion/rollback, and the CSV-to
 
 - Docker and Docker Compose
 - Access to `quay.io/aehrc` container registry (Ontoserver, Ontocloak, Atomio images)
-- `curl`, `jq`, `python3` installed locally
+- `bash`, `curl`, `jq`, `python3` installed locally
 - Node.js and npm (for visual walkthroughs only)
+
+### Windows Users
+
+The demo scripts are written in bash and require a Unix-like shell. On Windows, use one of:
+
+**WSL 2 (recommended):**
+
+1. Install [WSL 2](https://learn.microsoft.com/en-us/windows/wsl/install) with Ubuntu: `wsl --install`
+2. Install Docker Desktop and enable the **WSL 2 backend** in Settings > General
+3. Inside WSL, install the prerequisites: `sudo apt update && sudo apt install -y curl jq python3`
+4. Clone the repo inside WSL (e.g. `~/Projects/ontoserver-deploy`) — not on the Windows `/mnt/c/` filesystem, as this causes performance issues with Docker volumes
+5. Run all commands from the WSL terminal
+
+**Git Bash (limited):**
+
+Git Bash (bundled with [Git for Windows](https://gitforwindows.org/)) can run the demo scripts if `curl`, `jq`, and `python3` are on your PATH. Install them via [Chocolatey](https://chocolatey.org/): `choco install curl jq python3`. Docker Desktop must be installed and running. Note: Git Bash may have issues with terminal colours and interactive prompts in the walkthrough — WSL is preferred.
 
 ### Using the Demo Script
 
