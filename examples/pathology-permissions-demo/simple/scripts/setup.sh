@@ -36,7 +36,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMMON_DIR="$(cd "${PROJECT_DIR}/../common" && pwd)"
 
-ONTOCLOAK_URL="https://localhost:9090"
+# Ontocloak is accessed directly on HTTP port 19090 during setup (before Caddy starts).
+# Browser access uses HTTPS via Caddy on port 9090.
+ONTOCLOAK_URL="http://localhost:19090"
 AUTHORING_URL="https://localhost:9081"
 PRODUCTION_URL="https://localhost:9082"
 REALM="pathology-demo"
