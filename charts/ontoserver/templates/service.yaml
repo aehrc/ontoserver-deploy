@@ -7,7 +7,7 @@ spec:
   ports:
     - name: http
       port: 80
-      targetPort: 8080
+      targetPort: {{ .Values.ontoserver.deployment.containerPort }}
   selector:
     app: {{ .Release.Name }}-ontoserver
 {{- if eq .Values.ontoserver.deployment.type "scaled" }}
@@ -50,7 +50,7 @@ spec:
   ports:
     - name: http
       port: 80
-      targetPort: 8080
+      targetPort: {{ .Values.ontoserver.deployment.containerPort }}
   selector:
     app: {{ .Release.Name }}-ontoserver
     statefulset.kubernetes.io/pod-name: {{ .Release.Name }}-statefulset-0

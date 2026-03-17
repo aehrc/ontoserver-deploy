@@ -114,7 +114,7 @@ spec:
           image: {{ required "ontoserver.deployment.image is required " .Values.ontoserver.deployment.image }}
           imagePullPolicy: {{ required "ontoserver.deployment.imagePullPolicy is required" .Values.ontoserver.deployment.imagePullPolicy }}
           ports:
-            - containerPort: 8080
+            - containerPort: {{ .Values.ontoserver.deployment.containerPort }}
           resources:
             requests:
               cpu: {{ required "ontoserver.resources.ontoserver.requests.cpu is required" .Values.ontoserver.resources.ontoserver.requests.cpu }}

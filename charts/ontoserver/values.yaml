@@ -16,6 +16,8 @@ ontoserver:
     image: quay.io/aehrc/ontoserver:ctsa-6
     ## @param ontoserver.deployment.imagePullPolicy     Image pull policy
     imagePullPolicy: IfNotPresent
+    ## @param ontoserver.deployment.containerPort       Container port Ontoserver listens on. Use 8080 for HTTP (ONTOSERVER_INSECURE=true) or 8443 for HTTPS (ONTOSERVER_INSECURE=false).
+    containerPort: 8080
     ## @param ontoserver.deployment.imagePullSecrets    Additional pre-created image pull secrets to attach to the pod (merged with the chart-managed pull secret when imageCredentials are set)
     imagePullSecrets: []
     ## @param ontoserver.deployment.isReadOnly          Ontoserver in read‑only mode - keep it true for scaled

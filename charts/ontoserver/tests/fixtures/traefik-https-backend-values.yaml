@@ -1,7 +1,7 @@
 # charts/ontoserver/tests/fixtures/traefik-https-backend-values.yaml
 #
 # Integration test fixture for the Traefik HTTPS backend scenario.
-# Ontoserver serves HTTPS on port 8080 using its bundled self-signed keystore.
+# Ontoserver serves HTTPS on port 8443 using its bundled self-signed keystore.
 # Traefik connects to the HTTPS backend via ServersTransport (insecureSkipVerify).
 #
 # Used by: .github/workflows/integration-tests.yml (traefik-https-backend matrix entry)
@@ -9,10 +9,12 @@ ontoserver:
   hostNames:
     - ontoserver.traefik-test.local
   serverName: ontoserver.traefik-test.local
+  deployment:
+    containerPort: 8443
   config:
     # ONTOSERVER_INSECURE=true disables Ontoserver's inbound TLS listener (serves plain HTTP).
     # The chart default is "true" for convenience in cluster-internal deployments.
-    # Setting to "false" restores Ontoserver's out-of-box behaviour: HTTPS on port 8080
+    # Setting to "false" restores Ontoserver's out-of-box behaviour: HTTPS on port 8443
     # using its bundled self-signed keystore at /keystore.p12.
     #
     # Note: values.yaml documents this flag as "Disable TLS verification for outgoing
@@ -27,8 +29,8 @@ traefik:
       - web              # client → Traefik over plain HTTP; HTTPS is only on the backend side
     backendPort: 80      # Kubernetes Service port. Traefik opens a TLS connection over the TCP
                          # stream to Service port 80. kube-proxy NATs the stream to container
-                         # port 8080, where Ontoserver answers the TLS handshake.
-                         # Must be 80 (not 8080): the Service only exposes port 80.
+                         # port 8443, where Ontoserver answers the TLS handshake.
+                         # Must be 80 (not 8443): the Service only exposes port 80.
     backendScheme: https
     serversTransport:
       enabled: true

@@ -491,6 +491,7 @@ The ArgoCD examples use multi-source Applications with both the `ontoserver` and
 | `ontoserver.deployment.type`                                                                | single|scaled deployment topology                                                                                                                                                                                             | `single`                          |
 | `ontoserver.deployment.image`                                                               | Container image for OntoServer                                                                                                                                                                                                | `quay.io/aehrc/ontoserver:ctsa-6` |
 | `ontoserver.deployment.imagePullPolicy`                                                     | Image pull policy                                                                                                                                                                                                             | `IfNotPresent`                    |
+| `ontoserver.deployment.containerPort`                                                       | Container port Ontoserver listens on. Use 8080 for HTTP (ONTOSERVER_INSECURE=true) or 8443 for HTTPS (ONTOSERVER_INSECURE=false).                                                                                             | `8080`                            |
 | `ontoserver.deployment.imagePullSecrets`                                                    | Additional pre-created image pull secrets to attach to the pod (merged with the chart-managed pull secret when imageCredentials are set)                                                                                      | `[]`                              |
 | `ontoserver.deployment.isReadOnly`                                                          | Ontoserver in read‑only mode - keep it true for scaled                                                                                                                                                                        | `true`                            |
 | `ontoserver.deployment.replicas`                                                            | Number of replicas - min 2 for scaled deployment - can be set to 0                                                                                                                                                            | `1`                               |
@@ -621,16 +622,16 @@ The ArgoCD examples use multi-source Applications with both the `ontoserver` and
 
 ### Miscellaneous
 
-| Name                                    | Description                                                                                                                                         | Value   |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `ontoserver.tolerations`                | Pod tolerations                                                                                                                                     | `[]`    |
-| `ontoserver.nodeSelector`               | Pod node selector (e.g. for EKS node group targeting)                                                                                               | `{}`    |
-| `ontoserver.serviceAccount.create`      | Create a ServiceAccount for the pod (required for IRSA on EKS)                                                                                      | `false` |
-| `ontoserver.serviceAccount.name`        | ServiceAccount name. When create: true defaults to <release>-ontoserver. When create: false and name is set, references an existing ServiceAccount. | `""`    |
-| `ontoserver.serviceAccount.annotations` | ServiceAccount annotations (e.g. eks.amazonaws.com/role-arn for IRSA). Only used when create: true.                                                 | `{}`    |
-| `ontoserver.customization`              | The name of a ConfigMap containing custom logo and CSS files to be deployed with the application                                                    | `""`    |
-| `ontoserver.config.ONTOSERVER_INSECURE` | Disable TLS verification for outgoing connections                                                                                                   | `true`  |
-| `ontoserver.secretConfig`               | Secret-backed Ontoserver config entries                                                                                                             | `{}`    |
+| Name                                    | Description                                                                                                                                            | Value   |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| `ontoserver.tolerations`                | Pod tolerations                                                                                                                                        | `[]`    |
+| `ontoserver.nodeSelector`               | Pod node selector (e.g. for EKS node group targeting)                                                                                                  | `{}`    |
+| `ontoserver.serviceAccount.create`      | Create a ServiceAccount for the pod (required for IRSA on EKS)                                                                                         | `false` |
+| `ontoserver.serviceAccount.name`        | ServiceAccount name. When create: true defaults to <release>-ontoserver. When create: false and name is set, references an existing ServiceAccount.    | `""`    |
+| `ontoserver.serviceAccount.annotations` | ServiceAccount annotations (e.g. eks.amazonaws.com/role-arn for IRSA). Only used when create: true.                                                    | `{}`    |
+| `ontoserver.customization`              | The name of a ConfigMap containing custom logo and CSS files to be deployed with the application                                                       | `""`    |
+| `ontoserver.config.ONTOSERVER_INSECURE` | Disable Ontoserver's inbound TLS listener — set to "true" to serve plain HTTP, "false" (or omit) to serve HTTPS using the bundled self-signed keystore | `true`  |
+| `ontoserver.secretConfig`               | Secret-backed Ontoserver config entries                                                                                                                | `{}`    |
 
 ### External Secrets
 
@@ -836,13 +837,38 @@ Traefik supports both the standard Kubernetes `Ingress` API (`ontoserver.ingress
 
 Use `traefik.ingressRoute.enabled: true` whenever:
 1. Traefik is your ingress controller, **and**
-2. Any backend pod in the release exposes HTTPS/TLS (e.g. OntoServer configured with `server.ssl.enabled`, OntoCloak/Keycloak, or any TLS-terminating sidecar).
+2. Any backend pod in the release exposes HTTPS/TLS (e.g. Ontoserver with `ONTOSERVER_INSECURE: "false"`, OntoCloak/Keycloak, or any TLS-terminating sidecar).
 
 For HTTP backends with Traefik, the standard `ontoserver.ingress` is sufficient.
 
+### HTTPS backend (Ontoserver TLS mode)
+
+By default (`ONTOSERVER_INSECURE: "true"`) Ontoserver serves plain HTTP on port 8080. Setting `ONTOSERVER_INSECURE: "false"` restores Ontoserver's out-of-box behaviour: HTTPS on port **8443** using its bundled self-signed keystore. You must also set `ontoserver.deployment.containerPort: 8443` so the Kubernetes Service routes traffic to the correct container port.
+
+The client-to-Traefik leg remains plain HTTP via the `web` entrypoint; TLS is only on the Traefik-to-Ontoserver backend leg:
+
+```yaml
+ontoserver:
+  deployment:
+    containerPort: 8443   # Ontoserver's HTTPS port
+  config:
+    ONTOSERVER_INSECURE: "false"
+
+traefik:
+  ingressRoute:
+    enabled: true
+    entryPoints:
+      - web               # client → Traefik over plain HTTP
+    backendPort: 80       # Kubernetes Service port (Service maps 80 → containerPort 8443)
+    backendScheme: https  # Traefik → Ontoserver over HTTPS
+    serversTransport:
+      enabled: true
+      insecureSkipVerify: true   # trust Ontoserver's self-signed certificate
+```
+
 ### ServersTransport
 
-When `traefik.ingressRoute.serversTransport.enabled: true`, the chart creates a `ServersTransport` resource in the same namespace as the `IngressRoute`. Two trust modes are supported:
+When `traefik.ingressRoute.serversTransport.enabled: true`, the chart creates a `ServersTransport` resource in the same namespace as the `IngressRoute`. The `backendPort` value is always the **Kubernetes Service port** (default `80`), not the container port. Two trust modes are supported:
 
 **Option A — Skip verification (self-signed certificates):**
 
@@ -850,7 +876,7 @@ When `traefik.ingressRoute.serversTransport.enabled: true`, the chart creates a 
 traefik:
   ingressRoute:
     enabled: true
-    backendPort: 443
+    backendPort: 80       # Kubernetes Service port
     backendScheme: https
     serversTransport:
       enabled: true
@@ -863,7 +889,7 @@ traefik:
 traefik:
   ingressRoute:
     enabled: true
-    backendPort: 443
+    backendPort: 80       # Kubernetes Service port
     backendScheme: https
     serversTransport:
       enabled: true
