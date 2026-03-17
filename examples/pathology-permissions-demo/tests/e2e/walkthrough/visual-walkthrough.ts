@@ -610,11 +610,28 @@ async function scene10_atomioPromoteUAT(page: Page): Promise<void> {
 
   highlight('"uat" alias now points to release-2-0.');
   highlight('Atomio shows uat → release-2-0, production → release-1-0 (unchanged).');
-  explain('Triggering UAT to syndicate now via the redoPreload API...');
+  explain('Opening OntoCommand on UAT to trigger syndication via the Preload button...');
+  await pause();
 
-  // Trigger UAT preload and wait for v1.1.0
-  const uatBase = UAT_URL.replace(/\/fhir$/, '');
-  await triggerPreload(uatBase);
+  // Open OntoCommand on UAT (navigating to the FHIR root redirects to OntoCommand)
+  await page.goto(UAT_URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(3_000);
+
+  // Log in to OntoCommand
+  await loginViaKeycloak(page, 'admin');
+  await page.waitForTimeout(3_000);
+
+  // Navigate to Syndication and click Preload
+  await page.getByText('Syndication').click();
+  await page.waitForTimeout(2_000);
+  await page.getByRole('button', { name: 'Preload' }).click();
+  await page.waitForTimeout(2_000);
+
+  highlight('Preload triggered — UAT is now syndicating from Atomio.');
+  explain('Waiting for v1.1.0 to appear on UAT...');
+
+  // Wait for v1.1.0 to appear
   const uatSynced = await waitForResource(UAT_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 60);
   if (uatSynced) {
     highlight('v1.1.0 is now on UAT!');
@@ -623,7 +640,7 @@ async function scene10_atomioPromoteUAT(page: Page): Promise<void> {
   }
   await pause();
 
-  // Open Shrimp on UAT to show the content
+  // Open Shrimp on UAT to show the content visually
   explain('Opening Shrimp on UAT to verify...');
   await openShrimp(page, UAT_URL);
   await waitForShrimpReady(page);
@@ -683,11 +700,26 @@ async function scene11_atomioPromoteProduction(page: Page): Promise<void> {
 
   highlight('"production" alias now points to release-2-0.');
   highlight('Both aliases now point to release-2-0.');
-  explain('Triggering production to syndicate now via the redoPreload API...');
+  explain('Opening OntoCommand on production to trigger syndication via the Preload button...');
+  await pause();
 
-  // Trigger production preload and wait for v1.1.0
-  const prodBase = PRODUCTION_URL.replace(/\/fhir$/, '');
-  await triggerPreload(prodBase);
+  // Open OntoCommand on production (FHIR root redirects to OntoCommand)
+  await page.goto(PRODUCTION_URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(3_000);
+
+  // Log in and trigger preload
+  await loginViaKeycloak(page, 'admin');
+  await page.waitForTimeout(3_000);
+
+  await page.getByText('Syndication').click();
+  await page.waitForTimeout(2_000);
+  await page.getByRole('button', { name: 'Preload' }).click();
+  await page.waitForTimeout(2_000);
+
+  highlight('Preload triggered — production is now syndicating from Atomio.');
+  explain('Waiting for v1.1.0 to appear on production...');
+
   const prodSynced = await waitForResource(PRODUCTION_URL, 'CodeSystem/alpha-pathology-codes-v1-1-0', 60);
   if (prodSynced) {
     highlight('v1.1.0 is now on production!');
@@ -696,18 +728,12 @@ async function scene11_atomioPromoteProduction(page: Page): Promise<void> {
   }
   await pause();
 
-  // Open Shrimp on production to show the content
+  // Open Shrimp on production to show the content visually
   explain('Opening Shrimp on production to verify...');
   await openShrimp(page, PRODUCTION_URL);
   await waitForShrimpReady(page);
-
-  const loginBtn = page.locator('#fhir-server-login');
-  if (await loginBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await loginBtn.click();
-    await page.waitForURL(/ontoserver\.csiro\.au/, { timeout: 15_000 }).catch(() => {});
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(3_000);
-  }
+  await loginViaKeycloak(page, 'admin', 'demo', PRODUCTION_URL);
+  await waitForShrimpReady(page);
 
   await page.getByRole('link', { name: 'Terminology' }).click();
   await page.waitForTimeout(3_000);
