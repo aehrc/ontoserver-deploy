@@ -391,6 +391,7 @@
       "defaultClientScopes": [
         "authoring-server",
         "production-server",
+        "atomio-server",
         "user-realm-roles-authorities",
         "openid",
         "profile",
