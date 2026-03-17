@@ -122,15 +122,20 @@ export async function loginViaKeycloak(
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(3_000);
 
-  // Shrimp's OAuth callback replaces ?iss= with ?fhir= pointing to the
-  // Keycloak issuer, not the FHIR server. Re-navigate with ?iss= to
-  // restore the correct FHIR server connection. The Keycloak SSO session
-  // persists, so the user stays logged in.
+  // Shrimp's OAuth callback can replace ?iss= with ?fhir= pointing to the
+  // Keycloak issuer instead of the FHIR server (RFC 9207). The Keycloak
+  // attribute exclude.issuer.from.auth.response=true prevents this, but if
+  // the URL is still wrong, re-navigate to restore the correct FHIR server.
   if (isShrimp && fhirServerUrl) {
-    const shrimpBase = 'https://ontoserver.csiro.au/shrimp';
-    await page.goto(`${shrimpBase}?iss=${encodeURIComponent(fhirServerUrl)}`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(3_000);
+    const currentUrl = page.url();
+    const hasFhirServer = currentUrl.includes(encodeURIComponent(fhirServerUrl))
+      || currentUrl.includes(fhirServerUrl);
+    if (!hasFhirServer) {
+      const shrimpBase = 'https://ontoserver.csiro.au/shrimp';
+      await page.goto(`${shrimpBase}?iss=${encodeURIComponent(fhirServerUrl)}`);
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3_000);
+    }
   }
 }
 

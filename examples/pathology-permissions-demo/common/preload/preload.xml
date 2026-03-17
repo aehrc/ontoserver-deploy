@@ -4,14 +4,13 @@
   <id>urn:uuid:pathology-demo-preload</id>
   <title>Pathology Demo Preload Feed</title>
   <updated>2024-01-01T00:00:00Z</updated>
-  <author>
-    <name>Pathology Demo</name>
-  </author>
+  <link rel="self" href="file:///data/preload/preload.xml" type="application/atom+xml" />
   <ncts:atomSyndicationFormatProfile>http://ns.electronichealth.net.au/ncts/syndication/asf/profile/1.0.0</ncts:atomSyndicationFormatProfile>
 
   <entry>
     <title>National Pathology Standard Codes</title>
     <id>urn:uuid:national-pathology-codes</id>
+    <published>2024-01-01T00:00:00Z</published>
     <updated>2024-01-01T00:00:00Z</updated>
     <category term="FHIR_CodeSystem"
               scheme="http://ns.electronichealth.net.au/ncts/syndication/asf/scheme/1.0.0"
@@ -27,6 +26,7 @@
   <entry>
     <title>National Pathology Reference Set</title>
     <id>urn:uuid:national-pathology-refset</id>
+    <published>2024-01-01T00:00:00Z</published>
     <updated>2024-01-01T00:00:00Z</updated>
     <category term="FHIR_ValueSet"
               scheme="http://ns.electronichealth.net.au/ncts/syndication/asf/scheme/1.0.0"

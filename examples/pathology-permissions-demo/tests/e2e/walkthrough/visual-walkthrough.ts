@@ -153,6 +153,13 @@ async function scene4_adminSeesAll(page: Page): Promise<void> {
  * to the currently authenticated user.
  */
 async function snapperSearchByType(page: Page, type: 'CodeSystem' | 'ValueSet' | 'ConceptMap'): Promise<void> {
+  // Dismiss any modal that might be covering the page (e.g. syndication success, login confirmation)
+  const modalDismiss = page.locator('.modal.in .modal-footer button, .modal.in .close').first();
+  if (await modalDismiss.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await modalDismiss.click();
+    await page.waitForTimeout(1_000);
+  }
+
   // Click the "Find existing FHIR Resources" button to go to the search page
   await page.locator('#search-view-btn').click();
   await page.waitForTimeout(2_000);
@@ -342,6 +349,14 @@ async function scene7_approverPublishes(page: Page): Promise<void> {
     explain('Publishing version 1.1.0 to the syndication feed...');
     await syndicateBtn.click();
     await page.waitForTimeout(3_000);
+
+    // Dismiss the "Code System successfully syndicated" confirmation modal
+    const okBtn = page.locator('.modal.in .modal-footer button').first();
+    if (await okBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await okBtn.click();
+      await page.waitForTimeout(1_000);
+    }
+
     highlight('Syndicate button clicked — version 1.1.0 is now published!');
   } else {
     // Fallback: set syndication status via API
@@ -412,6 +427,17 @@ async function scene9_syndication(page: Page): Promise<void> {
 
   highlight('Production has the same community content — synced from authoring via the syndication feed.');
   highlight('The syndication-consumer service account has PERM_READ (all communities).');
+  await pause();
+
+  // Click on the Alpha CodeSystem to show its details including version 1.1.0
+  explain('Clicking on Pathology Alpha to verify version 1.1.0 was syndicated...');
+  const alphaLink = page.locator('a, td, tr, span, div')
+    .filter({ hasText: /Pathology Alpha/i })
+    .first();
+  await alphaLink.click();
+  await page.waitForTimeout(3_000);
+
+  highlight('Version 1.1.0 is here — the new version created by the author and published by the approver.');
   highlight('Security labels are preserved end-to-end — users on production still see only their community\'s resources.');
   await pause();
 }
@@ -523,6 +549,30 @@ async function main(): Promise<void> {
     viewport: { width: 1280, height: 800 },
   });
   const page = await context.newPage();
+
+  // Inject a visible cursor overlay that follows mouse movements.
+  // Uses page.on('load') + page.evaluate to inject after each navigation,
+  // since addInitScript can be blocked by CSP on some sites.
+  const installCursor = async () => {
+    await page.evaluate(() => {
+      if (document.getElementById('pw-cursor')) return;
+      const cursor = document.createElement('div');
+      cursor.id = 'pw-cursor';
+      cursor.style.cssText = [
+        'width: 20px', 'height: 20px', 'border-radius: 50%',
+        'background: rgba(255, 50, 50, 0.5)', 'border: 2px solid red',
+        'position: fixed', 'z-index: 2147483647', 'pointer-events: none',
+        'transform: translate(-50%, -50%)', 'transition: left 0.05s linear, top 0.05s linear',
+        'left: -100px', 'top: -100px',
+      ].join(';');
+      document.body.appendChild(cursor);
+      document.addEventListener('mousemove', (e) => {
+        cursor.style.left = e.clientX + 'px';
+        cursor.style.top = e.clientY + 'px';
+      });
+    }).catch(() => {}); // ignore if page navigated away
+  };
+  page.on('load', installCursor);
 
   // Ensure browser closes on Ctrl+C
   const cleanup = async () => {
