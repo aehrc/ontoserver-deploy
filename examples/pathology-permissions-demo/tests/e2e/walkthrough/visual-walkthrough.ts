@@ -555,24 +555,20 @@ async function scene9_atomioReleasePipeline(page: Page): Promise<void> {
   explain('Clicking "Clone Feed" to create a new release candidate from authoring...');
   await pause();
 
-  // Click "Clone Feed" button in the Atomio UI
-  const cloneFeedBtn = page.getByRole('button', { name: /Clone Feed/i });
-  await cloneFeedBtn.click();
+  // Click "Clone Feed" button in the Atomio UI toolbar
+  await page.getByRole('button', { name: 'Clone Feed' }).click();
   await page.waitForTimeout(2_000);
 
-  // Fill in the clone form: feed name and source URL
-  // The dialog should have text fields for name and URL
-  const nameField = page.getByLabel(/name/i).or(page.locator('input[name*="name"]')).first();
-  const urlField = page.getByLabel(/url/i).or(page.locator('input[name*="url"]')).first();
-
-  await nameField.fill('release-2-0');
-  await urlField.fill('http://authoring-ontoserver:8080/synd/syndication.xml');
+  // Dialog: "Clone existing feed" with Name and URL fields
+  await page.locator('[role="dialog"]').waitFor({ state: 'visible', timeout: 5_000 });
+  await page.getByLabel('Name').fill('release-2-0');
+  await page.getByLabel('URL').fill('http://authoring-ontoserver:8080/synd/syndication.xml');
   await page.waitForTimeout(1_000);
 
-  // Submit the clone — look for a submit/clone/create button in the dialog
-  const submitBtn = page.getByRole('button', { name: /clone|submit|create|ok/i }).last();
-  await submitBtn.click();
-  await page.waitForTimeout(5_000);
+  // Submit — the dialog has two "Clone Feed" buttons (toolbar + dialog submit),
+  // use the one inside the dialog
+  await page.locator('[role="dialog"]').getByRole('button', { name: 'Clone Feed' }).click();
+  await page.waitForTimeout(8_000);
 
   highlight('Release candidate "release-2-0" created from authoring feed.');
   highlight('Three feeds now: release-1-0, release-2-0 (with v1.1.0), and gamma-content.');
@@ -585,27 +581,27 @@ async function scene10_atomioPromoteUAT(page: Page): Promise<void> {
   explain('The UAT Ontoserver polls the uat alias for changes.');
   await pause();
 
-  // Navigate to Aliases page in the Atomio UI
-  const aliasesNav = page.getByRole('link', { name: /Aliases/i }).or(
-    page.getByText('Aliases'),
-  );
-  await aliasesNav.first().click();
+  // Navigate to Aliases page via left nav
+  await page.getByRole('link', { name: 'Aliases' }).click();
   await page.waitForTimeout(2_000);
 
-  // Click the edit button on the "uat" alias row
-  const uatRow = page.locator('tr, [class*="row"]').filter({ hasText: /\buat\b/ }).first();
-  const editBtn = uatRow.getByRole('button').or(uatRow.locator('[class*="edit"], [class*="action"] button')).first();
-  await editBtn.click();
+  // Click the "Redirect alias" (wrench) icon on the uat row
+  const uatRow = page.locator('tbody tr').filter({ hasText: 'uat' }).first();
+  await uatRow.locator('button[title="Redirect alias"]').click();
   await page.waitForTimeout(2_000);
 
-  // Change the feed to release-2-0 — look for a select/dropdown or text field
-  const feedField = page.getByLabel(/feed/i).or(page.locator('input[name*="feed"], select[name*="feed"]')).first();
-  await feedField.fill('release-2-0');
+  // Dialog: "Redirect alias to feed" with FeedSelect autocomplete
+  await page.locator('[role="dialog"]').waitFor({ state: 'visible', timeout: 5_000 });
+  // Type into the autocomplete to filter and select release-2-0
+  await page.getByLabel('Feed Name').click();
+  await page.getByLabel('Feed Name').fill('release-2-0');
+  await page.waitForTimeout(1_000);
+  // Select from the autocomplete dropdown
+  await page.locator('[role="listbox"] li').filter({ hasText: 'release-2-0' }).click();
   await page.waitForTimeout(500);
 
-  // Submit the change
-  const saveBtn = page.getByRole('button', { name: /save|update|ok|submit/i }).last();
-  await saveBtn.click();
+  // Submit
+  await page.locator('[role="dialog"]').getByRole('button', { name: 'Redirect Alias' }).click();
   await page.waitForTimeout(3_000);
 
   highlight('"uat" alias now points to release-2-0.');
@@ -656,28 +652,26 @@ async function scene11_atomioPromoteProduction(page: Page): Promise<void> {
   explain('Navigating back to the Atomio UI Aliases page...');
   await pause();
 
-  // Navigate back to Atomio UI and go to Aliases
+  // Navigate back to Atomio UI Aliases page
   await openAtomioAndLogin(page);
-  const aliasesNav = page.getByRole('link', { name: /Aliases/i }).or(
-    page.getByText('Aliases'),
-  );
-  await aliasesNav.first().click();
+  await page.getByRole('link', { name: 'Aliases' }).click();
   await page.waitForTimeout(2_000);
 
-  // Click the edit button on the "production" alias row
-  const prodRow = page.locator('tr, [class*="row"]').filter({ hasText: /\bproduction\b/ }).first();
-  const editBtn = prodRow.getByRole('button').or(prodRow.locator('[class*="edit"], [class*="action"] button')).first();
-  await editBtn.click();
+  // Click the "Redirect alias" (wrench) icon on the production row
+  const prodRow = page.locator('tbody tr').filter({ hasText: 'production' }).first();
+  await prodRow.locator('button[title="Redirect alias"]').click();
   await page.waitForTimeout(2_000);
 
-  // Change the feed to release-2-0
-  const feedField = page.getByLabel(/feed/i).or(page.locator('input[name*="feed"], select[name*="feed"]')).first();
-  await feedField.fill('release-2-0');
+  // Dialog: "Redirect alias to feed" — select release-2-0
+  await page.locator('[role="dialog"]').waitFor({ state: 'visible', timeout: 5_000 });
+  await page.getByLabel('Feed Name').click();
+  await page.getByLabel('Feed Name').fill('release-2-0');
+  await page.waitForTimeout(1_000);
+  await page.locator('[role="listbox"] li').filter({ hasText: 'release-2-0' }).click();
   await page.waitForTimeout(500);
 
-  // Submit the change
-  const saveBtn = page.getByRole('button', { name: /save|update|ok|submit/i }).last();
-  await saveBtn.click();
+  // Submit
+  await page.locator('[role="dialog"]').getByRole('button', { name: 'Redirect Alias' }).click();
   await page.waitForTimeout(3_000);
 
   highlight('"production" alias now points to release-2-0.');
