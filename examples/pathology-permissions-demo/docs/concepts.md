@@ -76,7 +76,9 @@ When `ontoserver.security.enabled=true`, Ontoserver enforces role-based access c
 | Admin | `/api` | `API_READ` | `API_WRITE` |
 | Syndication | `/synd` | `SYND_READ` | `SYND_WRITE` |
 
-Roles are carried in JWT tokens issued by Ontocloak, in the `authorities` claim. When using audience-prefixed authorities (recommended for multi-server deployments), each role name is prefixed with the target client ID, e.g., `authoring-serverFHIR_READ` or `production-serverFHIR_READ`. This ensures that a token's permissions are scoped to the correct resource server.
+Roles are carried in JWT tokens issued by Ontocloak, in the `authorities` claim. When using audience-prefixed authorities (recommended for multi-server deployments), each role name is prefixed with the target server's audience, e.g., `authoring-serverFHIR_READ` or `production-serverFHIR_READ`. This ensures that a token's permissions are scoped to the correct resource server.
+
+> **Demo note:** This demo uses human-readable client IDs (e.g. `authoring-server`, `production-server`) as audience values to make it easy to tell which server a role targets. In a production deployment, the SMART-on-FHIR specification requires the `aud` claim to be the **URL of the FHIR endpoint** (e.g. `https://terminology.example.com/fhir`). Ontoserver and Atomio both support URL-based audiences.
 
 ### Resource-Level Security (Fine-Grained Mode)
 
