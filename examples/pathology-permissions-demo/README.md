@@ -133,7 +133,7 @@ After setup, open:
 
 After setup, additionally open:
 - **Atomio API**: https://localhost:9083/swagger-ui/index.html
-- **Atomio UI**: https://ontoserver.csiro.au/atomio/ (enter `https://localhost:9083` as the Atomio URL and click Connect)
+- **Atomio UI**: https://localhost:9083 (redirects to the cloud-hosted Atomio UI)
 - **Shrimp** (UAT): https://ontoserver.csiro.au/shrimp?iss=https://localhost:9084/fhir
 - **Shrimp** (production): https://ontoserver.csiro.au/shrimp?iss=https://localhost:9085/fhir
 - **Snapper** (authoring): https://ontoserver.csiro.au/snapper?iss=https://localhost:9081/fhir
