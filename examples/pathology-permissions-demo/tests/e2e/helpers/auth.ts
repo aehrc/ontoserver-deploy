@@ -261,8 +261,10 @@ export async function openDashboard(page: Page, fhirServerUrl: string): Promise<
  * Navigate to the Atomio UI connected to a specific Atomio instance.
  */
 export async function openAtomioUI(page: Page, atomioUrl: string): Promise<void> {
-  const atomioUiBase = 'https://ontoserver.csiro.au/atomio/';
-  await page.goto(`${atomioUiBase}?iss=${encodeURIComponent(atomioUrl)}`);
+  // Navigate to the Atomio server URL directly — it redirects to the
+  // cloud-hosted Atomio UI with the correct connection. The ?iss= approach
+  // doesn't work because the Atomio UI SPA loses the parameter during routing.
+  await page.goto(atomioUrl);
   await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(3_000);
+  await page.waitForTimeout(5_000);
 }
