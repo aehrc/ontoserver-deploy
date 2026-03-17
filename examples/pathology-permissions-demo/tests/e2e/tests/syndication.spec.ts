@@ -1,16 +1,16 @@
 import { test, expect } from '@playwright/test';
 import { getToken } from '../helpers/auth';
 
-const AUTHORING_URL = process.env.AUTHORING_URL || 'http://localhost:9081';
+const AUTHORING_URL = process.env.AUTHORING_URL || 'http://localhost:9081/fhir';
 const PRODUCTION_URL = process.env.PRODUCTION_URL || (
-  process.env.VARIANT === 'atomio' ? 'http://localhost:9085' : 'http://localhost:9082'
+  process.env.VARIANT === 'atomio' ? 'http://localhost:9085/fhir' : 'http://localhost:9082/fhir'
 );
 
 test.describe('Syndication — Authoring to Production', () => {
   test('admin sees all CodeSystems on authoring', async ({ page }) => {
-    const token = await getToken(page, 'admin');
+    const token = await getToken('admin');
 
-    const response = await page.request.get(`${AUTHORING_URL}/fhir/CodeSystem`, {
+    const response = await page.request.get(`${AUTHORING_URL}/CodeSystem`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/fhir+json',
@@ -28,10 +28,10 @@ test.describe('Syndication — Authoring to Production', () => {
   });
 
   test('alpha user sees Alpha CodeSystem on production (syndicated)', async ({ page }) => {
-    const token = await getToken(page, 'alpha-viewer');
+    const token = await getToken('alpha-viewer');
 
     const response = await page.request.get(
-      `${PRODUCTION_URL}/fhir/CodeSystem?url=${encodeURIComponent(
+      `${PRODUCTION_URL}/CodeSystem?url=${encodeURIComponent(
         'http://pathology-alpha.example.com/CodeSystem/pathology-codes',
       )}`,
       {
@@ -48,10 +48,10 @@ test.describe('Syndication — Authoring to Production', () => {
   });
 
   test('alpha user cannot see Beta CodeSystem on production (labels preserved)', async ({ page }) => {
-    const token = await getToken(page, 'alpha-viewer');
+    const token = await getToken('alpha-viewer');
 
     const response = await page.request.get(
-      `${PRODUCTION_URL}/fhir/CodeSystem?url=${encodeURIComponent(
+      `${PRODUCTION_URL}/CodeSystem?url=${encodeURIComponent(
         'http://pathology-beta.example.com/CodeSystem/pathology-codes',
       )}`,
       {
@@ -71,9 +71,9 @@ test.describe('Syndication — Authoring to Production', () => {
     const nationalUrl = encodeURIComponent('http://example.org/ValueSet/national-pathology-refset');
 
     // Check authoring (needs auth since no readOnly.fhir)
-    const token = await getToken(page, 'alpha-viewer');
+    const token = await getToken('alpha-viewer');
     const authoringResp = await page.request.get(
-      `${AUTHORING_URL}/fhir/ValueSet?url=${nationalUrl}`,
+      `${AUTHORING_URL}/ValueSet?url=${nationalUrl}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -87,7 +87,7 @@ test.describe('Syndication — Authoring to Production', () => {
 
     // Check production (anonymous works due to readOnly.fhir + *.read label)
     const prodResp = await page.request.get(
-      `${PRODUCTION_URL}/fhir/ValueSet?url=${nationalUrl}`,
+      `${PRODUCTION_URL}/ValueSet?url=${nationalUrl}`,
       { headers: { Accept: 'application/fhir+json' } },
     );
     expect(prodResp.status()).toBe(200);

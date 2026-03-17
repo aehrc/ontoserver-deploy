@@ -1,11 +1,11 @@
-import { chromium, Page, Browser } from 'playwright';
+import { chromium, Page, Browser, request as playwrightRequest } from 'playwright';
 import {
   openSnapper,
   openShrimp,
-  openDashboard,
   openAtomioUI,
   loginViaKeycloak,
   logout,
+  getToken,
   waitForSnapperReady,
   waitForShrimpReady,
 } from '../helpers/auth';
@@ -33,6 +33,7 @@ const PRODUCTION_URL = process.env.PRODUCTION_URL || (
 );
 const UAT_URL = process.env.UAT_URL || 'http://localhost:9084/fhir';
 const ATOMIO_URL = process.env.ATOMIO_URL || 'http://localhost:9083';
+const AUTHORING_BASE = AUTHORING_URL.replace(/\/fhir$/, '');
 
 // ---------------------------------------------------------------------------
 // Scene runner with error handling
@@ -92,7 +93,7 @@ async function scene2_alphaAuthor(page: Page): Promise<void> {
   await waitForShrimpReady(page);
 
   // Log in via Keycloak SMART-on-FHIR flow
-  await loginViaKeycloak(page, 'alpha-author');
+  await loginViaKeycloak(page, 'alpha-author', 'demo', AUTHORING_URL);
   await waitForShrimpReady(page);
 
   await page.getByRole('link', { name: 'Terminology' }).click();
@@ -114,7 +115,7 @@ async function scene3_betaComparison(page: Page): Promise<void> {
   await openShrimp(page, AUTHORING_URL);
   await waitForShrimpReady(page);
 
-  await loginViaKeycloak(page, 'beta-author');
+  await loginViaKeycloak(page, 'beta-author', 'demo', AUTHORING_URL);
   await waitForShrimpReady(page);
 
   await page.getByRole('link', { name: 'Terminology' }).click();
@@ -135,7 +136,7 @@ async function scene4_adminSeesAll(page: Page): Promise<void> {
   await openShrimp(page, AUTHORING_URL);
   await waitForShrimpReady(page);
 
-  await loginViaKeycloak(page, 'admin');
+  await loginViaKeycloak(page, 'admin', 'demo', AUTHORING_URL);
   await waitForShrimpReady(page);
 
   await page.getByRole('link', { name: 'Terminology' }).click();
@@ -161,73 +162,226 @@ async function snapperSearchByType(page: Page, type: 'CodeSystem' | 'ValueSet' |
   await page.waitForTimeout(3_000);
 }
 
+/**
+ * Import a resource from Snapper search results and open it in the editor.
+ * After importing, clicks the resource in the sidebar and navigates to
+ * the "Upload to FHIR Server" tab.
+ */
+async function snapperImportAndOpenUploadTab(
+  page: Page,
+  importIndex: number,
+  sidebarText: string,
+): Promise<void> {
+  // Click the green plus (import) button on the search result
+  await page.locator(`#import-resource-btn-${importIndex}`).click();
+  await page.waitForTimeout(2_000);
+
+  // Click on the imported resource in the left sidebar to open the editor
+  await page.locator('.list-group-item')
+    .filter({ hasText: sidebarText })
+    .first()
+    .click();
+  await page.waitForTimeout(2_000);
+
+  // Navigate to the "Upload to FHIR Server" tab
+  await page.locator('#publish-link').click();
+  await page.waitForTimeout(3_000);
+}
+
+/**
+ * Dismiss Snapper's "Confirm FHIR Server Login?" modal if it appears.
+ * The modal shows when Snapper needs to (re-)authenticate with the FHIR server.
+ * If a Keycloak SSO session exists, the login completes without a form.
+ * Otherwise, fills the Keycloak login form and waits for redirect.
+ */
+async function handleSnapperLoginModal(page: Page, username: string): Promise<void> {
+  const loginBtn = page.locator('.modal-footer .btn-success');
+  if (await loginBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await loginBtn.click();
+
+    // If we land on Keycloak login form, fill it
+    const onKeycloak = await page.waitForURL(/localhost:9090/, { timeout: 5_000 }).then(() => true).catch(() => false);
+    if (onKeycloak) {
+      await page.locator('#username').fill(username);
+      await page.locator('#password').fill('demo');
+      await page.locator('#kc-login').click();
+      await page.waitForURL(/ontoserver\.csiro\.au/, { timeout: 15_000 });
+    }
+
+    await page.waitForTimeout(3_000);
+  }
+}
+
 async function scene5_viewerVsAuthor(page: Page): Promise<void> {
-  step('Viewer vs Author — Read-Only Access');
-  explain('Opening Snapper (the editing tool) as alpha-viewer.');
+  step('Viewer vs Author — Read-Only Access in Snapper');
+  explain('Opening Snapper (the authoring tool) as alpha-viewer.');
   explain('alpha-viewer has PERM_ALPHA_READ but NOT PERM_ALPHA_WRITE.');
-  explain('They can browse Alpha resources but cannot modify them.');
+  explain('They can browse Alpha resources but cannot upload changes.');
   await pause();
 
   await logout(page);
   await openSnapper(page, AUTHORING_URL);
   await waitForSnapperReady(page);
 
-  // Log in via Keycloak
   await loginViaKeycloak(page, 'alpha-viewer');
   await waitForSnapperReady(page);
 
-  // Search for CodeSystems — Snapper's landing page is an editor,
-  // not a browser; use the search page to find server resources
+  // Search for CodeSystems and import Pathology Alpha 1.0.0
   await snapperSearchByType(page, 'CodeSystem');
+  explain('Importing Pathology Alpha into the Snapper editor...');
+  await snapperImportAndOpenUploadTab(page, 1, 'Pathology Alpha');
 
-  // Wait for Pathology Alpha to appear in search results
-  await page.getByText('Pathology Alpha').first().waitFor({ timeout: 15_000 });
-
-  highlight('alpha-viewer sees Pathology Alpha CodeSystem in search results.');
-  highlight('They can open and browse it, but Save/Edit will return 403.');
-  highlight('The server enforces write protection even if the UI shows edit controls.');
+  highlight('The "Upload Code System" button shows "(unauthorised)".');
+  highlight('The "Syndicate" button is also disabled.');
+  highlight('alpha-viewer can browse and download, but cannot write anything back.');
+  explain('The server communicates the user\'s permissions to the editor via SMART scopes.');
   await pause();
 }
 
-async function scene6_authorEdits(page: Page): Promise<void> {
-  step('Author Edits — Adding a Concept');
-  explain('Switching to alpha-author in Snapper.');
-  explain('alpha-author has PERM_ALPHA_WRITE — they can modify Alpha resources.');
+async function scene6_authorUploads(page: Page): Promise<void> {
+  step('Author Permissions — Write but Not Syndicate');
+  explain('Logging in as alpha-author — has FHIR_WRITE but NOT SYND_WRITE.');
+  explain('Loading the published CodeSystem 1.0.0 to show the permission gates...');
   await pause();
 
   await logout(page);
   await openSnapper(page, AUTHORING_URL);
   await waitForSnapperReady(page);
-
   await loginViaKeycloak(page, 'alpha-author');
   await waitForSnapperReady(page);
 
-  // Search for CodeSystems as alpha-author
+  // Search and import the published 1.0.0, then open Upload tab
   await snapperSearchByType(page, 'CodeSystem');
+  explain('Importing the published Pathology Alpha 1.0.0...');
+  await snapperImportAndOpenUploadTab(page, 1, 'Pathology Alpha');
 
-  // Wait for Pathology Alpha to appear
-  await page.getByText('Pathology Alpha').first().waitFor({ timeout: 15_000 });
+  highlight('The Upload button is enabled — alpha-author has FHIR_WRITE permission.');
+  highlight('But uploading THIS resource would fail: it\'s syndicated, and the author lacks SYND_WRITE.');
+  explain('Even with write permission, syndicated resources are protected server-side.');
+  explain('The server returns "Operation not permitted" if an author tries to overwrite a published resource.');
+  explain('');
+  highlight('The Syndicate button shows "(unauthorised)" — only approvers can syndicate.');
+  explain('This is the governance gate: authors can draft and upload NEW content,');
+  explain('but only approvers (with SYND_WRITE) can publish or overwrite syndicated resources.');
+  explain('Next: the author creates version 1.1.0 with a NEW ID and uploads it.');
+  await pause();
 
-  highlight('alpha-author sees the same Pathology Alpha CodeSystem.');
-  highlight('But unlike alpha-viewer, this user has PERM_ALPHA_WRITE.');
-  highlight('The security labels on the resource match the author\'s write permission.');
+  // Edit the resource: change version to 1.1.0
+  explain('Editing the resource locally: changing version...');
+  await page.locator('a').filter({ hasText: 'Define codes' }).first().click();
+  await page.waitForTimeout(2_000);
+
+  const versionField = page.locator('#version');
+  await versionField.click({ clickCount: 3 });
+  await versionField.fill('1.1.0');
+  await page.waitForTimeout(500);
+
+  highlight('Version changed to 1.1.0.');
+  explain('In a real workflow the author would also add/modify concepts here.');
+  await pause();
+
+  // Navigate to Upload tab, change ID, and upload
+  explain('Going to the Upload tab to change the resource ID and upload...');
+  await page.locator('#publish-link').click();
+  await page.waitForTimeout(2_000);
+
+  // Handle login modal if it appears (Snapper re-checks auth on Upload tab)
+  await handleSnapperLoginModal(page, 'alpha-author');
+
+  // Change the Code System id to create a new resource instead of overwriting
+  const idField = page.locator('#resource-id');
+  await idField.click({ clickCount: 3 });
+  await idField.fill('alpha-pathology-codes-v1-1-0');
+  await page.waitForTimeout(1_000);
+
+  highlight('Resource ID changed to alpha-pathology-codes-v1-1-0.');
+  explain('This creates a new resource on the server instead of overwriting 1.0.0.');
+
+  // Click the Upload button
+  const uploadBtn = page.locator('#split-publish');
+  await page.waitForTimeout(1_000);
+  explain('Uploading version 1.1.0 to the authoring server...');
+  await uploadBtn.click();
+  await page.waitForTimeout(3_000);
+
+  highlight('Version 1.1.0 uploaded successfully via the Snapper UI!');
+  highlight('The new 1.1.0 is a draft — it has no syndication status yet.');
+  explain('It will not appear in the syndication feed until an approver publishes it.');
   await pause();
 }
 
-async function scene7_conceptMaps(page: Page): Promise<void> {
+async function scene7_approverPublishes(page: Page): Promise<void> {
+  step('Approver Publishes New Version');
+  explain('Switching to alpha-approver — has the Approver role with SYND_WRITE.');
+  explain('Only approvers can set syndication status — this is the publication gate.');
+  await pause();
+
+  await logout(page);
+  await openSnapper(page, AUTHORING_URL);
+  await waitForSnapperReady(page);
+  await loginViaKeycloak(page, 'alpha-approver');
+  await waitForSnapperReady(page);
+
+  // Search for CodeSystems — both 1.0.0 and 1.1.0 should appear
+  await snapperSearchByType(page, 'CodeSystem');
+  await page.waitForTimeout(2_000);
+
+  // Import the 1.1.0 version (last search result)
+  explain('Importing version 1.1.0 for review and approval...');
+  const importButtons = page.locator('[id^="import-resource-btn-"]');
+  const count = await importButtons.count();
+  await snapperImportAndOpenUploadTab(page, count - 1, 'Pathology Alpha');
+
+  highlight('The Approver role includes SYND_WRITE — the permission to publish resources.');
+
+  // Try clicking the Syndicate button in the UI
+  const syndicateBtn = page.locator('#syndicate-btn');
+  const isSyndicateDisabled = await syndicateBtn.getAttribute('disabled').catch(() => 'true');
+
+  if (!isSyndicateDisabled) {
+    explain('Publishing version 1.1.0 to the syndication feed...');
+    await syndicateBtn.click();
+    await page.waitForTimeout(3_000);
+    highlight('Syndicate button clicked — version 1.1.0 is now published!');
+  } else {
+    // Fallback: set syndication status via API
+    explain('Setting syndication status via the server API...');
+    const approverToken = await getToken('alpha-approver');
+    const syndUrl = `${AUTHORING_BASE}/synd/setSyndicationStatus`
+      + '?resourceType=CodeSystem&id=alpha-pathology-codes-v1-1-0&syndicate=true';
+
+    const ctx = await playwrightRequest.newContext();
+    try {
+      const response = await ctx.post(syndUrl, {
+        headers: { Authorization: `Bearer ${approverToken}` },
+      });
+      if (response.status() === 200) {
+        highlight('Syndication status set to TRUE — version 1.1.0 is now published!');
+      } else {
+        warn(`Unexpected status ${response.status()} setting syndication.`);
+      }
+    } finally {
+      await ctx.dispose();
+    }
+  }
+
+  highlight('The new version will appear in the syndication feed for downstream servers.');
+  await pause();
+}
+
+async function scene8_conceptMaps(page: Page): Promise<void> {
   step('ConceptMaps — Community Isolation for All Resource Types');
-  explain('Searching for ConceptMaps in Snapper (still as alpha-author).');
+  explain('Searching for ConceptMaps in Snapper (still as alpha-approver).');
   explain('ConceptMaps are also community-labeled — Alpha can only see their own.');
   await pause();
 
-  // If we're still on the Snapper search page from scene 6, just switch type.
-  // Otherwise open Snapper fresh.
+  // If we're still on the Snapper search page, just switch type.
   const isOnSnapper = page.url().includes('snapper');
   if (!isOnSnapper) {
     await logout(page);
     await openSnapper(page, AUTHORING_URL);
     await waitForSnapperReady(page);
-    await loginViaKeycloak(page, 'alpha-author');
+    await loginViaKeycloak(page, 'alpha-approver');
     await waitForSnapperReady(page);
   }
 
@@ -239,30 +393,30 @@ async function scene7_conceptMaps(page: Page): Promise<void> {
   await pause();
 }
 
-async function scene8_syndication(page: Page): Promise<void> {
+async function scene9_syndication(page: Page): Promise<void> {
   step('Syndication — Content Flows to Production');
-  explain('Opening the Ontoserver Dashboard (OntoCommand) for the authoring server.');
-  explain('The Dashboard shows which resources are loaded on each server.');
+  explain('The authoring server publishes a syndication feed of approved content.');
+  explain('Production subscribes to this feed and syncs automatically.');
+  explain('Opening Shrimp on the production server as admin to verify...');
   await pause();
 
   await logout(page);
-  await openDashboard(page, AUTHORING_URL);
-  await page.waitForTimeout(3_000);
+  await openShrimp(page, PRODUCTION_URL);
+  await waitForShrimpReady(page);
 
-  highlight('This shows the authoring server\'s loaded resources.');
-  explain('Now opening the Dashboard for the production server to compare...');
-  await pause();
+  await loginViaKeycloak(page, 'admin', 'demo', PRODUCTION_URL);
+  await waitForShrimpReady(page);
 
-  await openDashboard(page, PRODUCTION_URL);
-  await page.waitForTimeout(3_000);
+  await page.getByRole('link', { name: 'Terminology' }).click();
+  await page.waitForTimeout(2_000);
 
-  highlight('Production has the same resources — synced via the syndication feed.');
+  highlight('Production has the same community content — synced from authoring via the syndication feed.');
   highlight('The syndication-consumer service account has PERM_READ (all communities).');
-  highlight('Security labels are preserved — end users on production still see only their community\'s content.');
+  highlight('Security labels are preserved end-to-end — users on production still see only their community\'s resources.');
   await pause();
 }
 
-async function scene9_csvContent(page: Page): Promise<void> {
+async function scene10_csvContent(page: Page): Promise<void> {
   step('CSV-to-FHIR Pipeline — Gamma Content');
   explain('Opening Shrimp as admin to show the CSV-generated Gamma content.');
   explain('Pathology Gamma maintains codes in CSV files under version control.');
@@ -272,7 +426,7 @@ async function scene9_csvContent(page: Page): Promise<void> {
   await openShrimp(page, AUTHORING_URL);
   await waitForShrimpReady(page);
 
-  await loginViaKeycloak(page, 'admin');
+  await loginViaKeycloak(page, 'admin', 'demo', AUTHORING_URL);
   await waitForShrimpReady(page);
 
   await page.getByRole('link', { name: 'Terminology' }).click();
@@ -285,7 +439,7 @@ async function scene9_csvContent(page: Page): Promise<void> {
 }
 
 // Atomio-only scenes
-async function scene10_atomioFeeds(page: Page): Promise<void> {
+async function scene11_atomioFeeds(page: Page): Promise<void> {
   step('Atomio — Release Feeds');
   explain('Opening the Atomio UI to browse release feeds.');
   explain('Feeds are immutable snapshots of content cloned from authoring.');
@@ -300,7 +454,7 @@ async function scene10_atomioFeeds(page: Page): Promise<void> {
   await pause();
 }
 
-async function scene11_atomioAliases(page: Page): Promise<void> {
+async function scene12_atomioAliases(page: Page): Promise<void> {
   step('Atomio — Aliases for Promotion');
   explain('Aliases are named pointers (uat, production) that reference a feed.');
   explain('Downstream Ontoservers poll an alias URL, not a feed directly.');
@@ -312,7 +466,7 @@ async function scene11_atomioAliases(page: Page): Promise<void> {
   await pause();
 }
 
-async function scene12_atomioPromotion(page: Page): Promise<void> {
+async function scene13_atomioPromotion(page: Page): Promise<void> {
   step('Atomio — Content on UAT');
   explain('Opening Shrimp pointed at the UAT server to verify content.');
   explain('UAT syndicates from the Atomio "uat" alias.');
@@ -321,7 +475,7 @@ async function scene12_atomioPromotion(page: Page): Promise<void> {
   await openShrimp(page, UAT_URL);
   await waitForShrimpReady(page);
 
-  await loginViaKeycloak(page, 'admin');
+  await loginViaKeycloak(page, 'admin', 'demo', UAT_URL);
   await waitForShrimpReady(page);
 
   await page.getByRole('link', { name: 'Terminology' }).click();
@@ -387,17 +541,18 @@ async function main(): Promise<void> {
       scene3_betaComparison,
       scene4_adminSeesAll,
       scene5_viewerVsAuthor,
-      scene6_authorEdits,
-      scene7_conceptMaps,
-      scene8_syndication,
-      scene9_csvContent,
+      scene6_authorUploads,
+      scene7_approverPublishes,
+      scene8_conceptMaps,
+      scene9_syndication,
+      scene10_csvContent,
     ];
 
     // Atomio-only scenes
     const atomioScenes: SceneFn[] = [
-      scene10_atomioFeeds,
-      scene11_atomioAliases,
-      scene12_atomioPromotion,
+      scene11_atomioFeeds,
+      scene12_atomioAliases,
+      scene13_atomioPromotion,
     ];
 
     const allScenes = variant === 'atomio'

@@ -1,16 +1,16 @@
 import { test, expect } from '@playwright/test';
 import { getToken } from '../helpers/auth';
 
-const AUTHORING_URL = process.env.AUTHORING_URL || 'http://localhost:9081';
+const AUTHORING_URL = process.env.AUTHORING_URL || 'http://localhost:9081/fhir';
 
 const GAMMA_CS_URL = 'http://pathology-gamma.example.com/CodeSystem/pathology-codes';
 
 test.describe('CSV Content — Gamma Pathology', () => {
   test('admin sees Gamma CodeSystem on authoring', async ({ page }) => {
-    const token = await getToken(page, 'admin');
+    const token = await getToken('admin');
 
     const response = await page.request.get(
-      `${AUTHORING_URL}/fhir/CodeSystem?url=${encodeURIComponent(GAMMA_CS_URL)}`,
+      `${AUTHORING_URL}/CodeSystem?url=${encodeURIComponent(GAMMA_CS_URL)}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -25,10 +25,10 @@ test.describe('CSV Content — Gamma Pathology', () => {
   });
 
   test('Gamma CodeSystem has correct security labels', async ({ page }) => {
-    const token = await getToken(page, 'admin');
+    const token = await getToken('admin');
 
     const response = await page.request.get(
-      `${AUTHORING_URL}/fhir/CodeSystem?url=${encodeURIComponent(GAMMA_CS_URL)}`,
+      `${AUTHORING_URL}/CodeSystem?url=${encodeURIComponent(GAMMA_CS_URL)}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -48,10 +48,10 @@ test.describe('CSV Content — Gamma Pathology', () => {
   });
 
   test('Gamma CodeSystem has expected concept count', async ({ page }) => {
-    const token = await getToken(page, 'admin');
+    const token = await getToken('admin');
 
     const response = await page.request.get(
-      `${AUTHORING_URL}/fhir/CodeSystem?url=${encodeURIComponent(GAMMA_CS_URL)}`,
+      `${AUTHORING_URL}/CodeSystem?url=${encodeURIComponent(GAMMA_CS_URL)}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -70,10 +70,10 @@ test.describe('CSV Content — Gamma Pathology', () => {
   });
 
   test('alpha user cannot see Gamma CodeSystem (community isolation)', async ({ page }) => {
-    const token = await getToken(page, 'alpha-author');
+    const token = await getToken('alpha-author');
 
     const response = await page.request.get(
-      `${AUTHORING_URL}/fhir/CodeSystem?url=${encodeURIComponent(GAMMA_CS_URL)}`,
+      `${AUTHORING_URL}/CodeSystem?url=${encodeURIComponent(GAMMA_CS_URL)}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,

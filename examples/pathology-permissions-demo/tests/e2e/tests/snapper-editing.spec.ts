@@ -1,13 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { getToken, openSnapper, snapperLogin, waitForSnapperReady } from '../helpers/auth';
+import { getToken, openSnapper, loginViaKeycloak, waitForSnapperReady } from '../helpers/auth';
 
-const AUTHORING_URL = process.env.AUTHORING_URL || 'http://localhost:9081';
+const AUTHORING_URL = process.env.AUTHORING_URL || 'http://localhost:9081/fhir';
 
 test.describe('Snapper Resource Editing', () => {
   test('alpha-author can open Alpha CodeSystem detail view', async ({ page }) => {
     await openSnapper(page, AUTHORING_URL);
     await waitForSnapperReady(page);
-    await snapperLogin(page, 'alpha-author');
+    await loginViaKeycloak(page, 'alpha-author');
 
     // Navigate to Code Systems
     await page.getByText('Code Systems').first().click();
@@ -28,11 +28,11 @@ test.describe('Snapper Resource Editing', () => {
   });
 
   test('alpha-author can successfully write to own resources via API', async ({ page }) => {
-    const token = await getToken(page, 'alpha-author');
+    const token = await getToken('alpha-author');
 
     // Read the current resource first
     const readResponse = await page.request.get(
-      `${AUTHORING_URL}/fhir/CodeSystem/alpha-pathology-codes`,
+      `${AUTHORING_URL}/CodeSystem/alpha-pathology-codes`,
       { headers: { Authorization: `Bearer ${token}`, Accept: 'application/fhir+json' } },
     );
     expect(readResponse.status()).toBe(200);
@@ -40,7 +40,7 @@ test.describe('Snapper Resource Editing', () => {
 
     // Write it back unchanged (safe non-destructive write test)
     const writeResponse = await page.request.put(
-      `${AUTHORING_URL}/fhir/CodeSystem/alpha-pathology-codes`,
+      `${AUTHORING_URL}/CodeSystem/alpha-pathology-codes`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -53,10 +53,10 @@ test.describe('Snapper Resource Editing', () => {
   });
 
   test('alpha-viewer cannot modify resources via API', async ({ page }) => {
-    const token = await getToken(page, 'alpha-viewer');
+    const token = await getToken('alpha-viewer');
 
     const response = await page.request.put(
-      `${AUTHORING_URL}/fhir/CodeSystem/alpha-pathology-codes`,
+      `${AUTHORING_URL}/CodeSystem/alpha-pathology-codes`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -78,10 +78,10 @@ test.describe('Snapper Resource Editing', () => {
   });
 
   test('alpha-author cannot modify Beta resources via API', async ({ page }) => {
-    const token = await getToken(page, 'alpha-author');
+    const token = await getToken('alpha-author');
 
     const response = await page.request.put(
-      `${AUTHORING_URL}/fhir/CodeSystem/beta-pathology-codes`,
+      `${AUTHORING_URL}/CodeSystem/beta-pathology-codes`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -102,17 +102,17 @@ test.describe('Snapper Resource Editing', () => {
   });
 
   test('beta-author can write to own resources via API', async ({ page }) => {
-    const token = await getToken(page, 'beta-author');
+    const token = await getToken('beta-author');
 
     const readResponse = await page.request.get(
-      `${AUTHORING_URL}/fhir/CodeSystem/beta-pathology-codes`,
+      `${AUTHORING_URL}/CodeSystem/beta-pathology-codes`,
       { headers: { Authorization: `Bearer ${token}`, Accept: 'application/fhir+json' } },
     );
     expect(readResponse.status()).toBe(200);
     const original = await readResponse.json();
 
     const writeResponse = await page.request.put(
-      `${AUTHORING_URL}/fhir/CodeSystem/beta-pathology-codes`,
+      `${AUTHORING_URL}/CodeSystem/beta-pathology-codes`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -125,10 +125,10 @@ test.describe('Snapper Resource Editing', () => {
   });
 
   test('beta-author cannot modify Alpha resources via API', async ({ page }) => {
-    const token = await getToken(page, 'beta-author');
+    const token = await getToken('beta-author');
 
     const response = await page.request.put(
-      `${AUTHORING_URL}/fhir/CodeSystem/alpha-pathology-codes`,
+      `${AUTHORING_URL}/CodeSystem/alpha-pathology-codes`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -152,11 +152,11 @@ test.describe('Snapper Resource Editing', () => {
     // This test adds a concept via API (more reliable than UI selectors for
     // AngularJS apps) and verifies the concept appears in the CodeSystem.
     // It demonstrates the same authoring capability shown in the demo walkthrough.
-    const token = await getToken(page, 'alpha-author');
+    const token = await getToken('alpha-author');
 
     // Read current CodeSystem
     const readResponse = await page.request.get(
-      `${AUTHORING_URL}/fhir/CodeSystem/alpha-pathology-codes`,
+      `${AUTHORING_URL}/CodeSystem/alpha-pathology-codes`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -186,7 +186,7 @@ test.describe('Snapper Resource Editing', () => {
 
     // Write updated CodeSystem
     const writeResponse = await page.request.put(
-      `${AUTHORING_URL}/fhir/CodeSystem/alpha-pathology-codes`,
+      `${AUTHORING_URL}/CodeSystem/alpha-pathology-codes`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -199,7 +199,7 @@ test.describe('Snapper Resource Editing', () => {
 
     // Verify the concept was added
     const verifyResponse = await page.request.get(
-      `${AUTHORING_URL}/fhir/CodeSystem/alpha-pathology-codes`,
+      `${AUTHORING_URL}/CodeSystem/alpha-pathology-codes`,
       {
         headers: {
           Authorization: `Bearer ${token}`,

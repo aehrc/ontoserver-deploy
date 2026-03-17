@@ -84,13 +84,16 @@ export async function loginViaKeycloak(
   page: Page,
   username: string,
   password: string = 'demo',
+  fhirServerUrl?: string,
 ): Promise<void> {
   // Click the login button — Shrimp uses <a id="fhir-server-login">,
   // Snapper uses <button id="toggle-login-btn">
   const shrimpLogin = page.locator('#fhir-server-login');
   const snapperLogin = page.locator('#toggle-login-btn');
 
-  if (await shrimpLogin.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  const isShrimp = await shrimpLogin.isVisible({ timeout: 3_000 }).catch(() => false);
+
+  if (isShrimp) {
     await shrimpLogin.click();
   } else if (await snapperLogin.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await snapperLogin.click();
@@ -118,6 +121,17 @@ export async function loginViaKeycloak(
   await page.waitForURL(/ontoserver\.csiro\.au/, { timeout: 15_000 });
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(3_000);
+
+  // Shrimp's OAuth callback replaces ?iss= with ?fhir= pointing to the
+  // Keycloak issuer, not the FHIR server. Re-navigate with ?iss= to
+  // restore the correct FHIR server connection. The Keycloak SSO session
+  // persists, so the user stays logged in.
+  if (isShrimp && fhirServerUrl) {
+    const shrimpBase = 'https://ontoserver.csiro.au/shrimp';
+    await page.goto(`${shrimpBase}?iss=${encodeURIComponent(fhirServerUrl)}`);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(3_000);
+  }
 }
 
 /**
@@ -219,12 +233,23 @@ export async function waitForSnapperReady(page: Page): Promise<void> {
 
 /**
  * Navigate to the Ontoserver Dashboard connected to a specific server.
+ * Tries ?iss= first; if the Dashboard lands on its login page instead,
+ * fills in the Terminology Server URL and clicks Connect.
  */
 export async function openDashboard(page: Page, fhirServerUrl: string): Promise<void> {
   const dashboardBase = 'https://ontoserver.csiro.au/ui';
   await page.goto(`${dashboardBase}?iss=${encodeURIComponent(fhirServerUrl)}`);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(3_000);
+
+  // If we landed on the login page, fill in the URL and connect manually
+  if (page.url().includes('/ui/login')) {
+    const urlField = page.getByLabel('Terminology Server URL');
+    await urlField.fill(fhirServerUrl);
+    await page.getByRole('button', { name: 'Connect' }).click();
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(5_000);
+  }
 }
 
 /**

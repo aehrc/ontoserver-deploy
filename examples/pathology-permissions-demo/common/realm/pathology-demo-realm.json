@@ -358,54 +358,6 @@
       "optionalClientScopes": []
     },
     {
-      "clientId": "snapper-authoring",
-      "name": "Snapper (Authoring)",
-      "description": "Snapper web UI for the authoring Ontoserver",
-      "enabled": true,
-      "publicClient": true,
-      "standardFlowEnabled": true,
-      "implicitFlowEnabled": true,
-      "directAccessGrantsEnabled": false,
-      "protocol": "openid-connect",
-      "rootUrl": "http://localhost:9081",
-      "baseUrl": "/snapper",
-      "redirectUris": ["http://localhost:9081/*"],
-      "webOrigins": ["http://localhost:9081"],
-      "fullScopeAllowed": true,
-      "defaultClientScopes": [
-        "authoring-server",
-        "user-realm-roles-authorities",
-        "openid",
-        "profile",
-        "email"
-      ],
-      "optionalClientScopes": []
-    },
-    {
-      "clientId": "snapper-production",
-      "name": "Snapper (Production)",
-      "description": "Snapper web UI for the production Ontoserver",
-      "enabled": true,
-      "publicClient": true,
-      "standardFlowEnabled": true,
-      "implicitFlowEnabled": true,
-      "directAccessGrantsEnabled": false,
-      "protocol": "openid-connect",
-      "rootUrl": "http://localhost:9082",
-      "baseUrl": "/snapper",
-      "redirectUris": ["http://localhost:9082/*"],
-      "webOrigins": ["http://localhost:9082"],
-      "fullScopeAllowed": true,
-      "defaultClientScopes": [
-        "production-server",
-        "user-realm-roles-authorities",
-        "openid",
-        "profile",
-        "email"
-      ],
-      "optionalClientScopes": []
-    },
-    {
       "clientId": "demo-cli",
       "name": "Demo CLI Client",
       "description": "Client for setup scripts and API demos using direct access grants",
@@ -460,18 +412,23 @@
       "protocol": "openid-connect",
       "redirectUris": ["https://ontoserver.csiro.au/*"],
       "webOrigins": ["https://ontoserver.csiro.au"],
+      "attributes": {
+        "exclude.issuer.from.auth.response": "true"
+      },
       "fullScopeAllowed": true,
       "defaultClientScopes": [
         "authoring-server",
         "production-server",
         "user-realm-roles-authorities",
+        "system/*.read",
+        "system/*.write",
+        "onto/synd.read",
+        "onto/synd.write",
         "openid",
         "profile",
         "email"
       ],
       "optionalClientScopes": [
-        "system/*.read",
-        "system/*.write",
         "user/*.read",
         "user/*.write",
         "launch",
@@ -490,18 +447,23 @@
       "protocol": "openid-connect",
       "redirectUris": ["https://ontoserver.csiro.au/*"],
       "webOrigins": ["https://ontoserver.csiro.au"],
+      "attributes": {
+        "exclude.issuer.from.auth.response": "true"
+      },
       "fullScopeAllowed": true,
       "defaultClientScopes": [
         "authoring-server",
         "production-server",
         "user-realm-roles-authorities",
+        "system/*.read",
+        "system/*.write",
+        "onto/synd.read",
+        "onto/synd.write",
         "openid",
         "profile",
         "email"
       ],
       "optionalClientScopes": [
-        "system/*.read",
-        "system/*.write",
         "user/*.read",
         "user/*.write",
         "launch",
@@ -742,6 +704,26 @@
       "protocolMappers": []
     },
     {
+      "name": "onto/synd.read",
+      "description": "Ontoserver scope: syndication read access",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": []
+    },
+    {
+      "name": "onto/synd.write",
+      "description": "Ontoserver scope: syndication write access (publish/unpublish)",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": []
+    },
+    {
       "name": "user/*.read",
       "description": "SMART-on-FHIR scope: user-level read access",
       "protocol": "openid-connect",
@@ -801,6 +783,34 @@
       {
         "clientScope": "openid",
         "roles": ["view-profile"]
+      }
+    ],
+    "authoring-server": [
+      {
+        "clientScope": "system/*.read",
+        "roles": ["authoring-serverFHIR_READ"]
+      },
+      {
+        "clientScope": "system/*.write",
+        "roles": ["authoring-serverFHIR_WRITE"]
+      },
+      {
+        "clientScope": "onto/synd.read",
+        "roles": ["authoring-serverSYND_READ"]
+      },
+      {
+        "clientScope": "onto/synd.write",
+        "roles": ["authoring-serverSYND_WRITE"]
+      }
+    ],
+    "production-server": [
+      {
+        "clientScope": "system/*.read",
+        "roles": ["production-serverFHIR_READ"]
+      },
+      {
+        "clientScope": "onto/synd.read",
+        "roles": ["production-serverSYND_READ"]
       }
     ]
   },
