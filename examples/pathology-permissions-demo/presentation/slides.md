@@ -380,6 +380,72 @@ The audience-prefixed authorities are a key design feature. alpha-author has FHI
 
 ---
 
+# Realm Configuration
+
+## Clients, scopes, role mappings, and how tokens are assembled
+
+| Client | Type | Purpose |
+|--------|------|---------|
+| `authoring-server` | Bearer-only | Resource server audience |
+| `production-server` | Bearer-only | Resource server audience |
+| `atomio-server` | Bearer-only | Resource server audience |
+| `shrimp` | Public | Cloud-hosted FHIR browser |
+| `snapper` | Public | Cloud-hosted FHIR editor |
+| `atomio-ui` | Public | Cloud-hosted Atomio browser |
+| `demo-cli` | Public | Setup scripts (password grant) |
+| `syndication-consumer` | Confidential | Service account for feed syndication |
+
+<!--
+The realm has three categories of client: resource servers (bearer-only, define the audience and client roles), browser UIs (public, authorization code flow), and service accounts (confidential, client credentials). The browser UIs have exclude.issuer.from.auth.response set to prevent RFC 9207 issuer injection that conflicts with Shrimp's iss parameter. The syndication-consumer service account gets PERM_READ at runtime to download all community-labeled resources.
+-->
+
+---
+
+# SMART Scope Gating
+
+```mermaid
+graph LR
+    DS["Default scope:<br/>system/*.write"] -->|"role scope mapping"| CHECK{"User has<br/>FHIR_WRITE?"}
+    CHECK -->|yes| INCLUDE["Included in token scope"]
+    CHECK -->|no| EXCLUDE["Omitted from token"]
+```
+
+SMART scopes are **default scopes** on shrimp/snapper but **gated by role scope mappings**:
+
+| User Role | system/*.read | system/*.write | onto/synd.write |
+|-----------|:---:|:---:|:---:|
+| Viewer (Consumer) | ✓ | ✗ | ✗ |
+| Author | ✓ | ✓ | ✗ |
+| Approver | ✓ | ✓ | ✓ |
+
+> Snapper reads the `scope` claim to enable/disable buttons (Upload, Syndicate).
+
+<!--
+SMART scopes are default scopes on shrimp and snapper but gated by role scope mappings. Default means Keycloak considers including them without the client explicitly requesting them, but the role scope mapping checks whether the user has the required client role. This is how Snapper knows to show Upload as enabled or unauthorised — it reads the scope claim. Ontoserver checks both scope (preferred) and authorities (legacy) claims.
+-->
+
+---
+
+# Role Hierarchy
+
+```mermaid
+graph BT
+    C["Consumer<br/>FHIR_READ"] --> A["Author<br/>+ FHIR_WRITE"]
+    A --> AP["Approver<br/>+ SYND_READ + SYND_WRITE"]
+    AP --> FA["Full Administrator<br/>+ API_READ + API_WRITE<br/>+ All Communities"]
+```
+
+- Roles are **composites** — each builds on the previous
+- Users get roles through **group membership**: `/System/Consumers`, `/System/Authors`, `/System/Approvers`
+- `/System/Consumers` is the **default group** — all new users start here
+- **Community groups** (e.g., "Pathology Alpha authors") are created by the Ontocloak Communities API at runtime
+
+<!--
+Roles are composites — each builds on the previous. Users get roles through group membership. The setup script assigns users to system groups, and the Ontocloak Communities API creates community-specific groups. Consumer is the default group so all new users get read-only access automatically.
+-->
+
+---
+
 # SMART-on-FHIR Integration
 
 ```mermaid

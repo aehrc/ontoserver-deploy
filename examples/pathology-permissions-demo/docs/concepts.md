@@ -386,3 +386,103 @@ Ontoserver validates the token using the RSA public key from Ontocloak and check
 2. Audience claim matches the expected server
 3. Token is not expired
 4. Authorities include required permissions (matching the audience-prefixed role names)
+
+## Keycloak Realm Configuration
+
+The Ontocloak realm JSON defines the full set of clients, scopes, role mappings, and groups that produce the JWT tokens Ontoserver consumes. Understanding how these pieces fit together explains why tokens contain the claims they do.
+
+### Clients
+
+The realm contains seven clients in three categories:
+
+**Resource servers** (bearer-only):
+- `authoring-server` — represents the authoring Ontoserver instance
+- `production-server` — represents the production Ontoserver instance
+- `atomio-server` — represents the Atomio instance
+
+These clients never accept user logins directly. They exist to define an audience and a namespace for client roles. When a token includes `authoring-server` in its `aud` claim and `authoring-serverFHIR_READ` in its `authorities` claim, those values come from the audience mapper and role mapper associated with the `authoring-server` client.
+
+**Browser UIs** (public, authorization code flow):
+- `shrimp` — the cloud-hosted FHIR terminology browser
+- `snapper` — the cloud-hosted FHIR terminology editor
+- `atomio-ui` — the cloud-hosted Atomio release management UI
+
+These are public clients (no client secret) that use the standard OAuth2 authorization code flow. They have `exclude.issuer.from.auth.response: "true"` set in their attributes. This prevents Keycloak from injecting an `iss` parameter into the authorization response per RFC 9207, which would conflict with Shrimp's use of `?iss=` to specify the FHIR server endpoint.
+
+**CLI client** (public, direct-access-grants):
+- `demo-cli` — used by the setup scripts and API demos
+
+This client supports the resource owner password grant (direct access grants), allowing scripts to obtain tokens non-interactively via username and password. This is appropriate for demo and automation purposes.
+
+**Service account** (confidential, client credentials):
+- `syndication-consumer` — used by downstream Ontoserver instances to authenticate when pulling syndication feeds
+
+This is a confidential client with a client secret that uses the client credentials grant. The setup script grants it `PERM_READ` (the wildcard community read permission) at runtime so the downstream server can download all community-labeled resources from the syndication feed.
+
+### Client Scopes and Protocol Mappers
+
+Client scopes control which claims appear in the JWT. The realm defines several custom scopes that map Keycloak roles into the `authorities` and `aud` claims that Ontoserver expects:
+
+- **`authoring-server`** scope: contains two protocol mappers:
+  - An **audience mapper** that adds `authoring-server` to the `aud` claim
+  - A **client role mapper** that takes the client roles defined on the `authoring-server` client (e.g., `authoring-serverFHIR_READ`, `authoring-serverFHIR_WRITE`) and writes them into the `authorities` claim
+- **`production-server`** scope: same pattern — audience mapper for `production-server` and client role mapper for its roles
+- **`atomio-server`** scope: same pattern for the Atomio resource server
+- **`user-realm-roles-authorities`** scope: maps **realm roles** (such as community permissions like `PERM_ALPHA_READ`, `PERM_BETA_WRITE`) into the `authorities` claim
+
+The combination of these scopes means a single JWT token can contain both **audience-prefixed API roles** (e.g., `authoring-serverFHIR_READ`) from the client role mappers and **unprefixed community permissions** (e.g., `PERM_ALPHA_READ`) from the realm role mapper. This is how one token authorises access to multiple resource servers while carrying community-specific permissions that apply across all servers.
+
+### SMART-on-FHIR Scopes and Role Scope Mappings
+
+SMART-on-FHIR scopes control what operations a client application is permitted to perform. In the realm, these scopes interact with Keycloak's role scope mapping feature to conditionally appear in tokens based on the user's roles.
+
+**Scope definitions**: The following client scopes are defined with `include.in.token.scope: "true"`, meaning their name appears in the token's `scope` claim when granted:
+- `system/*.read`
+- `system/*.write`
+- `onto/synd.read`
+- `onto/synd.write`
+
+**Default scopes**: These SMART scopes are configured as **default scopes** on the browser UI clients (shrimp, snapper). "Default" means Keycloak will always *consider* including them in the token without the client explicitly requesting them in the authorization request.
+
+**Role scope mappings** (`clientScopeMappings`): Each SMART scope has a **role scope mapping** that gates whether it actually appears in the token. The scope is only included if the authenticated user holds the required client role:
+
+| SMART Scope | Required Client Role |
+|-------------|---------------------|
+| `system/*.read` | `authoring-serverFHIR_READ` |
+| `system/*.write` | `authoring-serverFHIR_WRITE` |
+| `onto/synd.read` | `authoring-serverSYND_READ` |
+| `onto/synd.write` | `authoring-serverSYND_WRITE` |
+
+The same pattern applies for production-server roles.
+
+**Effect on users by role**:
+- A **viewer** (Consumer role) has `FHIR_READ` but not `FHIR_WRITE`, so their token includes `system/*.read` in the scope claim but **not** `system/*.write`
+- An **author** has both `FHIR_READ` and `FHIR_WRITE`, so their token includes both `system/*.read` and `system/*.write`
+- An **approver** additionally has `SYND_READ` and `SYND_WRITE`, so their token also includes `onto/synd.read` and `onto/synd.write`
+
+**Why this matters**: Snapper reads the `scope` claim to determine which UI features to enable. If `system/*.write` is absent from the scope, the Upload button is shown as "(unauthorised)". If `onto/synd.write` is absent, the Syndicate button is disabled. Ontoserver itself checks both the `scope` claim (preferred, per SMART-on-FHIR conventions) and the `authorities` claim (legacy) when authorising requests.
+
+### Composite Realm Roles
+
+The realm defines a hierarchy of composite roles that build on each other:
+
+- **`Consumer`** — grants `FHIR_READ` on authoring-server, production-server, and atomio-server. This is the baseline role for read-only access to all resource servers.
+- **`Author`** — includes Consumer, plus `FHIR_WRITE` on authoring-server and atomio-server. Authors can create and modify draft resources on the authoring server but have only read access to production.
+- **`Approver`** — includes Author, plus `SYND_READ` and `SYND_WRITE` on authoring-server and atomio-server. Approvers can set syndication status and modify published resources.
+- **`Full administrator`** — includes everything: all of the above, plus `API_READ` and `API_WRITE` on all servers, plus the wildcard community permissions (`PERM_READ`, `PERM_WRITE`). Administrators have unrestricted access to all resources and all API endpoints.
+
+Users never need to be assigned individual client roles directly. Assigning a single composite realm role (or, more commonly, adding the user to a group) grants the full set of permissions for that level.
+
+### Groups
+
+Groups provide the mechanism for assigning roles to users:
+
+**System groups** (defined in the realm JSON):
+- `/System/Consumers` — the **default group** for all new users. Members receive the `Consumer` composite role, granting read access to all servers.
+- `/System/Authors` — members receive the `Author` composite role
+- `/System/Approvers` — members receive the `Approver` composite role
+
+**Community groups** (created at runtime by the Ontocloak Communities API):
+- `/Communities/...` — when a community is created (e.g., "Pathology Alpha" with label `ALPHA`), Ontocloak creates groups like "Pathology Alpha authors" and "Pathology Alpha consumers" with the appropriate `PERM_ALPHA_*` realm roles
+
+Users are assigned to system groups in the realm JSON (e.g., `alpha-author` is in `/System/Authors`). Community group assignments are made by the setup script after it creates the communities via the Ontocloak API. A user typically belongs to one system group (determining their API access level) and one or more community groups (determining which resources they can see).
