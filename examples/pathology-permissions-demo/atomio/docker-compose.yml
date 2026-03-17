@@ -1,0 +1,404 @@
+# Pathology Permissions Demo - Atomio Variant
+#
+# This extends the simple example with Atomio for release candidate management.
+# Instead of the production server pulling directly from the authoring server's
+# syndication feed, content flows through Atomio as curated release candidates.
+#
+# Architecture:
+#   Ontocloak (auth) --> Authoring Ontoserver (read/write)
+#                               |
+#                               v (clone syndication feed)
+#                           Atomio (release candidates)
+#                            /        \
+#                           v          v
+#              UAT Ontoserver    Production Ontoserver
+#              (read-only)       (read-only)
+#
+# The Atomio workflow:
+#   1. Authors create content on the authoring Ontoserver
+#   2. When ready, an approver clones the authoring feed into an Atomio feed
+#   3. The UAT Ontoserver syncs from the Atomio "uat" alias
+#   4. After testing, the "production" alias is updated to the approved feed
+#   5. The production Ontoserver syncs from the Atomio "production" alias
+#
+# For the CSV-in-Git workflow (Pathology Gamma):
+#   - CSV data is transformed to FHIR resources
+#   - Resources are uploaded as Atomio entries in a dedicated feed
+#   - The authoring Ontoserver syncs from this Atomio feed
+#   - The release candidate includes these resources
+#
+# Prerequisites:
+#   - Docker and Docker Compose
+#   - Access to quay.io/aehrc container registry
+#   - Run scripts/setup.sh before the first use
+
+volumes:
+  ontocloak-pgdata:
+  authoring-pgdata:
+  authoring-onto-data:
+  atomio-data:
+  uat-pgdata:
+  uat-onto-data:
+  production-pgdata:
+  production-onto-data:
+
+services:
+  # ============================================================================
+  # ONTOCLOAK - Authorization Server
+  # ============================================================================
+
+  ontocloak-db:
+    image: postgres:16-alpine
+    container_name: ontocloak-db
+    environment:
+      POSTGRES_DB: ontocloak
+      POSTGRES_USER: ontocloak
+      POSTGRES_PASSWORD: ontocloak
+    volumes:
+      - ontocloak-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ontocloak -d ontocloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ontocloak:
+    image: quay.io/aehrc/ontocloak:5
+    container_name: ontocloak
+    depends_on:
+      ontocloak-db:
+        condition: service_healthy
+    command:
+      - start
+      - --import-realm
+      - --hostname-strict=false
+      - --http-enabled=true
+      - --optimized
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: ontocloak-db
+      KC_DB_URL_DATABASE: ontocloak
+      KC_DB_USERNAME: ontocloak
+      KC_DB_PASSWORD: ontocloak
+      KC_HTTP_PORT: "8080"
+      KC_HEALTH_ENABLED: "true"
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - ../common/realm:/opt/keycloak/data/import:ro
+    ports:
+      - "9090:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
+
+  # ============================================================================
+  # AUTHORING ONTOSERVER - Read/Write Terminology Server
+  # ============================================================================
+
+  authoring-db:
+    image: postgres:16-alpine
+    container_name: authoring-db
+    environment:
+      POSTGRES_DB: ontoserver
+      POSTGRES_USER: ontoserver
+      POSTGRES_PASSWORD: ontoserver
+    volumes:
+      - authoring-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ontoserver -d ontoserver"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  authoring-ontoserver:
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    container_name: authoring-ontoserver
+    depends_on:
+      authoring-db:
+        condition: service_healthy
+      ontocloak:
+        condition: service_healthy
+    environment:
+      # HTTP server on port 8080 (disable HTTPS for demo simplicity)
+      server.port: "8080"
+      server.ssl.enabled: "false"
+
+      # Database
+      spring.datasource.url: jdbc:postgresql://authoring-db:5432/ontoserver
+      spring.datasource.username: ontoserver
+      spring.datasource.password: ontoserver
+      # FHIR endpoint configuration
+      # Uses Docker-internal hostname so syndication feed resource URLs are
+      # reachable by Atomio and other containers (localhost doesn't work between containers)
+      ontoserver.fhir.base: http://authoring-ontoserver:8080/fhir
+
+      # Security - fine-grained mode enables resource-level permissions.
+      # RSA public key from Ontocloak (PEM format via SPRING_APPLICATION_JSON).
+      SPRING_APPLICATION_JSON: "${ONTOSERVER_SPRING_JSON}"
+      ontoserver.security.enabled: fine
+      ontoserver.security.audience: authoring-server
+      # Syndication feed XML is read-only accessible (no write credentials needed).
+      # This allows downstream consumers (production, Atomio) to fetch the feed
+      # with read-only credentials. The FHIR resources in feed entries still require
+      # proper OAuth authentication with community permissions.
+      ontoserver.security.readOnly.synd: "true"
+
+      # SMART-on-FHIR endpoints (browser-accessible URLs for Snapper login)
+      conformance.security.kinds: SMART-on-FHIR
+      conformance.security.authorize: http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/auth
+      conformance.security.token: http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token
+      # Syndication publishing for Atomio to clone.
+      # "selected" means only resources with syndication status = true are published.
+      # secureSyndicated requires SYND_WRITE to modify a syndicated resource,
+      # preventing authors from accidentally changing published content.
+      atom.syndication.publish.enabled: "true"
+      atom.syndication.publish.fhir.enabled: "selected"
+      atom.syndication.publish.fhir.secureSyndicated: "true"
+      atom.syndication.publish.index.enabled: "false"
+      ontoserver.synd.base: http://authoring-ontoserver:8080/synd
+      # Preload national valueset + optionally pull from Atomio gamma feed
+      atom.preload.feedLocation: file:///data/preload/preload.xml
+      atom.preload.feedLocation.default: ""
+      atom.syndication.feedLocation: ""
+      ontoserver.feature.feedFilters: "true"
+      JAVA_OPTS: -Xmx4G
+      TZ: Australia/Brisbane
+    volumes:
+      - authoring-onto-data:/var/onto
+      - ../common/preload:/data/preload:ro
+    ports:
+      - "9081:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/fhir/metadata > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+
+  # ============================================================================
+  # ATOMIO - Syndication & Release Candidate Server
+  # ============================================================================
+  # Atomio hosts terminology content as entries in Atom syndication feeds.
+  # It serves as the intermediary between authoring and downstream environments.
+  #
+  # Key operations:
+  #   - Clone the authoring feed into a release candidate feed
+  #   - Create stable aliases (uat, production) pointing to specific releases
+  #   - UAT and production Ontoserver instances sync from these aliases
+  #   - Pathology Gamma's CSV-sourced content can be uploaded directly to Atomio
+
+  atomio:
+    image: quay.io/aehrc/atomio:2
+    container_name: atomio
+    read_only: true
+    security_opt:
+      - no-new-privileges
+    depends_on:
+      ontocloak:
+        condition: service_healthy
+    environment:
+      # H2 embedded database (sufficient for demo)
+      DATABASE_URL: jdbc:h2:/workspace/atomio/db
+      USERNAME: sa
+      PASSWORD: atomio
+      # Base URL for Atom feed links (as seen externally)
+      atomio.base.url: http://localhost:9083
+      # Security - use Ontocloak for JWT validation
+      atomio.security.enabled: "false"
+      # Whitelist authoring server for feed cloning
+      atomio.client.urlWhitelist: http://authoring-ontoserver:8080
+      # OAuth2 client credentials for downloading FHIR resources from authoring
+      # (required because authoring uses fine-grained security on community-labeled resources)
+      atomio.security.client[0].urlPrefix: http://authoring-ontoserver:8080
+      atomio.security.client[0].tokenUrl: http://ontocloak:8080/auth/realms/pathology-demo/protocol/openid-connect/token
+      atomio.security.client[0].clientId: syndication-consumer
+      atomio.security.client[0].clientSecret: syndication-consumer-secret
+      # CORS for browser access
+      atomio.cors.allowedOriginPatterns: "*"
+    volumes:
+      - atomio-data:/workspace/atomio
+      - /tmp
+    ports:
+      - "9083:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+
+  # ============================================================================
+  # UAT ONTOSERVER - Read-Only UAT/Staging Server
+  # ============================================================================
+  # Syncs from Atomio's "uat" alias. Used for testing release candidates
+  # before promoting to production.
+  #
+  # The syndication-consumer service account authenticates when fetching
+  # community-labeled FHIR resources from the authoring server (referenced
+  # in Atomio feed entries).
+
+  uat-db:
+    image: postgres:16-alpine
+    container_name: uat-db
+    environment:
+      POSTGRES_DB: ontoserver
+      POSTGRES_USER: ontoserver
+      POSTGRES_PASSWORD: ontoserver
+    volumes:
+      - uat-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ontoserver -d ontoserver"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  uat-ontoserver:
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    container_name: uat-ontoserver
+    depends_on:
+      uat-db:
+        condition: service_healthy
+      ontocloak:
+        condition: service_healthy
+      atomio:
+        condition: service_healthy
+    environment:
+      # HTTP server on port 8080 (disable HTTPS for demo simplicity)
+      server.port: "8080"
+      server.ssl.enabled: "false"
+
+      spring.datasource.url: jdbc:postgresql://uat-db:5432/ontoserver
+      spring.datasource.username: ontoserver
+      spring.datasource.password: ontoserver
+      ontoserver.fhir.base: http://localhost:9084/fhir
+      ontoserver.deployment.readOnly: "true"
+
+      # Security - fine-grained mode so community resource isolation is preserved
+      SPRING_APPLICATION_JSON: "${ONTOSERVER_SPRING_JSON}"
+      ontoserver.security.enabled: fine
+      ontoserver.security.audience: production-server
+      ontoserver.security.readOnly.fhir: "true"
+
+      # SMART-on-FHIR endpoints for Snapper (same Ontocloak realm)
+      conformance.security.kinds: SMART-on-FHIR
+      conformance.security.authorize: http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/auth
+      conformance.security.token: http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token
+
+      # Syndicate from Atomio's "uat" alias
+      atom.syndication.feedLocation: http://atomio:8080/alias/uat/syndication.xml
+      atom.preload.feedLocation: file:///data/preload/preload.xml,http://atomio:8080/alias/uat/syndication.xml
+      atom.preload.feedLocation.default: ""
+
+      # Schedule syndication polling (Spring cron: sec min hour dom month dow).
+      atom.preload.schedule.cron: "0 */2 * * * *"
+
+      # OAuth2 client credentials for authenticated syndication.
+      # Feed entries may reference FHIR resources on authoring which require auth.
+      authentication.oauth.endpoint.0: http://authoring-ontoserver:8080
+      authentication.oauth.endpoint.token_endpoint.0: http://ontocloak:8080/auth/realms/pathology-demo/protocol/openid-connect/token
+      authentication.oauth.endpoint.client_id.0: syndication-consumer
+      authentication.oauth.endpoint.client_secret.0: syndication-consumer-secret
+      authentication.oauth.endpoint.strategy.0: body
+
+      ontoserver.feature.feedFilters: "true"
+      JAVA_OPTS: -Xmx4G
+      TZ: Australia/Brisbane
+    volumes:
+      - uat-onto-data:/var/onto
+      - ../common/preload:/data/preload:ro
+    ports:
+      - "9084:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/fhir/metadata > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+
+  # ============================================================================
+  # PRODUCTION ONTOSERVER - Read-Only Production Server
+  # ============================================================================
+  # Syncs from Atomio's "production" alias. Only receives content that has
+  # been promoted through UAT testing.
+
+  production-db:
+    image: postgres:16-alpine
+    container_name: production-db
+    environment:
+      POSTGRES_DB: ontoserver
+      POSTGRES_USER: ontoserver
+      POSTGRES_PASSWORD: ontoserver
+    volumes:
+      - production-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ontoserver -d ontoserver"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  production-ontoserver:
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    container_name: production-ontoserver
+    depends_on:
+      production-db:
+        condition: service_healthy
+      ontocloak:
+        condition: service_healthy
+      atomio:
+        condition: service_healthy
+    environment:
+      # HTTP server on port 8080 (disable HTTPS for demo simplicity)
+      server.port: "8080"
+      server.ssl.enabled: "false"
+
+      spring.datasource.url: jdbc:postgresql://production-db:5432/ontoserver
+      spring.datasource.username: ontoserver
+      spring.datasource.password: ontoserver
+      ontoserver.fhir.base: http://localhost:9085/fhir
+      ontoserver.deployment.readOnly: "true"
+
+      # Security - fine-grained mode so community resource isolation is preserved
+      SPRING_APPLICATION_JSON: "${ONTOSERVER_SPRING_JSON}"
+      ontoserver.security.enabled: fine
+      ontoserver.security.audience: production-server
+      ontoserver.security.readOnly.fhir: "true"
+
+      # SMART-on-FHIR endpoints for Snapper (same Ontocloak realm)
+      conformance.security.kinds: SMART-on-FHIR
+      conformance.security.authorize: http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/auth
+      conformance.security.token: http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token
+
+      # Syndicate from Atomio's "production" alias
+      atom.syndication.feedLocation: http://atomio:8080/alias/production/syndication.xml
+      atom.preload.feedLocation: file:///data/preload/preload.xml,http://atomio:8080/alias/production/syndication.xml
+      atom.preload.feedLocation.default: ""
+
+      # Schedule syndication polling (Spring cron: sec min hour dom month dow).
+      atom.preload.schedule.cron: "0 */2 * * * *"
+
+      # OAuth2 client credentials for authenticated syndication.
+      # Feed entries may reference FHIR resources on authoring which require auth.
+      authentication.oauth.endpoint.0: http://authoring-ontoserver:8080
+      authentication.oauth.endpoint.token_endpoint.0: http://ontocloak:8080/auth/realms/pathology-demo/protocol/openid-connect/token
+      authentication.oauth.endpoint.client_id.0: syndication-consumer
+      authentication.oauth.endpoint.client_secret.0: syndication-consumer-secret
+      authentication.oauth.endpoint.strategy.0: body
+
+      ontoserver.feature.feedFilters: "true"
+      JAVA_OPTS: -Xmx4G
+      TZ: Australia/Brisbane
+    volumes:
+      - production-onto-data:/var/onto
+      - ../common/preload:/data/preload:ro
+    ports:
+      - "9085:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/fhir/metadata > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 120s

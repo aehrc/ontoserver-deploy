@@ -1,0 +1,89 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "alpha-pathology-codes",
+  "meta": {
+    "security": [
+      {
+        "system": "http://ontoserver.csiro.au/CodeSystem/ontoserver-permissions",
+        "code": "ALPHA.read"
+      },
+      {
+        "system": "http://ontoserver.csiro.au/CodeSystem/ontoserver-permissions",
+        "code": "ALPHA.write"
+      }
+    ]
+  },
+  "url": "http://pathology-alpha.example.com/CodeSystem/pathology-codes",
+  "version": "1.0.0",
+  "name": "PathologyAlphaPathologyCodes",
+  "title": "Pathology Alpha - Local Pathology Order Codes",
+  "status": "draft",
+  "experimental": false,
+  "date": "2024-03-01",
+  "publisher": "Pathology Alpha Pathology Department",
+  "description": "Local pathology order codes used by Pathology Alpha's laboratory information system. These codes are used internally for ordering pathology tests and need to be mapped to the national pathology reference set for interoperability.",
+  "content": "complete",
+  "count": 12,
+  "concept": [
+    {
+      "code": "FBC",
+      "display": "Full Blood Count",
+      "definition": "Complete blood count including WBC, RBC, Hb, Hct, platelets"
+    },
+    {
+      "code": "UEC",
+      "display": "Urea, Electrolytes & Creatinine",
+      "definition": "Renal function panel including urea, sodium, potassium, creatinine"
+    },
+    {
+      "code": "LFT",
+      "display": "Liver Function Tests",
+      "definition": "Hepatic function panel including ALT, AST, ALP, GGT, bilirubin, albumin"
+    },
+    {
+      "code": "TFT",
+      "display": "Thyroid Function Tests",
+      "definition": "Thyroid panel including TSH, free T3, free T4"
+    },
+    {
+      "code": "BGL",
+      "display": "Blood Glucose Level",
+      "definition": "Random or fasting blood glucose measurement"
+    },
+    {
+      "code": "HBA1C",
+      "display": "HbA1c",
+      "definition": "Glycated haemoglobin measurement"
+    },
+    {
+      "code": "LIPID",
+      "display": "Lipid Studies",
+      "definition": "Lipid panel including total cholesterol, HDL, LDL, triglycerides"
+    },
+    {
+      "code": "CRP",
+      "display": "C-Reactive Protein",
+      "definition": "C-reactive protein measurement for inflammation"
+    },
+    {
+      "code": "COAG",
+      "display": "Coagulation Screen",
+      "definition": "Coagulation screening including PT, APTT, INR"
+    },
+    {
+      "code": "FERR",
+      "display": "Ferritin",
+      "definition": "Serum ferritin measurement for iron stores"
+    },
+    {
+      "code": "ABG",
+      "display": "Arterial Blood Gas",
+      "definition": "Blood gas analysis including pH, pO2, pCO2, HCO3"
+    },
+    {
+      "code": "URINE",
+      "display": "Urinalysis",
+      "definition": "Urine dipstick and microscopy"
+    }
+  ]
+}

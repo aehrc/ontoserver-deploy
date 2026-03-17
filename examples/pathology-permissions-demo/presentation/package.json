@@ -1,0 +1,14 @@
+{
+  "name": "pathology-permissions-presentation",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "slidev",
+    "build": "slidev build",
+    "export": "slidev export --output dist/slides.pdf",
+    "export-pptx": "slidev export --format pptx --output dist/slides.pptx"
+  },
+  "devDependencies": {
+    "@slidev/cli": "^51.0.0",
+    "@slidev/theme-default": "latest"
+  }
+}

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"
+      xmlns:ncts="http://ns.electronichealth.net.au/ncts/syndication/asf/extensions/1.0.0">
+  <id>urn:uuid:pathology-demo-preload</id>
+  <title>Pathology Demo Preload Feed</title>
+  <updated>2024-01-01T00:00:00Z</updated>
+  <author>
+    <name>Pathology Demo</name>
+  </author>
+  <ncts:atomSyndicationFormatProfile>http://ns.electronichealth.net.au/ncts/syndication/asf/profile/1.0.0</ncts:atomSyndicationFormatProfile>
+
+  <entry>
+    <title>National Pathology Standard Codes</title>
+    <id>urn:uuid:national-pathology-codes</id>
+    <updated>2024-01-01T00:00:00Z</updated>
+    <category term="FHIR_CodeSystem"
+              scheme="http://ns.electronichealth.net.au/ncts/syndication/asf/scheme/1.0.0"
+              label="FHIR CodeSystem" />
+    <link rel="alternate"
+          href="file:///data/preload/national-pathology-codesystem.json"
+          type="application/fhir+json" />
+    <ncts:contentItemIdentifier>http://example.org/CodeSystem/national-pathology-codes</ncts:contentItemIdentifier>
+    <ncts:contentItemVersion>1.0.0</ncts:contentItemVersion>
+    <ncts:fhirVersion>4.0</ncts:fhirVersion>
+  </entry>
+
+  <entry>
+    <title>National Pathology Reference Set</title>
+    <id>urn:uuid:national-pathology-refset</id>
+    <updated>2024-01-01T00:00:00Z</updated>
+    <category term="FHIR_ValueSet"
+              scheme="http://ns.electronichealth.net.au/ncts/syndication/asf/scheme/1.0.0"
+              label="FHIR ValueSet" />
+    <link rel="alternate"
+          href="file:///data/preload/national-pathology-valueset.json"
+          type="application/fhir+json" />
+    <ncts:contentItemIdentifier>http://example.org/ValueSet/national-pathology-refset</ncts:contentItemIdentifier>
+    <ncts:contentItemVersion>1.0.0</ncts:contentItemVersion>
+    <ncts:fhirVersion>4.0</ncts:fhirVersion>
+  </entry>
+</feed>

@@ -1,0 +1,16 @@
+code,display,definition
+GLU-R,Glucose Random,Random blood glucose measurement
+GLU-F,Glucose Fasting,Fasting blood glucose measurement
+HBA1C,HbA1c,Glycated haemoglobin percentage
+CHOL-T,Total Cholesterol,Total serum cholesterol
+CHOL-HDL,HDL Cholesterol,High-density lipoprotein cholesterol
+CHOL-LDL,LDL Cholesterol,Low-density lipoprotein cholesterol
+TRIG,Triglycerides,Serum triglycerides
+NA,Sodium,Serum sodium
+K,Potassium,Serum potassium
+CREAT,Creatinine,Serum creatinine
+CA,Calcium,Serum calcium (total)
+MG,Magnesium,Serum magnesium
+PHOS,Phosphate,Serum phosphate
+TSH,TSH,Thyroid stimulating hormone
+FT4,Free T4,Free thyroxine

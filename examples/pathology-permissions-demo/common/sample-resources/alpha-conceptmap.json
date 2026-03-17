@@ -1,0 +1,168 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "alpha-pathology-to-national",
+  "meta": {
+    "security": [
+      {
+        "system": "http://ontoserver.csiro.au/CodeSystem/ontoserver-permissions",
+        "code": "ALPHA.read"
+      },
+      {
+        "system": "http://ontoserver.csiro.au/CodeSystem/ontoserver-permissions",
+        "code": "ALPHA.write"
+      }
+    ]
+  },
+  "url": "http://pathology-alpha.example.com/ConceptMap/pathology-to-national",
+  "version": "1.0.0",
+  "name": "PathologyAlphaPathologyToNational",
+  "title": "Pathology Alpha - Local Codes to National Standard Mapping",
+  "status": "draft",
+  "experimental": false,
+  "date": "2024-03-01",
+  "publisher": "Pathology Alpha Pathology Department",
+  "description": "Maps Pathology Alpha's local pathology order codes to the national pathology standard codes. This mapping enables interoperability between the provider's local system and the national standard.",
+  "sourceUri": "http://pathology-alpha.example.com/CodeSystem/pathology-codes",
+  "targetUri": "http://example.org/ValueSet/national-pathology-refset",
+  "group": [
+    {
+      "source": "http://pathology-alpha.example.com/CodeSystem/pathology-codes",
+      "target": "http://example.org/CodeSystem/national-pathology-codes",
+      "element": [
+        {
+          "code": "FBC",
+          "display": "Full Blood Count",
+          "target": [
+            {
+              "code": "NAT-CBC",
+              "display": "Complete blood count",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "BGL",
+          "display": "Blood Glucose Level",
+          "target": [
+            {
+              "code": "NAT-GLUC",
+              "display": "Glucose measurement",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "HBA1C",
+          "display": "HbA1c",
+          "target": [
+            {
+              "code": "NAT-HBA1C",
+              "display": "Hemoglobin A1c measurement",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "LIPID",
+          "display": "Lipid Studies",
+          "target": [
+            {
+              "code": "NAT-LIPID",
+              "display": "Lipid panel",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "UEC",
+          "display": "Urea, Electrolytes & Creatinine",
+          "target": [
+            {
+              "code": "NAT-CREAT",
+              "display": "Serum creatinine measurement",
+              "equivalence": "wider",
+              "comment": "UEC includes more analytes than just creatinine; mapped to the closest single national concept"
+            }
+          ]
+        },
+        {
+          "code": "LFT",
+          "display": "Liver Function Tests",
+          "target": [
+            {
+              "code": "NAT-LFT",
+              "display": "Liver function test",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "TFT",
+          "display": "Thyroid Function Tests",
+          "target": [
+            {
+              "code": "NAT-TFT",
+              "display": "Thyroid function test",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "CRP",
+          "display": "C-Reactive Protein",
+          "target": [
+            {
+              "code": "NAT-CRP",
+              "display": "C-reactive protein measurement",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "COAG",
+          "display": "Coagulation Screen",
+          "target": [
+            {
+              "code": "NAT-COAG",
+              "display": "Coagulation screening test",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "FERR",
+          "display": "Ferritin",
+          "target": [
+            {
+              "code": "NAT-FERR",
+              "display": "Serum ferritin measurement",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "ABG",
+          "display": "Arterial Blood Gas",
+          "target": [
+            {
+              "code": "NAT-ABG",
+              "display": "Blood gas and pH analysis",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "URINE",
+          "display": "Urinalysis",
+          "target": [
+            {
+              "code": "NAT-URINE",
+              "display": "Urinalysis",
+              "equivalence": "equivalent"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

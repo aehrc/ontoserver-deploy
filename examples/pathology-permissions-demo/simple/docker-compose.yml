@@ -1,0 +1,288 @@
+# Pathology Permissions Demo - Simple Example
+#
+# This docker-compose configuration demonstrates resource-level permissions
+# using Ontoserver, Ontocloak, and Snapper in a pathology code mapping scenario.
+#
+# Architecture:
+#   Ontocloak (auth) --> Authoring Ontoserver (read/write) --> Production Ontoserver (read-only)
+#
+# Prerequisites:
+#   - Docker and Docker Compose
+#   - Access to quay.io/aehrc container registry
+#   - Run scripts/setup.sh before the first use
+#
+# Usage:
+#   cd simple/
+#   ./scripts/setup.sh    # First time only - configures keys and communities
+#   docker compose up -d  # Start all services (after setup has completed)
+
+volumes:
+  ontocloak-pgdata:
+  authoring-pgdata:
+  authoring-onto-data:
+  production-pgdata:
+  production-onto-data:
+
+services:
+  # ============================================================================
+  # ONTOCLOAK - Authorization Server (Keycloak with community management)
+  # ============================================================================
+  # Ontocloak provides OAuth2/OIDC authentication and authorization.
+  # It manages user communities that map to Ontoserver's resource-level
+  # security labels, controlling which users can see and edit which resources.
+
+  ontocloak-db:
+    image: postgres:16-alpine
+    container_name: ontocloak-db
+    environment:
+      POSTGRES_DB: ontocloak
+      POSTGRES_USER: ontocloak
+      POSTGRES_PASSWORD: ontocloak
+    volumes:
+      - ontocloak-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ontocloak -d ontocloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ontocloak:
+    image: quay.io/aehrc/ontocloak:5
+    container_name: ontocloak
+    depends_on:
+      ontocloak-db:
+        condition: service_healthy
+    command:
+      - start
+      - --import-realm
+      - --hostname-strict=false
+      - --http-enabled=true
+      - --optimized
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: ontocloak-db
+      KC_DB_URL_DATABASE: ontocloak
+      KC_DB_USERNAME: ontocloak
+      KC_DB_PASSWORD: ontocloak
+      KC_HTTP_PORT: "8080"
+      KC_HEALTH_ENABLED: "true"
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - ../common/realm:/opt/keycloak/data/import:ro
+    ports:
+      - "9090:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
+
+  # ============================================================================
+  # AUTHORING ONTOSERVER - Read/Write Terminology Server
+  # ============================================================================
+  # The authoring instance is where terminology authors create and manage
+  # CodeSystems, ConceptMaps, and ValueSets. It uses fine-grained security
+  # (ontoserver.security.enabled=fine) to enforce resource-level permissions
+  # based on FHIR security labels and Ontocloak community memberships.
+  #
+  # Syndication is enabled so content can flow to the production instance.
+
+  authoring-db:
+    image: postgres:16-alpine
+    container_name: authoring-db
+    environment:
+      POSTGRES_DB: ontoserver
+      POSTGRES_USER: ontoserver
+      POSTGRES_PASSWORD: ontoserver
+    volumes:
+      - authoring-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ontoserver -d ontoserver"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  authoring-ontoserver:
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    container_name: authoring-ontoserver
+    depends_on:
+      authoring-db:
+        condition: service_healthy
+      ontocloak:
+        condition: service_healthy
+    environment:
+      # HTTP server on port 8080 (disable HTTPS for demo simplicity)
+      server.port: "8080"
+      server.ssl.enabled: "false"
+
+      # Database
+      spring.datasource.url: jdbc:postgresql://authoring-db:5432/ontoserver
+      spring.datasource.username: ontoserver
+      spring.datasource.password: ontoserver
+
+      # FHIR endpoint configuration
+      # Uses Docker-internal hostname so syndication feed resource URLs are
+      # reachable by the production container (localhost doesn't work between containers)
+      ontoserver.fhir.base: http://authoring-ontoserver:8080/fhir
+
+      # Security - fine-grained mode enables resource-level permissions.
+      # Resources are isolated by community: authors only see/edit their own community's resources.
+      # RSA public key from Ontocloak (PEM format via SPRING_APPLICATION_JSON).
+      SPRING_APPLICATION_JSON: "${ONTOSERVER_SPRING_JSON}"
+      ontoserver.security.enabled: fine
+      ontoserver.security.audience: authoring-server
+      # Syndication feed XML is read-only accessible (no write credentials needed).
+      # This allows downstream consumers (production, Atomio) to fetch the feed
+      # with read-only credentials. The FHIR resources in feed entries still require
+      # proper OAuth authentication with community permissions.
+      ontoserver.security.readOnly.synd: "true"
+
+      # SMART-on-FHIR endpoints (browser-accessible URLs for Snapper login)
+      conformance.security.kinds: SMART-on-FHIR
+      conformance.security.authorize: http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/auth
+      conformance.security.token: http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token
+
+      # Syndication - publish approved FHIR resources for downstream consumption.
+      # "selected" means only resources with syndication status = true are published.
+      # secureSyndicated requires SYND_WRITE to modify a syndicated resource,
+      # preventing authors from accidentally changing published content.
+      atom.syndication.publish.enabled: "true"
+      atom.syndication.publish.fhir.enabled: "selected"
+      atom.syndication.publish.fhir.secureSyndicated: "true"
+      atom.syndication.publish.index.enabled: "false"
+      ontoserver.synd.base: http://authoring-ontoserver:8080/synd
+
+      # Preload the national pathology valueset on startup
+      atom.preload.feedLocation: file:///data/preload/preload.xml
+      atom.preload.feedLocation.default: ""
+
+      # Do not pull from any upstream syndication feeds
+      atom.syndication.feedLocation: ""
+
+      # Features
+      ontoserver.feature.feedFilters: "true"
+
+      # JVM settings
+      JAVA_OPTS: -Xmx4G
+      TZ: Australia/Brisbane
+    volumes:
+      - authoring-onto-data:/var/onto
+      - ../common/preload:/data/preload:ro
+    ports:
+      - "9081:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/fhir/metadata > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+
+  # ============================================================================
+  # PRODUCTION ONTOSERVER - Read-Only Terminology Server
+  # ============================================================================
+  # The production instance is read-only and syncs content from the authoring
+  # instance via live syndication. It represents a production terminology server
+  # that consumers and downstream systems use.
+  #
+  # The syndication-consumer service account (client credentials grant) is used
+  # to authenticate when fetching community-labeled FHIR resources from authoring.
+  # It has PERM_READ (all communities read) so it can access all resources.
+  #
+  # Anonymous FHIR read access is enabled. Users can authenticate to access
+  # community-labeled resources through Snapper.
+
+  production-db:
+    image: postgres:16-alpine
+    container_name: production-db
+    environment:
+      POSTGRES_DB: ontoserver
+      POSTGRES_USER: ontoserver
+      POSTGRES_PASSWORD: ontoserver
+    volumes:
+      - production-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ontoserver -d ontoserver"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  production-ontoserver:
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    container_name: production-ontoserver
+    depends_on:
+      production-db:
+        condition: service_healthy
+      ontocloak:
+        condition: service_healthy
+      authoring-ontoserver:
+        condition: service_healthy
+    environment:
+      # HTTP server on port 8080 (disable HTTPS for demo simplicity)
+      server.port: "8080"
+      server.ssl.enabled: "false"
+
+      # Database
+      spring.datasource.url: jdbc:postgresql://production-db:5432/ontoserver
+      spring.datasource.username: ontoserver
+      spring.datasource.password: ontoserver
+
+      # FHIR endpoint configuration
+      ontoserver.fhir.base: http://localhost:9082/fhir
+
+      # Read-only mode - rejects all write operations except syndication ingestion
+      ontoserver.deployment.readOnly: "true"
+
+      # Security - fine-grained mode so community resource isolation is preserved
+      SPRING_APPLICATION_JSON: "${ONTOSERVER_SPRING_JSON}"
+      ontoserver.security.enabled: fine
+      ontoserver.security.audience: production-server
+      # Anonymous read access to FHIR endpoint (national resources visible to all)
+      ontoserver.security.readOnly.fhir: "true"
+
+      # SMART-on-FHIR endpoints for Snapper (same Ontocloak realm)
+      conformance.security.kinds: SMART-on-FHIR
+      conformance.security.authorize: http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/auth
+      conformance.security.token: http://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token
+
+      # Syndicate from authoring server's feed.
+      # The syndication-consumer service account authenticates via OAuth2 client
+      # credentials to fetch community-labeled FHIR resources from authoring.
+      # Both the local preload file and the remote syndication feed are listed in
+      # atom.preload.feedLocation (comma-separated). atom.syndication.feedLocation
+      # is also set for Ontoserver to know the upstream feed source.
+      atom.syndication.feedLocation: http://authoring-ontoserver:8080/synd/syndication.xml
+      atom.preload.feedLocation: file:///data/preload/preload.xml,http://authoring-ontoserver:8080/synd/syndication.xml
+      atom.preload.feedLocation.default: ""
+
+      # Schedule syndication polling (Spring cron: sec min hour dom month dow).
+      # Every 2 minutes for demo responsiveness; production would use longer intervals.
+      atom.preload.schedule.cron: "0 */2 * * * *"
+
+      # OAuth2 client credentials for authenticated syndication.
+      # Matches requests to authoring-ontoserver and obtains a token from Ontocloak.
+      # The syndication-consumer service account has PERM_READ (all communities read).
+      authentication.oauth.endpoint.0: http://authoring-ontoserver:8080
+      authentication.oauth.endpoint.token_endpoint.0: http://ontocloak:8080/auth/realms/pathology-demo/protocol/openid-connect/token
+      authentication.oauth.endpoint.client_id.0: syndication-consumer
+      authentication.oauth.endpoint.client_secret.0: syndication-consumer-secret
+      authentication.oauth.endpoint.strategy.0: body
+
+      # Features
+      ontoserver.feature.feedFilters: "true"
+
+      # JVM settings
+      JAVA_OPTS: -Xmx4G
+      TZ: Australia/Brisbane
+    volumes:
+      - production-onto-data:/var/onto
+      - ../common/preload:/data/preload:ro
+    ports:
+      - "9082:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/fhir/metadata > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 120s

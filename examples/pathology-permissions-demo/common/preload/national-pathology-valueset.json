@@ -1,0 +1,65 @@
+{
+  "resourceType": "ValueSet",
+  "id": "national-pathology-refset",
+  "meta": {
+    "security": [
+      {
+        "system": "http://ontoserver.csiro.au/CodeSystem/ontoserver-permissions",
+        "code": "*.read"
+      },
+      {
+        "system": "http://ontoserver.csiro.au/CodeSystem/ontoserver-permissions",
+        "code": "NATIONAL.write"
+      }
+    ]
+  },
+  "url": "http://example.org/ValueSet/national-pathology-refset",
+  "version": "1.0.0",
+  "name": "NationalPathologyReferenceSet",
+  "title": "National Pathology Reference Set",
+  "status": "active",
+  "experimental": false,
+  "date": "2024-01-01",
+  "publisher": "National Pathology Authority",
+  "contact": [
+    {
+      "name": "National Pathology Authority",
+      "telecom": [
+        {
+          "system": "url",
+          "value": "http://example.org/national-pathology"
+        }
+      ]
+    }
+  ],
+  "description": "National reference set of standard codes for common pathology tests. This ValueSet serves as the mapping target for all participating pathology laboratories. Each provider maps their local order codes to concepts in this reference set.",
+  "compose": {
+    "include": [
+      {
+        "system": "http://example.org/CodeSystem/national-pathology-codes",
+        "concept": [
+          { "code": "NAT-CBC", "display": "Complete blood count" },
+          { "code": "NAT-GLUC", "display": "Glucose measurement" },
+          { "code": "NAT-HBA1C", "display": "Hemoglobin A1c measurement" },
+          { "code": "NAT-TCHOL", "display": "Total cholesterol measurement" },
+          { "code": "NAT-CREAT", "display": "Serum creatinine measurement" },
+          { "code": "NAT-K", "display": "Potassium measurement" },
+          { "code": "NAT-NA", "display": "Sodium measurement" },
+          { "code": "NAT-TSH", "display": "Thyroid stimulating hormone measurement" },
+          { "code": "NAT-LFT", "display": "Liver function test" },
+          { "code": "NAT-HAEM", "display": "Haematology test" },
+          { "code": "NAT-CRP", "display": "C-reactive protein measurement" },
+          { "code": "NAT-ABG", "display": "Blood gas and pH analysis" },
+          { "code": "NAT-TFT", "display": "Thyroid function test" },
+          { "code": "NAT-COAG", "display": "Coagulation screening test" },
+          { "code": "NAT-FERR", "display": "Serum ferritin measurement" },
+          { "code": "NAT-URINE", "display": "Urinalysis" },
+          { "code": "NAT-LIPID", "display": "Lipid panel" },
+          { "code": "NAT-CA", "display": "Serum calcium measurement" },
+          { "code": "NAT-MG", "display": "Serum magnesium measurement" },
+          { "code": "NAT-PHOS", "display": "Serum phosphate measurement" }
+        ]
+      }
+    ]
+  }
+}

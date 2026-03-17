@@ -1,0 +1,61 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "national-pathology-codes",
+  "meta": {
+    "security": [
+      {
+        "system": "http://ontoserver.csiro.au/CodeSystem/ontoserver-permissions",
+        "code": "*.read"
+      },
+      {
+        "system": "http://ontoserver.csiro.au/CodeSystem/ontoserver-permissions",
+        "code": "NATIONAL.write"
+      }
+    ]
+  },
+  "url": "http://example.org/CodeSystem/national-pathology-codes",
+  "version": "1.0.0",
+  "name": "NationalPathologyCodes",
+  "title": "National Pathology Standard Codes",
+  "valueSet": "http://example.org/CodeSystem/national-pathology-codes",
+  "status": "active",
+  "experimental": false,
+  "date": "2024-01-01",
+  "publisher": "National Pathology Authority",
+  "contact": [
+    {
+      "name": "National Pathology Authority",
+      "telecom": [
+        {
+          "system": "url",
+          "value": "http://example.org/national-pathology"
+        }
+      ]
+    }
+  ],
+  "description": "National standard codes for common pathology tests. Each participating laboratory maps their local order codes to this standard code set for interoperability.",
+  "content": "complete",
+  "count": 20,
+  "concept": [
+    { "code": "NAT-CBC", "display": "Complete blood count", "definition": "Complete blood count including white cells, red cells, haemoglobin, haematocrit, and platelets" },
+    { "code": "NAT-GLUC", "display": "Glucose measurement", "definition": "Blood glucose measurement (random or fasting)" },
+    { "code": "NAT-HBA1C", "display": "Hemoglobin A1c measurement", "definition": "Glycated haemoglobin measurement for long-term glucose control" },
+    { "code": "NAT-TCHOL", "display": "Total cholesterol measurement", "definition": "Serum total cholesterol measurement" },
+    { "code": "NAT-CREAT", "display": "Serum creatinine measurement", "definition": "Serum creatinine for renal function assessment" },
+    { "code": "NAT-K", "display": "Potassium measurement", "definition": "Serum potassium measurement" },
+    { "code": "NAT-NA", "display": "Sodium measurement", "definition": "Serum sodium measurement" },
+    { "code": "NAT-TSH", "display": "Thyroid stimulating hormone measurement", "definition": "TSH measurement for thyroid function screening" },
+    { "code": "NAT-LFT", "display": "Liver function test", "definition": "Liver function panel including ALT, AST, ALP, GGT, bilirubin, albumin" },
+    { "code": "NAT-HAEM", "display": "Haematology test", "definition": "General haematology investigation" },
+    { "code": "NAT-CRP", "display": "C-reactive protein measurement", "definition": "C-reactive protein for inflammation assessment" },
+    { "code": "NAT-ABG", "display": "Blood gas and pH analysis", "definition": "Arterial blood gas analysis including pH, pO2, pCO2, HCO3" },
+    { "code": "NAT-TFT", "display": "Thyroid function test", "definition": "Thyroid function panel including TSH, free T3, free T4" },
+    { "code": "NAT-COAG", "display": "Coagulation screening test", "definition": "Coagulation screen including PT, APTT, INR" },
+    { "code": "NAT-FERR", "display": "Serum ferritin measurement", "definition": "Serum ferritin for iron stores assessment" },
+    { "code": "NAT-URINE", "display": "Urinalysis", "definition": "Urine dipstick and microscopy" },
+    { "code": "NAT-LIPID", "display": "Lipid panel", "definition": "Full lipid panel including total cholesterol, HDL, LDL, triglycerides" },
+    { "code": "NAT-CA", "display": "Serum calcium measurement", "definition": "Serum calcium (total) measurement" },
+    { "code": "NAT-MG", "display": "Serum magnesium measurement", "definition": "Serum magnesium measurement" },
+    { "code": "NAT-PHOS", "display": "Serum phosphate measurement", "definition": "Serum phosphate measurement" }
+  ]
+}

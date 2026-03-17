@@ -1,0 +1,149 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "beta-pathology-to-national",
+  "meta": {
+    "security": [
+      {
+        "system": "http://ontoserver.csiro.au/CodeSystem/ontoserver-permissions",
+        "code": "BETA.read"
+      },
+      {
+        "system": "http://ontoserver.csiro.au/CodeSystem/ontoserver-permissions",
+        "code": "BETA.write"
+      }
+    ]
+  },
+  "url": "http://pathology-beta.example.com/ConceptMap/pathology-to-national",
+  "version": "1.0.0",
+  "name": "PathologyBetaPathologyToNational",
+  "title": "Pathology Beta - Local Codes to National Standard Mapping",
+  "status": "draft",
+  "experimental": false,
+  "date": "2024-03-01",
+  "publisher": "Pathology Beta Pathology Department",
+  "description": "Maps Pathology Beta's local pathology order codes to the national pathology standard codes.",
+  "sourceUri": "http://pathology-beta.example.com/CodeSystem/pathology-codes",
+  "targetUri": "http://example.org/ValueSet/national-pathology-refset",
+  "group": [
+    {
+      "source": "http://pathology-beta.example.com/CodeSystem/pathology-codes",
+      "target": "http://example.org/CodeSystem/national-pathology-codes",
+      "element": [
+        {
+          "code": "CBC",
+          "display": "Complete Blood Count",
+          "target": [
+            {
+              "code": "NAT-CBC",
+              "display": "Complete blood count",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "GLUC",
+          "display": "Glucose",
+          "target": [
+            {
+              "code": "NAT-GLUC",
+              "display": "Glucose measurement",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "A1C",
+          "display": "Glycated Haemoglobin",
+          "target": [
+            {
+              "code": "NAT-HBA1C",
+              "display": "Hemoglobin A1c measurement",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "CHOL",
+          "display": "Cholesterol Panel",
+          "target": [
+            {
+              "code": "NAT-LIPID",
+              "display": "Lipid panel",
+              "equivalence": "wider",
+              "comment": "Beta's CHOL is a full lipid panel, mapped to the broader national concept"
+            }
+          ]
+        },
+        {
+          "code": "RFP",
+          "display": "Renal Function Panel",
+          "target": [
+            {
+              "code": "NAT-CREAT",
+              "display": "Serum creatinine measurement",
+              "equivalence": "wider",
+              "comment": "RFP is broader than creatinine alone; mapped to closest single concept"
+            }
+          ]
+        },
+        {
+          "code": "HEPAT",
+          "display": "Hepatic Panel",
+          "target": [
+            {
+              "code": "NAT-LFT",
+              "display": "Liver function test",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "THYP",
+          "display": "Thyroid Panel",
+          "target": [
+            {
+              "code": "NAT-TFT",
+              "display": "Thyroid function test",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "INFLAM",
+          "display": "Inflammatory Markers",
+          "target": [
+            {
+              "code": "NAT-CRP",
+              "display": "C-reactive protein measurement",
+              "equivalence": "narrower",
+              "comment": "Beta's INFLAM includes ESR in addition to CRP"
+            }
+          ]
+        },
+        {
+          "code": "FE-STUD",
+          "display": "Iron Studies",
+          "target": [
+            {
+              "code": "NAT-FERR",
+              "display": "Serum ferritin measurement",
+              "equivalence": "wider",
+              "comment": "Iron studies includes more than just ferritin"
+            }
+          ]
+        },
+        {
+          "code": "UA",
+          "display": "Urine Analysis",
+          "target": [
+            {
+              "code": "NAT-URINE",
+              "display": "Urinalysis",
+              "equivalence": "equivalent"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

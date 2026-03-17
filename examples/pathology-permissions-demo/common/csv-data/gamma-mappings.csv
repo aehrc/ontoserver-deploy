@@ -1,0 +1,16 @@
+source_code,source_display,target_system,target_code,target_display,equivalence,comment
+GLU-R,Glucose Random,http://example.org/CodeSystem/national-pathology-codes,NAT-GLUC,Glucose measurement,equivalent,
+GLU-F,Glucose Fasting,http://example.org/CodeSystem/national-pathology-codes,NAT-GLUC,Glucose measurement,equivalent,Both random and fasting map to same national concept
+HBA1C,HbA1c,http://example.org/CodeSystem/national-pathology-codes,NAT-HBA1C,Hemoglobin A1c measurement,equivalent,
+CHOL-T,Total Cholesterol,http://example.org/CodeSystem/national-pathology-codes,NAT-TCHOL,Total cholesterol measurement,equivalent,
+CHOL-HDL,HDL Cholesterol,http://example.org/CodeSystem/national-pathology-codes,NAT-LIPID,Lipid panel,narrower,HDL is a component of the lipid panel
+CHOL-LDL,LDL Cholesterol,http://example.org/CodeSystem/national-pathology-codes,NAT-LIPID,Lipid panel,narrower,LDL is a component of the lipid panel
+TRIG,Triglycerides,http://example.org/CodeSystem/national-pathology-codes,NAT-LIPID,Lipid panel,narrower,Triglycerides is a component of the lipid panel
+NA,Sodium,http://example.org/CodeSystem/national-pathology-codes,NAT-NA,Sodium measurement,equivalent,
+K,Potassium,http://example.org/CodeSystem/national-pathology-codes,NAT-K,Potassium measurement,equivalent,
+CREAT,Creatinine,http://example.org/CodeSystem/national-pathology-codes,NAT-CREAT,Serum creatinine measurement,equivalent,
+CA,Calcium,http://example.org/CodeSystem/national-pathology-codes,NAT-CA,Serum calcium measurement,equivalent,
+MG,Magnesium,http://example.org/CodeSystem/national-pathology-codes,NAT-MG,Serum magnesium measurement,equivalent,
+PHOS,Phosphate,http://example.org/CodeSystem/national-pathology-codes,NAT-PHOS,Serum phosphate measurement,equivalent,
+TSH,TSH,http://example.org/CodeSystem/national-pathology-codes,NAT-TSH,Thyroid stimulating hormone measurement,equivalent,
+FT4,Free T4,http://example.org/CodeSystem/national-pathology-codes,NAT-TFT,Thyroid function test,wider,Free T4 is narrower than full thyroid function test

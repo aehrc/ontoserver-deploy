@@ -1,0 +1,79 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "beta-pathology-codes",
+  "meta": {
+    "security": [
+      {
+        "system": "http://ontoserver.csiro.au/CodeSystem/ontoserver-permissions",
+        "code": "BETA.read"
+      },
+      {
+        "system": "http://ontoserver.csiro.au/CodeSystem/ontoserver-permissions",
+        "code": "BETA.write"
+      }
+    ]
+  },
+  "url": "http://pathology-beta.example.com/CodeSystem/pathology-codes",
+  "version": "1.0.0",
+  "name": "PathologyBetaPathologyCodes",
+  "title": "Pathology Beta - Local Pathology Order Codes",
+  "status": "draft",
+  "experimental": false,
+  "date": "2024-03-01",
+  "publisher": "Pathology Beta Pathology Department",
+  "description": "Local pathology order codes used by Pathology Beta's laboratory information system. These differ from Pathology Alpha's codes, reflecting different LIS naming conventions while mapping to the same national pathology reference set.",
+  "content": "complete",
+  "count": 10,
+  "concept": [
+    {
+      "code": "CBC",
+      "display": "Complete Blood Count",
+      "definition": "Full blood count with differential"
+    },
+    {
+      "code": "RFP",
+      "display": "Renal Function Panel",
+      "definition": "Renal panel including Na, K, Cl, HCO3, urea, creatinine, eGFR"
+    },
+    {
+      "code": "HEPAT",
+      "display": "Hepatic Panel",
+      "definition": "Liver function panel"
+    },
+    {
+      "code": "THYP",
+      "display": "Thyroid Panel",
+      "definition": "Thyroid function including TSH and free hormones"
+    },
+    {
+      "code": "GLUC",
+      "display": "Glucose",
+      "definition": "Blood glucose measurement (random or fasting)"
+    },
+    {
+      "code": "A1C",
+      "display": "Glycated Haemoglobin",
+      "definition": "HbA1c percentage"
+    },
+    {
+      "code": "CHOL",
+      "display": "Cholesterol Panel",
+      "definition": "Full lipid profile"
+    },
+    {
+      "code": "INFLAM",
+      "display": "Inflammatory Markers",
+      "definition": "CRP and ESR"
+    },
+    {
+      "code": "FE-STUD",
+      "display": "Iron Studies",
+      "definition": "Iron, ferritin, transferrin, TIBC"
+    },
+    {
+      "code": "UA",
+      "display": "Urine Analysis",
+      "definition": "Urinalysis with microscopy"
+    }
+  ]
+}

@@ -1,0 +1,286 @@
+/* AEHRC Brand Theme for Slidev */
+
+/* ============================================
+   CUSTOM PROPERTIES
+   ============================================ */
+:root {
+  --slidev-theme-primary: #00A9CE;
+  --color-navy: #001D34;
+  --color-grey: #757579;
+  --color-indigo: #1E22AA;
+  --color-teal: #007377;
+  --color-purple: #6D2077;
+}
+
+/* ============================================
+   BASE SLIDE STYLES
+   Slidev puts class: frontmatter ON the
+   .slidev-layout element (not a parent).
+   ============================================ */
+.slidev-layout {
+  font-family: Calibri, 'Segoe UI', Arial, Helvetica, sans-serif !important;
+  color: var(--color-navy) !important;
+  background-color: #fff !important;
+}
+
+/* ============================================
+   TYPOGRAPHY (light background default)
+   ============================================ */
+.slidev-layout h1 {
+  color: var(--color-navy) !important;
+  border-bottom: 3px solid var(--slidev-theme-primary);
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+}
+
+.slidev-layout h2 {
+  color: var(--color-navy) !important;
+  margin-bottom: 8px;
+}
+
+.slidev-layout h3 {
+  color: var(--color-teal) !important;
+  margin-bottom: 4px;
+}
+
+/* ============================================
+   COVER SLIDE (layout: cover)
+   "cover" is on the SAME element as .slidev-layout
+   so .slidev-layout.cover works correctly.
+   ============================================ */
+.slidev-layout.cover {
+  background: linear-gradient(135deg, var(--color-navy) 0%, #002A4D 100%) !important;
+  color: #fff !important;
+}
+
+.slidev-layout.cover h1 {
+  color: #fff !important;
+  border-bottom-color: var(--slidev-theme-primary);
+}
+
+.slidev-layout.cover h2 {
+  color: var(--slidev-theme-primary) !important;
+}
+
+.slidev-layout.cover h3,
+.slidev-layout.cover p {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* ============================================
+   DARK BACKGROUND CLASSES
+   Applied via `class:` in slide frontmatter.
+   Slidev puts these ON the .slidev-layout element,
+   so we use .bg-X (same element) not
+   .bg-X .slidev-layout (descendant — WRONG).
+   ============================================ */
+
+/* --- Navy --- */
+.bg-navy {
+  background: linear-gradient(135deg, var(--color-navy) 0%, #002A4D 100%) !important;
+  color: #fff !important;
+}
+.bg-navy h1 {
+  color: #fff !important;
+  border-bottom-color: var(--slidev-theme-primary) !important;
+}
+.bg-navy h2 {
+  color: var(--slidev-theme-primary) !important;
+}
+.bg-navy h3,
+.bg-navy p,
+.bg-navy li,
+.bg-navy span,
+.bg-navy strong,
+.bg-navy td,
+.bg-navy th {
+  color: #fff !important;
+}
+
+/* --- Teal --- */
+.bg-teal {
+  background: linear-gradient(135deg, var(--color-teal) 0%, #005A5D 100%) !important;
+  color: #fff !important;
+}
+.bg-teal h1 {
+  color: #fff !important;
+  border-bottom-color: rgba(255, 255, 255, 0.5) !important;
+}
+.bg-teal h2 {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+.bg-teal h3,
+.bg-teal p,
+.bg-teal li,
+.bg-teal span,
+.bg-teal strong {
+  color: #fff !important;
+}
+
+/* --- Indigo --- */
+.bg-indigo {
+  background: linear-gradient(135deg, var(--color-indigo) 0%, #151880 100%) !important;
+  color: #fff !important;
+}
+.bg-indigo h1 {
+  color: #fff !important;
+  border-bottom-color: var(--slidev-theme-primary) !important;
+}
+.bg-indigo h2 {
+  color: var(--slidev-theme-primary) !important;
+}
+.bg-indigo h3,
+.bg-indigo p,
+.bg-indigo li,
+.bg-indigo span,
+.bg-indigo strong {
+  color: #fff !important;
+}
+
+/* --- Purple --- */
+.bg-purple {
+  background: linear-gradient(135deg, var(--color-purple) 0%, #4A1652 100%) !important;
+  color: #fff !important;
+}
+.bg-purple h1 {
+  color: #fff !important;
+  border-bottom-color: rgba(255, 255, 255, 0.5) !important;
+}
+.bg-purple h2 {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+.bg-purple h3,
+.bg-purple p,
+.bg-purple li,
+.bg-purple span,
+.bg-purple strong {
+  color: #fff !important;
+}
+
+/* ============================================
+   TABLES
+   ============================================ */
+table {
+  font-size: 0.75em;
+  width: 100%;
+}
+
+thead {
+  background-color: var(--color-navy);
+}
+
+thead th {
+  color: #fff !important;
+  font-weight: 600;
+  padding: 5px 8px;
+}
+
+tbody td {
+  padding: 3px 8px;
+}
+
+tbody tr:nth-child(even) {
+  background-color: #f5f5f5;
+}
+
+/* ============================================
+   CODE BLOCKS
+   ============================================ */
+.slidev-code code {
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace !important;
+}
+
+:not(pre) > code {
+  background-color: rgba(0, 169, 206, 0.1);
+  color: var(--color-navy);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.88em;
+}
+
+/* ============================================
+   BLOCKQUOTES
+   ============================================ */
+blockquote {
+  background-color: rgba(0, 169, 206, 0.08);
+  border-left: 4px solid var(--slidev-theme-primary);
+  border-radius: 0 8px 8px 0;
+  padding: 6px 12px;
+  margin: 6px 0;
+}
+
+blockquote p {
+  color: var(--color-navy) !important;
+  margin: 0 !important;
+  font-size: 0.85em;
+}
+
+/* ============================================
+   LIST ITEMS
+   ============================================ */
+li::marker {
+  color: var(--slidev-theme-primary);
+}
+
+li {
+  line-height: 1.35;
+  margin-bottom: 2px;
+}
+
+ul, ol {
+  margin: 4px 0;
+}
+
+/* ============================================
+   MERMAID DIAGRAMS
+   ============================================ */
+.mermaid svg {
+  max-height: 240px;
+  width: auto;
+}
+
+/* High-contrast arrows and lines */
+.mermaid .edge-pattern-solid,
+.mermaid .flowchart-link,
+.mermaid path.path {
+  stroke: #00A9CE !important;
+  stroke-width: 2px !important;
+}
+
+.mermaid .arrowheadPath,
+.mermaid marker path {
+  fill: #00A9CE !important;
+  stroke: #00A9CE !important;
+}
+
+.mermaid .edgeLabel {
+  background-color: #fff !important;
+  color: #001D34 !important;
+}
+
+.mermaid .edgeLabel rect {
+  fill: #fff !important;
+  opacity: 1 !important;
+}
+
+.mermaid .edgeLabel span,
+.mermaid .edgeLabel .label,
+.mermaid .edgeLabel p {
+  color: #001D34 !important;
+  background: #fff !important;
+}
+
+/* ============================================
+   LOGO
+   ============================================ */
+.logo {
+  position: absolute;
+  bottom: 20px;
+  right: 32px;
+}
+
+.logo img {
+  height: 40px;
+  width: auto;
+  opacity: 0.9;
+}
