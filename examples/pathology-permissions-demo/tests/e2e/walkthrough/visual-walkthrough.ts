@@ -589,7 +589,7 @@ async function scene10_atomioPromoteUAT(page: Page): Promise<void> {
 
   // Click the "Redirect alias" (wrench) icon on the uat row
   const uatRow = page.locator('tbody tr').filter({ hasText: 'uat' }).first();
-  await uatRow.locator('button[title="Redirect alias"]').click();
+  await uatRow.getByRole('button', { name: 'Redirect alias' }).click();
   await page.waitForTimeout(2_000);
 
   // Dialog: "Redirect alias to feed" with FeedSelect autocomplete
@@ -663,7 +663,7 @@ async function scene11_atomioPromoteProduction(page: Page): Promise<void> {
 
   // Click the "Redirect alias" (wrench) icon on the production row
   const prodRow = page.locator('tbody tr').filter({ hasText: 'production' }).first();
-  await prodRow.locator('button[title="Redirect alias"]').click();
+  await prodRow.getByRole('button', { name: 'Redirect alias' }).click();
   await page.waitForTimeout(2_000);
 
   // Dialog: "Redirect alias to feed" — select release-2-0
