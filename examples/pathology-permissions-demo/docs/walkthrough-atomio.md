@@ -44,7 +44,7 @@ These cloud-hosted tools connect to your local servers via the `?iss=` parameter
 
 Server connections:
 - **Authoring**: append `?iss=https://localhost:9081`
-- **Atomio**: append `?iss=https://localhost:9083`
+- **Atomio**: open `https://localhost:9083` (redirects to Atomio UI)
 - **UAT**: append `?iss=https://localhost:9084`
 - **Production**: append `?iss=https://localhost:9085`
 
@@ -58,7 +58,7 @@ Demo users (all passwords: **`demo`**):
 **Using Atomio UI:**
 
 1. Open the Atomio UI:
-   `https://ontoserver.csiro.au/atomio/?iss=https://localhost:9083`
+   `https://localhost:9083`
 2. Browse **Feeds** — you should see:
    - `release-1-0` — the initial release candidate (cloned from authoring)
    - `gamma-content` — dedicated feed for Pathology Gamma's CSV-sourced content
@@ -78,6 +78,8 @@ curl -sk https://localhost:9083/feed/release-1-0/syndication.xml | head -30
 ```
 
 > Atomio also has a Swagger UI at `https://localhost:9083/swagger-ui/index.html` for interactive API exploration.
+
+> **Atomio Security:** Atomio has security enabled. All write operations (clone, alias update) require authentication via a Bearer token. Read operations (list feeds, list aliases, view feed content) are publicly accessible without authentication.
 
 ## Part 2: Resource Isolation
 
@@ -209,7 +211,7 @@ curl -sk -o /dev/null -w "HTTP %{http_code}\n" -X POST \
 **Using Atomio UI:**
 
 1. Open the Atomio UI:
-   `https://ontoserver.csiro.au/atomio/?iss=https://localhost:9083`
+   `https://localhost:9083`
 2. Create a new feed by cloning the authoring syndication feed
 3. Name it `release-2-0`
 4. Verify both `release-1-0` and `release-2-0` appear in the feeds list
@@ -217,9 +219,16 @@ curl -sk -o /dev/null -w "HTTP %{http_code}\n" -X POST \
 **Using curl:**
 
 ```bash
+# Get an admin token for Atomio write operations
+ADMIN_TOKEN=$(curl -sk -X POST \
+  https://localhost:9090/auth/realms/pathology-demo/protocol/openid-connect/token \
+  -d "grant_type=password&client_id=demo-cli&username=admin&password=demo" \
+  | jq -r '.access_token')
+
 # Clone authoring's syndication feed into a new snapshot
 curl -sk -o /dev/null -w "HTTP %{http_code}\n" -X POST \
-  "https://localhost:9083/feed/\$clone?name=release-2-0&url=http://authoring-ontoserver:8080/synd/syndication.xml"
+  "https://localhost:9083/feed/\$clone?name=release-2-0&url=http://authoring-ontoserver:8080/synd/syndication.xml" \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
 
 # Verify both feeds exist
 curl -sk https://localhost:9083/feed | jq '.[].name'
@@ -243,6 +252,7 @@ curl -sk https://localhost:9083/feed | jq '.[].name'
 curl -sk -o /dev/null -w "HTTP %{http_code}\n" -X PUT \
   https://localhost:9083/alias/uat \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{"aliasName": "uat", "feedName": "release-2-0"}'
 
 # Verify
@@ -296,6 +306,7 @@ After UAT testing, promote to production:
 curl -sk -o /dev/null -w "HTTP %{http_code}\n" -X PUT \
   https://localhost:9083/alias/production \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{"aliasName": "production", "feedName": "release-2-0"}'
 
 # Verify
@@ -320,6 +331,7 @@ If issues are found, rollback is instant — repoint the alias to the previous f
 curl -sk -o /dev/null -w "HTTP %{http_code}\n" -X PUT \
   https://localhost:9083/alias/production \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{"aliasName": "production", "feedName": "release-1-0"}'
 
 # UAT stays on release-2-0
@@ -437,10 +449,19 @@ npm install && npm run install-browsers  # first time only
 npm run walkthrough:atomio
 ```
 
-This launches a visible Chromium window and walks through all 13 scenes — the 10 core scenes from the simple variant plus 3 Atomio-specific scenes:
-11. Atomio UI — browse feeds and aliases
-12. Atomio aliases — promotion workflow
-13. Compare UAT vs production environments
+This launches a visible Chromium window and walks through all 12 scenes — 8 shared scenes plus 4 Atomio-specific scenes:
+1. Anonymous Access
+2. Alpha Community
+3. Beta Community
+4. Admin Full Access
+5. Viewer vs Author Roles
+6. Upload and Syndication
+7. Approve Resources
+8. ConceptMaps
+9. Atomio — Clone Release Candidate
+10. Atomio — Promote to UAT
+11. Atomio — Promote to Production
+12. CSV-to-FHIR Pipeline — Gamma Content
 
 Press Enter at each pause point to advance. If a scene fails, you can retry, skip, or quit.
 
