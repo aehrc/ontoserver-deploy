@@ -88,8 +88,6 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin
     volumes:
       - ../common/realm:/opt/keycloak/data/import:ro
-    ports:
-      - "19090:8080"
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
       interval: 15s
@@ -416,12 +414,8 @@ services:
     image: caddy:2-alpine
     container_name: caddy
     depends_on:
-      ontocloak:
-        condition: service_healthy
-      authoring-ontoserver:
-        condition: service_healthy
-      atomio:
-        condition: service_healthy
+      ontocloak-db:
+        condition: service_started
     ports:
       - "9081:9081"
       - "9083:9083"

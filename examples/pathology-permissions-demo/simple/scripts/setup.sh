@@ -36,9 +36,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMMON_DIR="$(cd "${PROJECT_DIR}/../common" && pwd)"
 
-# Ontocloak is accessed directly on HTTP port 19090 during setup (before Caddy starts).
-# Browser access uses HTTPS via Caddy on port 9090.
-ONTOCLOAK_URL="http://localhost:19090"
+ONTOCLOAK_URL="https://localhost:9090"
 AUTHORING_URL="https://localhost:9081"
 PRODUCTION_URL="https://localhost:9082"
 REALM="pathology-demo"
@@ -479,8 +477,8 @@ main() {
     # Step 1: Start Ontocloak
     # ------------------------------------------------------------------
     echo ""
-    log "STEP 1: Starting Ontocloak (authorization server)..."
-    docker compose up -d ontocloak-db ontocloak
+    log "STEP 1: Starting Ontocloak and Caddy (authorization + HTTPS proxy)..."
+    docker compose up -d ontocloak-db ontocloak caddy
 
     wait_for_service "${ONTOCLOAK_URL}/auth/realms/master" 180 "Ontocloak"
 
