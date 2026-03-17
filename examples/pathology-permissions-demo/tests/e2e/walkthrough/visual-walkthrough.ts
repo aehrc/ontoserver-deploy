@@ -560,14 +560,16 @@ async function scene9_atomioReleasePipeline(page: Page): Promise<void> {
   await page.waitForTimeout(2_000);
 
   // Dialog: "Clone existing feed" with Name and URL fields
-  await page.locator('[role="dialog"]').waitFor({ state: 'visible', timeout: 5_000 });
-  await page.getByLabel('Name').fill('release-2-0');
-  await page.getByLabel('URL').fill('http://authoring-ontoserver:8080/synd/syndication.xml');
+  const cloneDialog = page.locator('[role="dialog"]');
+  await cloneDialog.waitFor({ state: 'visible', timeout: 5_000 });
+
+  // Fill form fields — scope to dialog to avoid matching table headers
+  await cloneDialog.getByLabel('Name').fill('release-2-0');
+  await cloneDialog.getByLabel('URL').fill('http://authoring-ontoserver:8080/synd/syndication.xml');
   await page.waitForTimeout(1_000);
 
-  // Submit — the dialog has two "Clone Feed" buttons (toolbar + dialog submit),
-  // use the one inside the dialog
-  await page.locator('[role="dialog"]').getByRole('button', { name: 'Clone Feed' }).click();
+  // Submit — click the "Clone Feed" button inside the dialog
+  await cloneDialog.getByRole('button', { name: 'Clone Feed' }).click();
   await page.waitForTimeout(8_000);
 
   highlight('Release candidate "release-2-0" created from authoring feed.');
@@ -591,17 +593,19 @@ async function scene10_atomioPromoteUAT(page: Page): Promise<void> {
   await page.waitForTimeout(2_000);
 
   // Dialog: "Redirect alias to feed" with FeedSelect autocomplete
-  await page.locator('[role="dialog"]').waitFor({ state: 'visible', timeout: 5_000 });
+  const uatDialog = page.locator('[role="dialog"]');
+  await uatDialog.waitFor({ state: 'visible', timeout: 5_000 });
+
   // Type into the autocomplete to filter and select release-2-0
-  await page.getByLabel('Feed Name').click();
-  await page.getByLabel('Feed Name').fill('release-2-0');
+  await uatDialog.getByLabel('Feed Name').click();
+  await uatDialog.getByLabel('Feed Name').fill('release-2-0');
   await page.waitForTimeout(1_000);
   // Select from the autocomplete dropdown
   await page.locator('[role="listbox"] li').filter({ hasText: 'release-2-0' }).click();
   await page.waitForTimeout(500);
 
   // Submit
-  await page.locator('[role="dialog"]').getByRole('button', { name: 'Redirect Alias' }).click();
+  await uatDialog.getByRole('button', { name: 'Redirect Alias' }).click();
   await page.waitForTimeout(3_000);
 
   highlight('"uat" alias now points to release-2-0.');
@@ -663,15 +667,16 @@ async function scene11_atomioPromoteProduction(page: Page): Promise<void> {
   await page.waitForTimeout(2_000);
 
   // Dialog: "Redirect alias to feed" — select release-2-0
-  await page.locator('[role="dialog"]').waitFor({ state: 'visible', timeout: 5_000 });
-  await page.getByLabel('Feed Name').click();
-  await page.getByLabel('Feed Name').fill('release-2-0');
+  const prodDialog = page.locator('[role="dialog"]');
+  await prodDialog.waitFor({ state: 'visible', timeout: 5_000 });
+  await prodDialog.getByLabel('Feed Name').click();
+  await prodDialog.getByLabel('Feed Name').fill('release-2-0');
   await page.waitForTimeout(1_000);
   await page.locator('[role="listbox"] li').filter({ hasText: 'release-2-0' }).click();
   await page.waitForTimeout(500);
 
   // Submit
-  await page.locator('[role="dialog"]').getByRole('button', { name: 'Redirect Alias' }).click();
+  await prodDialog.getByRole('button', { name: 'Redirect Alias' }).click();
   await page.waitForTimeout(3_000);
 
   highlight('"production" alias now points to release-2-0.');
