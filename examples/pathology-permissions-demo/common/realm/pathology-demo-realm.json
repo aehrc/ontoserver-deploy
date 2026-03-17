@@ -83,7 +83,7 @@
           "client": {
             "authoring-server": ["authoring-serverFHIR_READ"],
             "production-server": ["production-serverFHIR_READ"],
-            "atomio-server": ["atomio-serverFHIR_READ"]
+            "atomio-server": ["FHIR_READ"]
           }
         }
       },
@@ -95,7 +95,7 @@
           "client": {
             "authoring-server": ["authoring-serverFHIR_READ", "authoring-serverFHIR_WRITE"],
             "production-server": ["production-serverFHIR_READ"],
-            "atomio-server": ["atomio-serverFHIR_READ", "atomio-serverFHIR_WRITE"]
+            "atomio-server": ["FHIR_READ", "FHIR_WRITE"]
           }
         }
       },
@@ -107,7 +107,7 @@
           "realm": ["Author"],
           "client": {
             "authoring-server": ["authoring-serverSYND_READ", "authoring-serverSYND_WRITE"],
-            "atomio-server": ["atomio-serverSYND_READ", "atomio-serverSYND_WRITE"]
+            "atomio-server": ["SYND_READ", "SYND_WRITE"]
           }
         }
       },
@@ -125,7 +125,7 @@
           "client": {
             "authoring-server": ["authoring-serverAPI_READ", "authoring-serverAPI_WRITE", "authoring-serverFHIR_READ", "authoring-serverFHIR_WRITE", "authoring-serverSYND_READ", "authoring-serverSYND_WRITE"],
             "production-server": ["production-serverAPI_READ", "production-serverAPI_WRITE", "production-serverFHIR_READ", "production-serverSYND_READ"],
-            "atomio-server": ["atomio-serverFHIR_READ", "atomio-serverFHIR_WRITE", "atomio-serverSYND_READ", "atomio-serverSYND_WRITE"]
+            "atomio-server": ["FHIR_READ", "FHIR_WRITE", "SYND_READ", "SYND_WRITE"]
           }
         }
       },
@@ -198,19 +198,19 @@
       ],
       "atomio-server": [
         {
-          "name": "atomio-serverFHIR_READ",
+          "name": "FHIR_READ",
           "description": "Read access to the Atomio FHIR/feed endpoint (audience-prefixed for token scoping)"
         },
         {
-          "name": "atomio-serverFHIR_WRITE",
+          "name": "FHIR_WRITE",
           "description": "Write access to the Atomio FHIR/feed endpoint (audience-prefixed for token scoping)"
         },
         {
-          "name": "atomio-serverSYND_READ",
+          "name": "SYND_READ",
           "description": "Read access to the Atomio syndication endpoint (audience-prefixed for token scoping)"
         },
         {
-          "name": "atomio-serverSYND_WRITE",
+          "name": "SYND_WRITE",
           "description": "Write/publish access to the Atomio syndication endpoint (audience-prefixed for token scoping)"
         }
       ]
