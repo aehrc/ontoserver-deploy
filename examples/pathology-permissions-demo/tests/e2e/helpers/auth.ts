@@ -115,15 +115,21 @@ export async function loginViaKeycloak(
     throw new Error('No login button found on page');
   }
 
-  // Wait for Keycloak login page to load
-  await page.waitForURL(/localhost:9090/, { timeout: 15_000 });
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(1_000);
+  // Wait for Keycloak login page — SSO may auto-complete instantly,
+  // so this wait is non-fatal. Only fill credentials if we land on Keycloak.
+  const onKeycloak = await page.waitForURL(/localhost:9090/, { timeout: 15_000 })
+    .then(() => true)
+    .catch(() => false);
 
-  // Fill in credentials and submit
-  await page.locator('#username').fill(username);
-  await page.locator('#password').fill(password);
-  await page.locator('#kc-login').click();
+  if (onKeycloak && page.url().includes('localhost:9090')) {
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(1_000);
+
+    // Fill in credentials and submit
+    await page.locator('#username').fill(username);
+    await page.locator('#password').fill(password);
+    await page.locator('#kc-login').click();
+  }
 
   // Wait for redirect back to the app
   await page.waitForURL(/ontoserver\.csiro\.au/, { timeout: 15_000 });
