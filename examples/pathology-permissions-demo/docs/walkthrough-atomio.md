@@ -261,7 +261,23 @@ curl -sk https://localhost:9083/alias | jq '.[] | {alias: .aliasName, feed: .fee
 
 **Result**: UAT points to `release-2-0` (new content), production still on `release-1-0`.
 
-The UAT Ontoserver polls every 2 minutes. After waiting, verify the new content:
+**Trigger syndication (OntoCommand or curl):**
+
+> Without triggering preload manually, the UAT and production servers poll every 2 minutes via the configured cron schedule (`atom.preload.schedule.cron`). You can trigger immediate syndication to avoid waiting.
+
+Option A — Using OntoCommand:
+1. Open OntoCommand for UAT: navigate to `https://localhost:9084/fhir` (redirects to OntoCommand)
+2. Log in as **admin** / **demo**
+3. Click **Syndication** in the left menu
+4. Click the **Preload** button to trigger immediate syndication
+
+Option B — Using curl:
+```bash
+curl -sk -X POST "https://localhost:9084/synd/redoPreload" \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+```
+
+After triggering (or waiting for the poll), verify the new content:
 
 **Using Shrimp:**
 
@@ -313,7 +329,21 @@ curl -sk -o /dev/null -w "HTTP %{http_code}\n" -X PUT \
 curl -sk https://localhost:9083/alias | jq '.[] | {alias: .aliasName, feed: .feedName}'
 ```
 
-> The production Ontoserver polls every 2 minutes and automatically picks up the new content. No restart needed.
+**Trigger syndication (OntoCommand or curl):**
+
+Option A — Using OntoCommand:
+1. Open OntoCommand for production: navigate to `https://localhost:9085/fhir` (redirects to OntoCommand)
+2. Log in as **admin** / **demo**
+3. Click **Syndication** in the left menu
+4. Click the **Preload** button to trigger immediate syndication
+
+Option B — Using curl:
+```bash
+curl -sk -X POST "https://localhost:9085/synd/redoPreload" \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+```
+
+> Without triggering preload, the production Ontoserver polls every 2 minutes and automatically picks up the new content. No restart needed.
 
 ### 3.8 Rollback
 

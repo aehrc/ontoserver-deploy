@@ -217,10 +217,13 @@ run_cmd "curl -sk '${ATOMIO_URL}/alias' | jq '.[] | {alias: .aliasName, feed: .f
 explain ""
 explain "UAT now points to release-2-0 (with the new content)."
 explain "Production still points to release-1-0 (unchanged)."
-explain ""
-explain "The UAT Ontoserver polls every 2 minutes, so the new content"
-explain "will appear shortly. In a real deployment, you could trigger"
-explain "a manual sync or wait for the scheduled poll."
+
+# Trigger UAT to syndicate now
+ADMIN_TOKEN=$(get_token "admin")
+step "Triggering UAT syndication via redoPreload..."
+curl -sk -X POST "${UAT_URL}/synd/redoPreload" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" || true
+explain "UAT preload triggered — syndication will complete shortly."
 
 pause
 
@@ -252,7 +255,12 @@ run_cmd "curl -sk '${ATOMIO_URL}/alias' | jq '.[] | {alias: .aliasName, feed: .f
 
 explain ""
 explain "Both UAT and Production now point to release-2-0."
-explain "The production Ontoserver will pick up the changes on its next poll."
+
+# Trigger production to syndicate now
+step "Triggering production syndication via redoPreload..."
+curl -sk -X POST "${PRODUCTION_URL}/synd/redoPreload" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" || true
+explain "Production preload triggered — syndication will complete shortly."
 
 pause
 
