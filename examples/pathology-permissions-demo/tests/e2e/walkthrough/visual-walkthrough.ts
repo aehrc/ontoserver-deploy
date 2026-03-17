@@ -552,55 +552,63 @@ async function scene9_atomioReleasePipeline(page: Page): Promise<void> {
 
   highlight('Current feeds: release-1-0 (initial) and gamma-content.');
   highlight('Both "uat" and "production" aliases point to release-1-0 (the old content).');
-  explain('Now cloning a new release candidate from authoring — this captures v1.1.0...');
+  explain('Clicking "Clone Feed" to create a new release candidate from authoring...');
   await pause();
 
-  // Clone authoring feed via Atomio API (requires auth since security is enabled)
-  const adminToken = await getToken('admin');
-  const cloneCtx = await playwrightRequest.newContext({ ignoreHTTPSErrors: true });
-  try {
-    const cloneUrl = `${ATOMIO_URL}/feed/$clone?name=release-2-0&url=http://authoring-ontoserver:8080/synd/syndication.xml`;
-    const cloneResp = await cloneCtx.post(cloneUrl, {
-      headers: { Authorization: `Bearer ${adminToken}` },
-    });
-    if (cloneResp.status() === 200 || cloneResp.status() === 201) {
-      highlight('Release candidate "release-2-0" created from authoring feed.');
-    } else {
-      warn(`Clone returned HTTP ${cloneResp.status()}`);
-    }
-  } finally {
-    await cloneCtx.dispose();
-  }
+  // Click "Clone Feed" button in the Atomio UI
+  const cloneFeedBtn = page.getByRole('button', { name: /Clone Feed/i });
+  await cloneFeedBtn.click();
+  await page.waitForTimeout(2_000);
 
-  // Refresh Atomio UI to show the new feed
-  await openAtomioAndLogin(page);
+  // Fill in the clone form: feed name and source URL
+  // The dialog should have text fields for name and URL
+  const nameField = page.getByLabel(/name/i).or(page.locator('input[name*="name"]')).first();
+  const urlField = page.getByLabel(/url/i).or(page.locator('input[name*="url"]')).first();
 
+  await nameField.fill('release-2-0');
+  await urlField.fill('http://authoring-ontoserver:8080/synd/syndication.xml');
+  await page.waitForTimeout(1_000);
+
+  // Submit the clone — look for a submit/clone/create button in the dialog
+  const submitBtn = page.getByRole('button', { name: /clone|submit|create|ok/i }).last();
+  await submitBtn.click();
+  await page.waitForTimeout(5_000);
+
+  highlight('Release candidate "release-2-0" created from authoring feed.');
   highlight('Three feeds now: release-1-0, release-2-0 (with v1.1.0), and gamma-content.');
   await pause();
 }
 
 async function scene10_atomioPromoteUAT(page: Page): Promise<void> {
   step('Atomio — Promote to UAT');
-  explain('Updating the "uat" alias to point to release-2-0.');
+  explain('Navigating to Aliases in the Atomio UI to promote release-2-0 to UAT.');
   explain('The UAT Ontoserver polls the uat alias for changes.');
   await pause();
 
-  // Update UAT alias via API (requires auth)
-  const uatToken = await getToken('admin');
-  const aliasCtx = await playwrightRequest.newContext({ ignoreHTTPSErrors: true });
-  try {
-    await aliasCtx.put(`${ATOMIO_URL}/alias/uat`, {
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${uatToken}` },
-      data: JSON.stringify({ aliasName: 'uat', feedName: 'release-2-0' }),
-    });
-    highlight('"uat" alias now points to release-2-0.');
-  } finally {
-    await aliasCtx.dispose();
-  }
+  // Navigate to Aliases page in the Atomio UI
+  const aliasesNav = page.getByRole('link', { name: /Aliases/i }).or(
+    page.getByText('Aliases'),
+  );
+  await aliasesNav.first().click();
+  await page.waitForTimeout(2_000);
 
-  // Refresh Atomio UI to show updated alias
-  await openAtomioAndLogin(page);
+  // Click the edit button on the "uat" alias row
+  const uatRow = page.locator('tr, [class*="row"]').filter({ hasText: /\buat\b/ }).first();
+  const editBtn = uatRow.getByRole('button').or(uatRow.locator('[class*="edit"], [class*="action"] button')).first();
+  await editBtn.click();
+  await page.waitForTimeout(2_000);
 
+  // Change the feed to release-2-0 — look for a select/dropdown or text field
+  const feedField = page.getByLabel(/feed/i).or(page.locator('input[name*="feed"], select[name*="feed"]')).first();
+  await feedField.fill('release-2-0');
+  await page.waitForTimeout(500);
+
+  // Submit the change
+  const saveBtn = page.getByRole('button', { name: /save|update|ok|submit/i }).last();
+  await saveBtn.click();
+  await page.waitForTimeout(3_000);
+
+  highlight('"uat" alias now points to release-2-0.');
   highlight('Atomio shows uat → release-2-0, production → release-1-0 (unchanged).');
   explain('UAT Ontoserver polls Atomio every 2 minutes. Waiting for v1.1.0 to appear...');
 
@@ -645,25 +653,34 @@ async function scene10_atomioPromoteUAT(page: Page): Promise<void> {
 async function scene11_atomioPromoteProduction(page: Page): Promise<void> {
   step('Atomio — Promote to Production');
   explain('After UAT testing passes, updating the "production" alias to release-2-0.');
-  explain('Then triggering production to syndicate the new content.');
+  explain('Navigating back to the Atomio UI Aliases page...');
   await pause();
 
-  // Update production alias via API (requires auth)
-  const prodToken = await getToken('admin');
-  const aliasCtx = await playwrightRequest.newContext({ ignoreHTTPSErrors: true });
-  try {
-    await aliasCtx.put(`${ATOMIO_URL}/alias/production`, {
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${prodToken}` },
-      data: JSON.stringify({ aliasName: 'production', feedName: 'release-2-0' }),
-    });
-    highlight('"production" alias now points to release-2-0.');
-  } finally {
-    await aliasCtx.dispose();
-  }
-
-  // Show updated aliases in Atomio UI
+  // Navigate back to Atomio UI and go to Aliases
   await openAtomioAndLogin(page);
+  const aliasesNav = page.getByRole('link', { name: /Aliases/i }).or(
+    page.getByText('Aliases'),
+  );
+  await aliasesNav.first().click();
+  await page.waitForTimeout(2_000);
 
+  // Click the edit button on the "production" alias row
+  const prodRow = page.locator('tr, [class*="row"]').filter({ hasText: /\bproduction\b/ }).first();
+  const editBtn = prodRow.getByRole('button').or(prodRow.locator('[class*="edit"], [class*="action"] button')).first();
+  await editBtn.click();
+  await page.waitForTimeout(2_000);
+
+  // Change the feed to release-2-0
+  const feedField = page.getByLabel(/feed/i).or(page.locator('input[name*="feed"], select[name*="feed"]')).first();
+  await feedField.fill('release-2-0');
+  await page.waitForTimeout(500);
+
+  // Submit the change
+  const saveBtn = page.getByRole('button', { name: /save|update|ok|submit/i }).last();
+  await saveBtn.click();
+  await page.waitForTimeout(3_000);
+
+  highlight('"production" alias now points to release-2-0.');
   highlight('Both aliases now point to release-2-0.');
   explain('Production Ontoserver polls Atomio every 2 minutes. Waiting for v1.1.0...');
 
