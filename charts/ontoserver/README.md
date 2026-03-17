@@ -10,6 +10,54 @@ This chart provides flexible deployment options for [Ontoserver](https://ontoser
 > - **[Traefik](https://doc.traefik.io/traefik/)** with CRD support — required when `traefik.ingressRoute.enabled: true`
 > - **[External Secrets Operator](https://external-secrets.io/)** — required when `ontoserver.externalSecret.enabled: true`
 
+## Table of Contents
+
+- [Deployment Modes](#deployment-modes)
+  - [Supported configurations](#supported-configurations)
+  - [Unsupported configurations](#unsupported-configurations)
+  - [Production recommendations](#production-recommendations)
+- [Registry Credentials (Required)](#registry-credentials-required)
+  - [Option A — chart-managed secret (recommended)](#option-a--chart-managed-secret-recommended)
+  - [Option B — External Secrets](#option-b--external-secrets)
+  - [Option C — pre-created secret](#option-c--pre-created-secret)
+- [Testing](#testing)
+  - [Unit Tests](#unit-tests)
+  - [Integration Tests](#integration-tests)
+- [Persistence](#persistence)
+  - [Pre-provisioned PersistentVolumes](#pre-provisioned-persistentvolumes)
+- [Health Checking](#health-checking)
+  - [Healthcheck and HTTPS mode](#healthcheck-and-https-mode-ontoserver_insecure-false)
+- [Amazon EKS](#amazon-eks)
+  - [Storage](#storage)
+  - [Ingress](#ingress)
+  - [IRSA (IAM Roles for Service Accounts)](#irsa-iam-roles-for-service-accounts)
+  - [Node Targeting](#node-targeting)
+- [Azure AKS](#azure-aks)
+- [Local Development (k3d / minikube)](#local-development-k3d--minikube)
+  - [k3d quick-start](#k3d-quick-start)
+  - [ArgoCD](#argocd)
+- [Optional Feature Prerequisites](#optional-feature-prerequisites)
+- [Postgres sidecar](#postgres-sidecar)
+- [Configuring an external database](#configuring-an-external-database)
+- [Customisation](#customisation)
+- [Outbound HTTP proxy](#outbound-http-proxy)
+- [Gateway API vs Ingress](#gateway-api-vs-ingress)
+  - [$closure routing for scaled StatefulSet deployments](#closure-routing-for-scaled-statefulset-deployments)
+- [Envoy Gateway](#envoy-gateway)
+  - [Infrastructure (GatewayClass and EnvoyProxy)](#infrastructure-gatewayclass-and-envoyproxy)
+  - [Traffic Policies](#traffic-policies)
+- [Traefik Ingress Controller](#traefik-ingress-controller)
+  - [IngressRoute vs standard Ingress](#ingressroute-vs-standard-ingress)
+  - [HTTPS backend (Ontoserver TLS mode)](#https-backend-ontoserver-tls-mode)
+  - [ServersTransport](#serverstransport)
+  - [Traefik API version](#traefik-api-version)
+- [Observability](#observability)
+  - [Management Service](#management-service)
+  - [Prometheus Metrics](#prometheus-metrics)
+  - [OpenTelemetry Tracing](#opentelemetry-tracing)
+- [External Secrets](#external-secrets)
+- [Parameters](#parameters)
+
 ## Deployment Modes
 
 The chart supports four deployment combinations controlled by `ontoserver.deployment.kind` and `ontoserver.deployment.type`:
@@ -73,8 +121,6 @@ The recommended production topology separates content development from publicati
 
 **Development / local** — ephemeral storage with the sidecar PostgreSQL avoids cloud disk provisioning. The index is rebuilt from syndication feeds on each start, which is acceptable at small scale.
 
-> **`$closure` routing:** The [`$closure` FHIR operation](https://www.hl7.org/fhir/conceptmap-operation-closure.html) is stateful — all requests for a given closure table must reach the same instance. For scaled StatefulSet deployments, the chart automatically creates a dedicated `RELEASE-ontoserver-pod0-service` that selects only pod-0, and routes `/fhir/ConceptMap/$closure` to it in both the Gateway HTTPRoute and Ingress — before the catchall `/` rule. This keeps `$closure` functional on a scaled cluster without requiring client-side sticky sessions. The routing is active whenever `deployment.kind: StatefulSet` and `deployment.type: scaled`, regardless of other settings.
->
 > **Feeds must stay available:** New instances (after a pod is rescheduled or the cluster is scaled up) rebuild their local index from the syndication feeds that originally loaded the content. If those feeds become unavailable, new instances cannot complete startup and will not become ready.
 
 ## Registry Credentials (Required)
@@ -511,6 +557,266 @@ The ArgoCD examples use multi-source Applications with both the `ontoserver` and
 
 > **Note:** The GitHub Actions integration workflow uses a similar k3d setup (single agent, no load balancer, Traefik disabled) to run `helm install` followed by `helm test` in both read-only and read-write modes. See [`.github/workflows/integration-tests.yml`](../../.github/workflows/integration-tests.yml) for details.
 
+## Optional Feature Prerequisites
+
+| Feature | Cluster Requirement |
+| ------- | ------------------- |
+| `ontoserver.metrics.serviceMonitor.enabled` | [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) CRDs installed |
+| `ontoserver.opentelemetry.instrumentation.enabled` | [OpenTelemetry Operator](https://opentelemetry.io/docs/kubernetes/operator/) installed |
+| `envoygateway.*` policies | [Envoy Gateway](https://gateway.envoyproxy.io/) CRDs installed |
+| `envoygateway.gatewayServiceMonitor.enabled` | [Envoy Gateway](https://gateway.envoyproxy.io/) installed + [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) CRDs installed |
+| `traefik.ingressRoute.enabled` | [Traefik](https://doc.traefik.io/traefik/) installed with CRD support (`traefik.io/v1alpha1` for v3, `traefik.containo.us/v1alpha1` for v2) |
+| `ontoserver.externalSecret.enabled` | [External Secrets Operator](https://external-secrets.io/) installed |
+
+## Postgres sidecar
+
+When `ontoserver.deployment.db.enabled: true` (the default), a Postgres container is injected as a [native sidecar init container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) (`restartPolicy: Always`). This requires **Kubernetes 1.29+**.
+
+The native sidecar pattern provides a hard ordering guarantee: Kubernetes will not start the Ontoserver container until the Postgres sidecar has passed its readiness probe (`pg_isready`). This eliminates the race condition where Ontoserver would fail on startup because Postgres was not yet accepting connections — previously a one-time restart on cold pod starts.
+
+**Startup probe behaviour:**
+Ontoserver's `startupProbe` (using `healthcheck.sh`) runs after Postgres is ready, polling until Ontoserver itself is up. With a `failureThreshold` of 150 and `periodSeconds` of 2, the probe allows up to 5 minutes for Ontoserver to start — enough headroom for slow environments such as AKS. Once the startup probe passes, the `readinessProbe` kicks in immediately (default `initialDelaySeconds: 0`).
+
+**Constraints:**
+- `scaled` deployments cannot use the Postgres sidecar — an external database is required.
+- `StatefulSet` kind supports the Postgres sidecar for `single` deployments only.
+
+## Configuring an external database
+
+If you disable the embedded sidecar (`ontoserver.deployment.db.enabled: false`), you must supply the following in `ontoserver.config`:
+
+```yaml
+spring.datasource.url: "jdbc:postgresql://<host>:<port>/<db>"
+spring.datasource.username: "<user>"
+```
+and pass the database password via `ontoserver.secretConfig`
+```yaml
+spring.datasource.password: "<password>"
+```
+
+See the [Spring Boot DataSource configuration guide](https://docs.spring.io/spring-boot/docs/current/reference/html/data.html#data.sql.datasource.configuration).
+
+## Customisation
+
+To override the default CSS and logos under `/fhir/.well-known`, create a `ConfigMap`:
+
+```bash
+kubectl create configmap ontoserver-customization \
+  --from-file=logo.png \
+  --from-file=organisation_logo.png \
+  --from-file=organisation.css
+```
+
+Then set:
+
+```yaml
+ontoserver.customization: "ontoserver-customization"
+```
+
+## Outbound HTTP proxy
+
+If Ontoserver needs to route outbound internet traffic through an HTTP proxy — for example to reach SNOMED CT syndication feeds or external FHIR terminology servers — you can set the relevant environment variables via `ontoserver.config`:
+
+```yaml
+ontoserver:
+  config:
+    HTTP_PROXY: "http://proxy.example.com:3128"
+    HTTPS_PROXY: "http://proxy.example.com:3128"
+    NO_PROXY: ".svc.cluster.local,.svc,.example.com"
+```
+
+Ontoserver is a Java application and does not read the standard Linux proxy environment variables. If the proxy requires host and port to be specified separately, use the Java-style variables instead:
+
+```yaml
+ontoserver:
+  config:
+    HTTP_PROXY_HOST: "proxy.example.com"
+    HTTP_PROXY_PORT: "3128"
+    HTTPS_PROXY_HOST: "proxy.example.com"
+    HTTPS_PROXY_PORT: "3128"
+```
+
+> **Note:** This is only needed when Ontoserver itself requires a specific proxy for outbound connections. If your entire cluster is behind a corporate proxy, configure the proxy at the node or container runtime level instead — pods will inherit it automatically and per-pod configuration is unnecessary.
+
+## Gateway API vs Ingress
+
+> **Gateway API is the recommended networking mode.** Active development of the standard Kubernetes Ingress API is suspended by the K8s community in favor of the newer Gateway API. Gateway API is the configuration used by the chart developers and unlocks the full set of Envoy Gateway traffic policies (rate limiting, request buffering, CIDR deny rules). Unless you have a specific reason to use Ingress (e.g. legacy cluster constraints), we strongly steer you toward Envoy Gateway and the Gateway API.
+
+By default none is enabled — the chart deploys Ontoserver with no external access, suitable for internal use or testing. Enable one to expose the server:
+
+* **Gateway API** (`ontoserver.gateway.enabled: true`) *(recommended)*: requires Gateway API CRDs and a compatible GatewayClass (e.g. [Envoy Gateway](https://gateway.envoyproxy.io/), [Traefik](https://doc.traefik.io/traefik/routing/providers/kubernetes-gateway/), [Cilium](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/), or any conformant implementation). Creates `Gateway`, `HTTPRoute`, and optionally a cert-manager `Issuer` resource. The default `className` is `envoy-gateway-class` — set `ontoserver.gateway.className` to match your GatewayClass. The default listener port is `443`; some implementations use a different port (e.g. Traefik defaults to `8443` — set `ontoserver.gateway.listenerPortSecure: 8443`). TLS termination is optional: set `ontoserver.tls.enabled: true` with a certificate reference, or enable cert-manager for automatic provisioning.
+* **Ingress** (`ontoserver.ingress.enabled: true`) *(deprecated)*: creates a standard `networking.k8s.io/v1` Ingress. Use the bundled F5 nginx-ingress subchart (`nginx-ingress.enabled: true`), the cluster's default controller (e.g. Traefik on k3d/k3s), or any other Ingress controller by setting `ontoserver.ingress.className` appropriately.
+* **Traefik IngressRoute** (`traefik.ingressRoute.enabled: true`): creates a Traefik-native `IngressRoute` CRD resource. Use this instead of `ontoserver.ingress` when Traefik is your ingress controller **and** any backend pod exposes HTTPS/TLS. See [Traefik Ingress Controller](#traefik-ingress-controller-1) below.
+
+Gateway API, Ingress, and IngressRoute are mutually exclusive. All three support a `backendServiceNameOverride` to route traffic through an intermediate proxy such as the Varnish cache from `ontoserver-extras`:
+
+- Gateway: `ontoserver.gateway.backendServiceNameOverride: <release>-varnish-service`
+- Ingress: `ontoserver.ingress.backendServiceNameOverride: <release>-varnish-service`
+- IngressRoute: `traefik.ingressRoute.backendServiceNameOverride: <release>-varnish-service`
+
+See the [extras chart README](../../charts/ontoserver-extras/README.md) for the full wiring instructions, including the recommended ArgoCD multi-source approach.
+
+**Common GatewayClass configuration reference:**
+
+| Implementation | `gateway.className` | `gateway.listenerPortSecure` | Notes |
+|---|---|---|---|
+| [Envoy Gateway](https://gateway.envoyproxy.io/) *(default)* | `envoy-gateway-class` | `443` | Full Envoy policy support |
+| [Traefik](https://doc.traefik.io/traefik/) v3.1+ | `traefik` | `8443` | Default k3d/k3s install |
+| [Cilium](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/) | `cilium` | `443` | Requires Cilium CNI with Gateway API enabled |
+| AWS Load Balancer Controller | `alb` | `443` | Envoy policies will not apply |
+
+The Envoy Gateway traffic policies (`envoygateway.*`) are specific to Envoy Gateway and should remain disabled when using other implementations.
+
+### `$closure` routing for scaled StatefulSet deployments
+
+The [`$closure` FHIR operation](https://www.hl7.org/fhir/conceptmap-operation-closure.html) is stateful — all requests for a given closure table must reach the same instance. For scaled StatefulSet deployments, the chart automatically creates a dedicated `RELEASE-ontoserver-pod0-service` that selects only pod-0, and routes `/fhir/ConceptMap/$closure` to it in both the Gateway HTTPRoute and Ingress — before the catchall `/` rule. This keeps `$closure` functional on a scaled cluster without requiring client-side sticky sessions. The routing is active whenever `deployment.kind: StatefulSet` and `deployment.type: scaled`, regardless of other settings.
+
+## Envoy Gateway
+
+### Infrastructure (GatewayClass and EnvoyProxy)
+
+Set `envoygateway.createGatewayClass: true` (requires `ontoserver.gateway.enabled: true`) to let the chart create and manage the `GatewayClass` and `EnvoyProxy` resources. This is useful when Ontoserver owns its own Gateway installation rather than sharing a cluster-wide one.
+
+The `GatewayClass` is named after `ontoserver.gateway.className` and the `EnvoyProxy` is created in `envoygateway.controlPlaneNamespace` (default: `envoy-gateway-system`). The EnvoyProxy configures:
+
+- Prometheus scrape annotations on the Envoy service (ports `19001` for metrics, `19000` for admin)
+- A `PodDisruptionBudget` via `envoygateway.envoyProxy.pdbMinAvailable`
+- Structured JSON access logging to stdout (`envoygateway.envoyProxy.accessLog.enabled`). The log format is fully configurable via `envoygateway.envoyProxy.accessLog.format` — useful for adjusting fields or disabling verbose logging in production.
+
+### Traffic Policies
+
+Three optional traffic policies and a data-plane ServiceMonitor can be independently enabled (all require `ontoserver.gateway.enabled: true` and Envoy Gateway CRDs):
+
+- **ClientTrafficPolicy** (`envoygateway.clientTrafficPolicy.enabled`) — applies an HTTP idle timeout on inbound connections from clients. Optionally enables PROXY protocol (`proxyProtocol.enabled`) for upstream load balancers that send PROXY protocol headers (e.g. AWS NLB), and configures client IP detection via `clientIPDetection.xForwardedFor.numTrustedHops` (set to `0` alongside PROXY protocol to use the peer address rather than XFF headers).
+- **BackendTrafficPolicy** (`envoygateway.backendTrafficPolicy.enabled`) — caps the maximum upstream request body size and enforces a local rate limit (requests per time unit).
+- **SecurityPolicy** (`envoygateway.securityPolicy.enabled`) — enforces IP-based authorization by denying traffic from a list of CIDRs.
+- **Gateway ServiceMonitor** (`envoygateway.gatewayServiceMonitor.enabled`) — creates a Prometheus `ServiceMonitor` targeting the Envoy Gateway data-plane pods (scraping `/stats/prometheus` on the `metrics` port). Set `envoygateway.controlPlaneNamespace` to the namespace where Envoy Gateway is installed (default: `envoy-gateway-system`). Requires Prometheus Operator CRDs.
+
+## Traefik Ingress Controller
+
+### IngressRoute vs standard Ingress
+
+Traefik supports both the standard Kubernetes `Ingress` API (`ontoserver.ingress.enabled: true`, `className: traefik`) and its own `IngressRoute` CRD (`traefik.ingressRoute.enabled: true`). The key difference is TLS backend trust:
+
+- **Standard Ingress** — Traefik, unlike NGINX, does **not** connect to self-signed backend TLS certificates by default. There is no way to attach a `ServersTransport` to a standard `Ingress` resource, so backend certificate trust cannot be configured through the standard API.
+- **IngressRoute** — Traefik's native CRD allows a `ServersTransport` resource to be attached directly to a backend service, giving explicit control over how Traefik connects to TLS backends (CA trust, client certificates, insecure skip-verify).
+
+Use `traefik.ingressRoute.enabled: true` whenever:
+1. Traefik is your ingress controller, **and**
+2. Any backend pod in the release exposes HTTPS/TLS (e.g. Ontoserver with `ONTOSERVER_INSECURE: "false"`, OntoCloak/Keycloak, or any TLS-terminating sidecar).
+
+For HTTP backends with Traefik, the standard `ontoserver.ingress` is sufficient.
+
+### HTTPS backend (Ontoserver TLS mode)
+
+By default (`ONTOSERVER_INSECURE: "true"`) Ontoserver serves plain HTTP on port 8080. Setting `ONTOSERVER_INSECURE: "false"` restores Ontoserver's out-of-box behaviour: HTTPS on port **8443** using its bundled self-signed keystore. You must also set `ontoserver.deployment.containerPort: 8443` so the Kubernetes Service routes traffic to the correct container port.
+
+The client-to-Traefik leg remains plain HTTP via the `web` entrypoint; TLS is only on the Traefik-to-Ontoserver backend leg.
+
+> **Important — probe patch required:** When `ONTOSERVER_INSECURE: "false"`, the container's `/healthcheck.sh` uses `wget` to trigger FHIR initialization via `https://localhost:8443`. Because the certificate is self-signed, `wget` rejects it and the startup probe fails permanently. A `postStart` lifecycle hook is required to patch the script before the first probe fires. See [Healthcheck and HTTPS mode](#healthcheck-and-https-mode-ontoserver_insecure-false) for the full explanation.
+
+```yaml
+ontoserver:
+  deployment:
+    containerPort: 8443   # Ontoserver's HTTPS port
+    lifecycle:
+      postStart:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - sed -i 's|wget -o /dev/null -q -O /dev/null|wget --no-check-certificate -o /dev/null -q -O /dev/null|' /healthcheck.sh
+  config:
+    ONTOSERVER_INSECURE: "false"
+
+traefik:
+  ingressRoute:
+    enabled: true
+    entryPoints:
+      - web               # client → Traefik over plain HTTP
+    backendPort: 80       # Kubernetes Service port (Service maps 80 → containerPort 8443)
+    backendScheme: https  # Traefik → Ontoserver over HTTPS
+    serversTransport:
+      enabled: true
+      insecureSkipVerify: true   # trust Ontoserver's self-signed certificate
+```
+
+### ServersTransport
+
+When `traefik.ingressRoute.serversTransport.enabled: true`, the chart creates a `ServersTransport` resource in the same namespace as the `IngressRoute`. The `backendPort` value is always the **Kubernetes Service port** (default `80`), not the container port. Two trust modes are supported:
+
+**Option A — Skip verification (self-signed certificates):**
+
+```yaml
+traefik:
+  ingressRoute:
+    enabled: true
+    backendPort: 80       # Kubernetes Service port
+    backendScheme: https
+    serversTransport:
+      enabled: true
+      insecureSkipVerify: true
+```
+
+**Option B — CA-signed certificate (provide the CA):**
+
+```yaml
+traefik:
+  ingressRoute:
+    enabled: true
+    backendPort: 80       # Kubernetes Service port
+    backendScheme: https
+    serversTransport:
+      enabled: true
+      insecureSkipVerify: false
+      rootCAsSecrets:
+        - my-backend-ca-secret   # Secret with key tls.crt containing the CA certificate
+```
+
+### Traefik API version
+
+The templates use `traefik.io/v1alpha1` (Traefik v3). For Traefik v2, change the `apiVersion` in `templates/traefik-ingressroute.yaml` and `templates/traefik-serverstransport.yaml` to `traefik.containo.us/v1alpha1`.
+
+## Observability
+
+### Management Service
+
+Set `ontoserver.managementService.enabled: true` to create a dedicated `ClusterIP` service exposing the Spring Boot Actuator on port 18080. This is a prerequisite for Prometheus scraping.
+
+### Prometheus Metrics
+
+Set `ontoserver.metrics.serviceMonitor.enabled: true` to create a Prometheus `ServiceMonitor` that scrapes `/actuator/prometheus` from the management service. Requires both `managementService.enabled: true` and the Prometheus Operator CRDs installed in the cluster.
+
+### OpenTelemetry Tracing
+
+Set `ontoserver.opentelemetry.instrumentation.enabled: true` to create an OpenTelemetry `Instrumentation` resource for Java auto-instrumentation. The chart automatically adds the `instrumentation.opentelemetry.io/inject-java` pod annotation on the Ontoserver pod. An exporter endpoint (`ontoserver.opentelemetry.instrumentation.exporter.endpoint`) is required. Requires the OpenTelemetry Operator installed in the cluster.
+
+## External Secrets
+
+Set `ontoserver.externalSecret.enabled: true` to create an `ExternalSecret` resource that syncs secrets from an external store (e.g. AWS Secrets Manager, Azure Key Vault, HashiCorp Vault) into a Kubernetes Secret, which is then injected as environment variables into the Ontoserver pod.
+
+Required fields:
+- `ontoserver.externalSecret.secretStoreRef.name` — name of the `SecretStore` or `ClusterSecretStore`.
+- At least one of `ontoserver.externalSecret.data` or `ontoserver.externalSecret.dataFrom`.
+
+Example using individual key mappings:
+
+```yaml
+ontoserver:
+  externalSecret:
+    enabled: true
+    secretStoreRef:
+      name: my-cluster-secret-store
+      kind: ClusterSecretStore
+    data:
+      - secretKey: spring.datasource.password
+        remoteRef:
+          key: /myapp/db
+          property: password
+```
+
+Requires the [External Secrets Operator](https://external-secrets.io/) installed in the cluster.
+
 ## Parameters
 
 ### Deployment
@@ -723,264 +1029,7 @@ The ArgoCD examples use multi-source Applications with both the `ontoserver` and
 | `nginx-ingress.controller.ingressClass.name`   | Name of the custom IngressClass    | `ontoserver-nginx` |
 | `nginx-ingress.controller.ingressClassByName`  | Lookup IngressClasses by name      | `true`             |
 
-## Optional Feature Prerequisites
-
-| Feature | Cluster Requirement |
-| ------- | ------------------- |
-| `ontoserver.metrics.serviceMonitor.enabled` | [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) CRDs installed |
-| `ontoserver.opentelemetry.instrumentation.enabled` | [OpenTelemetry Operator](https://opentelemetry.io/docs/kubernetes/operator/) installed |
-| `envoygateway.*` policies | [Envoy Gateway](https://gateway.envoyproxy.io/) CRDs installed |
-| `envoygateway.gatewayServiceMonitor.enabled` | [Envoy Gateway](https://gateway.envoyproxy.io/) installed + [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) CRDs installed |
-| `traefik.ingressRoute.enabled` | [Traefik](https://doc.traefik.io/traefik/) installed with CRD support (`traefik.io/v1alpha1` for v3, `traefik.containo.us/v1alpha1` for v2) |
-| `ontoserver.externalSecret.enabled` | [External Secrets Operator](https://external-secrets.io/) installed |
-
 Table generated with Readme Generator For Helm: [https://github.com/bitnami/readme-generator-for-helm](https://github.com/bitnami/readme-generator-for-helm)
-
-
-## Postgres sidecar
-
-When `ontoserver.deployment.db.enabled: true` (the default), a Postgres container is injected as a [native sidecar init container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) (`restartPolicy: Always`). This requires **Kubernetes 1.29+**.
-
-The native sidecar pattern provides a hard ordering guarantee: Kubernetes will not start the Ontoserver container until the Postgres sidecar has passed its readiness probe (`pg_isready`). This eliminates the race condition where Ontoserver would fail on startup because Postgres was not yet accepting connections — previously a one-time restart on cold pod starts.
-
-**Startup probe behaviour:**
-Ontoserver's `startupProbe` (using `healthcheck.sh`) runs after Postgres is ready, polling until Ontoserver itself is up. With a `failureThreshold` of 150 and `periodSeconds` of 2, the probe allows up to 5 minutes for Ontoserver to start — enough headroom for slow environments such as AKS. Once the startup probe passes, the `readinessProbe` kicks in immediately (default `initialDelaySeconds: 0`).
-
-**Constraints:**
-- `scaled` deployments cannot use the Postgres sidecar — an external database is required.
-- `StatefulSet` kind supports the Postgres sidecar for `single` deployments only.
-
-## Configuring an external database
-
-If you disable the embedded sidecar (`ontoserver.deployment.db.enabled: false`), you must supply the following in `ontoserver.config`:
-
-```yaml
-spring.datasource.url: "jdbc:postgresql://<host>:<port>/<db>"
-spring.datasource.username: "<user>"
-```
-and pass the database password via `ontoserver.secretConfig`
-```yaml
-spring.datasource.password: "<password>"
-```
-
-See the [Spring Boot DataSource configuration guide](https://docs.spring.io/spring-boot/docs/current/reference/html/data.html#data.sql.datasource.configuration).
-
-## Customisation
-
-To override the default CSS and logos under `/fhir/.well-known`, create a `ConfigMap`:
-
-```bash
-kubectl create configmap ontoserver-customization \
-  --from-file=logo.png \
-  --from-file=organisation_logo.png \
-  --from-file=organisation.css
-```
-
-Then set:
-
-```yaml
-ontoserver.customization: "ontoserver-customization"
-```
-
-## Outbound HTTP proxy
-
-If Ontoserver needs to route outbound internet traffic through an HTTP proxy — for example to reach SNOMED CT syndication feeds or external FHIR terminology servers — you can set the relevant environment variables via `ontoserver.config`:
-
-```yaml
-ontoserver:
-  config:
-    HTTP_PROXY: "http://proxy.example.com:3128"
-    HTTPS_PROXY: "http://proxy.example.com:3128"
-    NO_PROXY: ".svc.cluster.local,.svc,.example.com"
-```
-
-Ontoserver is a Java application and does not read the standard Linux proxy environment variables. If the proxy requires host and port to be specified separately, use the Java-style variables instead:
-
-```yaml
-ontoserver:
-  config:
-    HTTP_PROXY_HOST: "proxy.example.com"
-    HTTP_PROXY_PORT: "3128"
-    HTTPS_PROXY_HOST: "proxy.example.com"
-    HTTPS_PROXY_PORT: "3128"
-```
-
-> **Note:** This is only needed when Ontoserver itself requires a specific proxy for outbound connections. If your entire cluster is behind a corporate proxy, configure the proxy at the node or container runtime level instead — pods will inherit it automatically and per-pod configuration is unnecessary.
-
-## Gateway API vs Ingress
-
-> **Gateway API is the recommended networking mode.** Active development of the standard Kubernetes Ingress API is suspended by the K8s community in favor of the newer Gateway API. Gateway API is the configuration used by the chart developers and unlocks the full set of Envoy Gateway traffic policies (rate limiting, request buffering, CIDR deny rules). Unless you have a specific reason to use Ingress (e.g. legacy cluster constraints), we strongly steer you toward Envoy Gateway and the Gateway API.
-
-By default none is enabled — the chart deploys Ontoserver with no external access, suitable for internal use or testing. Enable one to expose the server:
-
-* **Gateway API** (`ontoserver.gateway.enabled: true`) *(recommended)*: requires Gateway API CRDs and a compatible GatewayClass (e.g. [Envoy Gateway](https://gateway.envoyproxy.io/), [Traefik](https://doc.traefik.io/traefik/routing/providers/kubernetes-gateway/), [Cilium](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/), or any conformant implementation). Creates `Gateway`, `HTTPRoute`, and optionally a cert-manager `Issuer` resource. The default `className` is `envoy-gateway-class` — set `ontoserver.gateway.className` to match your GatewayClass. The default listener port is `443`; some implementations use a different port (e.g. Traefik defaults to `8443` — set `ontoserver.gateway.listenerPortSecure: 8443`). TLS termination is optional: set `ontoserver.tls.enabled: true` with a certificate reference, or enable cert-manager for automatic provisioning.
-* **Ingress** (`ontoserver.ingress.enabled: true`) *(deprecated)*: creates a standard `networking.k8s.io/v1` Ingress. Use the bundled F5 nginx-ingress subchart (`nginx-ingress.enabled: true`), the cluster's default controller (e.g. Traefik on k3d/k3s), or any other Ingress controller by setting `ontoserver.ingress.className` appropriately.
-* **Traefik IngressRoute** (`traefik.ingressRoute.enabled: true`): creates a Traefik-native `IngressRoute` CRD resource. Use this instead of `ontoserver.ingress` when Traefik is your ingress controller **and** any backend pod exposes HTTPS/TLS. See [Traefik Ingress Controller](#traefik-ingress-controller-1) below.
-
-Gateway API, Ingress, and IngressRoute are mutually exclusive. All three support a `backendServiceNameOverride` to route traffic through an intermediate proxy such as the Varnish cache from `ontoserver-extras`:
-
-- Gateway: `ontoserver.gateway.backendServiceNameOverride: <release>-varnish-service`
-- Ingress: `ontoserver.ingress.backendServiceNameOverride: <release>-varnish-service`
-- IngressRoute: `traefik.ingressRoute.backendServiceNameOverride: <release>-varnish-service`
-
-See the [extras chart README](../../charts/ontoserver-extras/README.md) for the full wiring instructions, including the recommended ArgoCD multi-source approach.
-
-**Common GatewayClass configuration reference:**
-
-| Implementation | `gateway.className` | `gateway.listenerPortSecure` | Notes |
-|---|---|---|---|
-| [Envoy Gateway](https://gateway.envoyproxy.io/) *(default)* | `envoy-gateway-class` | `443` | Full Envoy policy support |
-| [Traefik](https://doc.traefik.io/traefik/) v3.1+ | `traefik` | `8443` | Default k3d/k3s install |
-| [Cilium](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/) | `cilium` | `443` | Requires Cilium CNI with Gateway API enabled |
-| AWS Load Balancer Controller | `alb` | `443` | Envoy policies will not apply |
-
-The Envoy Gateway traffic policies (`envoygateway.*`) are specific to Envoy Gateway and should remain disabled when using other implementations.
-
-## Envoy Gateway
-
-### Infrastructure (GatewayClass and EnvoyProxy)
-
-Set `envoygateway.createGatewayClass: true` (requires `ontoserver.gateway.enabled: true`) to let the chart create and manage the `GatewayClass` and `EnvoyProxy` resources. This is useful when Ontoserver owns its own Gateway installation rather than sharing a cluster-wide one.
-
-The `GatewayClass` is named after `ontoserver.gateway.className` and the `EnvoyProxy` is created in `envoygateway.controlPlaneNamespace` (default: `envoy-gateway-system`). The EnvoyProxy configures:
-
-- Prometheus scrape annotations on the Envoy service (ports `19001` for metrics, `19000` for admin)
-- A `PodDisruptionBudget` via `envoygateway.envoyProxy.pdbMinAvailable`
-- Structured JSON access logging to stdout (`envoygateway.envoyProxy.accessLog.enabled`). The log format is fully configurable via `envoygateway.envoyProxy.accessLog.format` — useful for adjusting fields or disabling verbose logging in production.
-
-### Traffic Policies
-
-Three optional traffic policies and a data-plane ServiceMonitor can be independently enabled (all require `ontoserver.gateway.enabled: true` and Envoy Gateway CRDs):
-
-- **ClientTrafficPolicy** (`envoygateway.clientTrafficPolicy.enabled`) — applies an HTTP idle timeout on inbound connections from clients. Optionally enables PROXY protocol (`proxyProtocol.enabled`) for upstream load balancers that send PROXY protocol headers (e.g. AWS NLB), and configures client IP detection via `clientIPDetection.xForwardedFor.numTrustedHops` (set to `0` alongside PROXY protocol to use the peer address rather than XFF headers).
-- **BackendTrafficPolicy** (`envoygateway.backendTrafficPolicy.enabled`) — caps the maximum upstream request body size and enforces a local rate limit (requests per time unit).
-- **SecurityPolicy** (`envoygateway.securityPolicy.enabled`) — enforces IP-based authorization by denying traffic from a list of CIDRs.
-- **Gateway ServiceMonitor** (`envoygateway.gatewayServiceMonitor.enabled`) — creates a Prometheus `ServiceMonitor` targeting the Envoy Gateway data-plane pods (scraping `/stats/prometheus` on the `metrics` port). Set `envoygateway.controlPlaneNamespace` to the namespace where Envoy Gateway is installed (default: `envoy-gateway-system`). Requires Prometheus Operator CRDs.
-
-## Traefik Ingress Controller
-
-### IngressRoute vs standard Ingress
-
-Traefik supports both the standard Kubernetes `Ingress` API (`ontoserver.ingress.enabled: true`, `className: traefik`) and its own `IngressRoute` CRD (`traefik.ingressRoute.enabled: true`). The key difference is TLS backend trust:
-
-- **Standard Ingress** — Traefik, unlike NGINX, does **not** connect to self-signed backend TLS certificates by default. There is no way to attach a `ServersTransport` to a standard `Ingress` resource, so backend certificate trust cannot be configured through the standard API.
-- **IngressRoute** — Traefik's native CRD allows a `ServersTransport` resource to be attached directly to a backend service, giving explicit control over how Traefik connects to TLS backends (CA trust, client certificates, insecure skip-verify).
-
-Use `traefik.ingressRoute.enabled: true` whenever:
-1. Traefik is your ingress controller, **and**
-2. Any backend pod in the release exposes HTTPS/TLS (e.g. Ontoserver with `ONTOSERVER_INSECURE: "false"`, OntoCloak/Keycloak, or any TLS-terminating sidecar).
-
-For HTTP backends with Traefik, the standard `ontoserver.ingress` is sufficient.
-
-### HTTPS backend (Ontoserver TLS mode)
-
-By default (`ONTOSERVER_INSECURE: "true"`) Ontoserver serves plain HTTP on port 8080. Setting `ONTOSERVER_INSECURE: "false"` restores Ontoserver's out-of-box behaviour: HTTPS on port **8443** using its bundled self-signed keystore. You must also set `ontoserver.deployment.containerPort: 8443` so the Kubernetes Service routes traffic to the correct container port.
-
-The client-to-Traefik leg remains plain HTTP via the `web` entrypoint; TLS is only on the Traefik-to-Ontoserver backend leg.
-
-> **Important — probe patch required:** When `ONTOSERVER_INSECURE: "false"`, the container's `/healthcheck.sh` uses `wget` to trigger FHIR initialization via `https://localhost:8443`. Because the certificate is self-signed, `wget` rejects it and the startup probe fails permanently. A `postStart` lifecycle hook is required to patch the script before the first probe fires. See [Healthcheck and HTTPS mode](#healthcheck-and-https-mode-ontoserver_insecure-false) for the full explanation.
-
-```yaml
-ontoserver:
-  deployment:
-    containerPort: 8443   # Ontoserver's HTTPS port
-    lifecycle:
-      postStart:
-        exec:
-          command:
-            - /bin/sh
-            - -c
-            - sed -i 's|wget -o /dev/null -q -O /dev/null|wget --no-check-certificate -o /dev/null -q -O /dev/null|' /healthcheck.sh
-  config:
-    ONTOSERVER_INSECURE: "false"
-
-traefik:
-  ingressRoute:
-    enabled: true
-    entryPoints:
-      - web               # client → Traefik over plain HTTP
-    backendPort: 80       # Kubernetes Service port (Service maps 80 → containerPort 8443)
-    backendScheme: https  # Traefik → Ontoserver over HTTPS
-    serversTransport:
-      enabled: true
-      insecureSkipVerify: true   # trust Ontoserver's self-signed certificate
-```
-
-### ServersTransport
-
-When `traefik.ingressRoute.serversTransport.enabled: true`, the chart creates a `ServersTransport` resource in the same namespace as the `IngressRoute`. The `backendPort` value is always the **Kubernetes Service port** (default `80`), not the container port. Two trust modes are supported:
-
-**Option A — Skip verification (self-signed certificates):**
-
-```yaml
-traefik:
-  ingressRoute:
-    enabled: true
-    backendPort: 80       # Kubernetes Service port
-    backendScheme: https
-    serversTransport:
-      enabled: true
-      insecureSkipVerify: true
-```
-
-**Option B — CA-signed certificate (provide the CA):**
-
-```yaml
-traefik:
-  ingressRoute:
-    enabled: true
-    backendPort: 80       # Kubernetes Service port
-    backendScheme: https
-    serversTransport:
-      enabled: true
-      insecureSkipVerify: false
-      rootCAsSecrets:
-        - my-backend-ca-secret   # Secret with key tls.crt containing the CA certificate
-```
-
-### Traefik API version
-
-The templates use `traefik.io/v1alpha1` (Traefik v3). For Traefik v2, change the `apiVersion` in `templates/traefik-ingressroute.yaml` and `templates/traefik-serverstransport.yaml` to `traefik.containo.us/v1alpha1`.
-
-## Observability
-
-### Management Service
-
-Set `ontoserver.managementService.enabled: true` to create a dedicated `ClusterIP` service exposing the Spring Boot Actuator on port 18080. This is a prerequisite for Prometheus scraping.
-
-### Prometheus Metrics
-
-Set `ontoserver.metrics.serviceMonitor.enabled: true` to create a Prometheus `ServiceMonitor` that scrapes `/actuator/prometheus` from the management service. Requires both `managementService.enabled: true` and the Prometheus Operator CRDs installed in the cluster.
-
-### OpenTelemetry Tracing
-
-Set `ontoserver.opentelemetry.instrumentation.enabled: true` to create an OpenTelemetry `Instrumentation` resource for Java auto-instrumentation. The chart automatically adds the `instrumentation.opentelemetry.io/inject-java` pod annotation on the Ontoserver pod. An exporter endpoint (`ontoserver.opentelemetry.instrumentation.exporter.endpoint`) is required. Requires the OpenTelemetry Operator installed in the cluster.
-
-## External Secrets
-
-Set `ontoserver.externalSecret.enabled: true` to create an `ExternalSecret` resource that syncs secrets from an external store (e.g. AWS Secrets Manager, Azure Key Vault, HashiCorp Vault) into a Kubernetes Secret, which is then injected as environment variables into the Ontoserver pod.
-
-Required fields:
-- `ontoserver.externalSecret.secretStoreRef.name` — name of the `SecretStore` or `ClusterSecretStore`.
-- At least one of `ontoserver.externalSecret.data` or `ontoserver.externalSecret.dataFrom`.
-
-Example using individual key mappings:
-
-```yaml
-ontoserver:
-  externalSecret:
-    enabled: true
-    secretStoreRef:
-      name: my-cluster-secret-store
-      kind: ClusterSecretStore
-    data:
-      - secretKey: spring.datasource.password
-        remoteRef:
-          key: /myapp/db
-          property: password
-```
-
-Requires the [External Secrets Operator](https://external-secrets.io/) installed in the cluster.
 
 ---
 
