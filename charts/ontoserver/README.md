@@ -669,7 +669,11 @@ The Envoy Gateway traffic policies (`envoygateway.*`) are specific to Envoy Gate
 
 ### `$closure` routing for scaled StatefulSet deployments
 
-The [`$closure` FHIR operation](https://www.hl7.org/fhir/conceptmap-operation-closure.html) is stateful — all requests for a given closure table must reach the same instance. For scaled StatefulSet deployments, the chart automatically creates a dedicated `RELEASE-ontoserver-pod0-service` that selects only pod-0, and routes `/fhir/ConceptMap/$closure` to it in the Gateway HTTPRoute, Ingress, and Traefik IngressRoute — before the catchall `/` rule. This keeps `$closure` functional on a scaled cluster without requiring client-side sticky sessions. The routing is active whenever `deployment.kind: StatefulSet` and `deployment.type: scaled`, regardless of other settings.
+The [`$closure` FHIR operation](https://www.hl7.org/fhir/conceptmap-operation-closure.html) is stateful — all requests for a given closure table must reach the same instance. For scaled StatefulSet deployments (`deployment.kind: StatefulSet` and `deployment.type: scaled`), the chart automatically creates a dedicated `RELEASE-ontoserver-pod0-service` selecting only pod-0, and renders a dedicated route matching `/fhir/ConceptMap/$closure` before the catchall `/` rule.
+
+For Gateway API, this is a **separate `HTTPRoute` resource** (`RELEASE-closure-route`) rather than a rule in the main `RELEASE-route`, which ensures the more-specific path takes precedence regardless of Gateway implementation. For Ingress and Traefik IngressRoute it is a path rule within the same resource.
+
+The `$closure` route backend follows `backendServiceNameOverride` — defaulting to `RELEASE-ontoserver-pod0-service` when no override is set. If `backendServiceNameOverride` points to a proxy such as Varnish, `$closure` is also routed through it; ensure that proxy handles stateful sticky routing to a single upstream instance.
 
 ## Envoy Gateway
 

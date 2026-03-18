@@ -41,7 +41,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ $releaseName }}-ontoserver-pod0-service
+                name: {{ $.Values.ontoserver.ingress.backendServiceNameOverride | default (printf "%s-ontoserver-pod0-service" $releaseName) }}
                 port:
                   number: 80
           {{- end }}

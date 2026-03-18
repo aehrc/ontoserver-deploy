@@ -30,7 +30,7 @@ spec:
     - match: Host(`{{ . }}`) && PathPrefix(`/fhir/ConceptMap/$closure`)
       kind: Rule
       services:
-        - name: {{ $releaseName }}-ontoserver-pod0-service
+        - name: {{ $.Values.traefik.ingressRoute.backendServiceNameOverride | default (printf "%s-ontoserver-pod0-service" $releaseName) }}
           port: {{ $.Values.traefik.ingressRoute.backendPort }}
           {{- if $.Values.traefik.ingressRoute.backendScheme }}
           scheme: {{ $.Values.traefik.ingressRoute.backendScheme }}

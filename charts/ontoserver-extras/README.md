@@ -181,18 +181,18 @@ When Varnish fronts a scaled StatefulSet Ontoserver cluster, two additional sett
 **`varnish.closureBackend`** — Optional dedicated backend for the [`$closure` FHIR operation](https://www.hl7.org/fhir/conceptmap-operation-closure.html), which is stateful and must always reach the same Ontoserver instance. When set, Varnish routes all `POST /fhir/ConceptMap/$closure` requests to this specific backend hostname, bypassing the cache and the normal load-balanced backend. Set it to the stable DNS name of pod-0 via the headless service (e.g. `RELEASE-statefulset-0.RELEASE-ontoserver-headless`). Empty string (the default) disables dedicated `$closure` routing.
 
 > [!IMPORTANT]
-> You usually do **not** need `varnish.closureBackend` when using the `ontoserver` chart's Gateway or Ingress. In that setup, the `ontoserver` chart already routes `/fhir/ConceptMap/$closure` directly to `RELEASE-ontoserver-pod0-service` before the catchall route to Varnish, so `$closure` bypasses Varnish entirely.
+> Whether you need `varnish.closureBackend` depends on how traffic reaches Varnish:
 >
-> Set `varnish.closureBackend` only when clients send `$closure` requests to Varnish directly, bypassing the `ontoserver` chart's Gateway/Ingress path-based routing. That is a niche setup, such as port-forwarding or exposing Varnish through a separate ingress/proxy in front of the Ontoserver chart. Without `varnish.closureBackend`, Varnish forwards `$closure` to its normal backend service, which load-balances across all Ontoserver pods and breaks the stateful closure table.
+> **`backendServiceNameOverride` NOT set** (Gateway/Ingress routes directly to Ontoserver): The `ontoserver` chart routes `/fhir/ConceptMap/$closure` to `RELEASE-ontoserver-pod0-service`, which bypasses Varnish entirely. `varnish.closureBackend` is not needed.
 >
-> Set it to the stable pod-0 DNS name:
+> **`backendServiceNameOverride` set to the Varnish service**: `$closure` is routed through Varnish along with all other traffic. Varnish always treats `$closure` as a cache miss (`return (pass)`), but without `varnish.closureBackend` it will forward to its normal backend — which load-balances across all Ontoserver pods and breaks the stateful closure table. In this case, set `varnish.closureBackend` to the stable pod-0 DNS name:
 > ```yaml
 > varnish:
 >   closureBackend: "RELEASE-statefulset-0.RELEASE-ontoserver-headless"
 > ```
-> Replace `RELEASE` with your Helm release name (the same release name used for the `ontoserver` chart).
+> Replace `RELEASE` with your Helm release name.
 >
-> If you are **not** routing through Varnish (Gateway/Ingress points directly at Ontoserver), this is not needed — the `ontoserver` chart already handles `$closure` routing at the network level.
+> **Varnish exposed directly** (no `ontoserver` chart Gateway/Ingress in front): Same requirement as above — set `varnish.closureBackend` to the pod-0 headless DNS name.
 
 ## Resource Naming
 

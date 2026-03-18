@@ -129,6 +129,30 @@ data:
     check "\$translate returns Parameters" "$(grep -q '"resourceType":"Parameters"' /tmp/response.json && echo ok || echo "not found")"
     check "\$translate maps to target-a" "$(grep -q '"target-a"' /tmp/response.json && echo ok || echo "not found")"
 
+    echo "=== Test: ConceptMap \$closure ==="
+    # Tests the $closure API contract on a single instance.
+    # Routing correctness for scaled deployments (pod-0 stickiness) is covered by helm unit tests.
+
+    # Initialise a named closure table
+    CODE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+      -X POST \
+      -H "Content-Type: application/fhir+json" \
+      -H "Accept: application/fhir+json" \
+      --data-binary '{"resourceType":"Parameters","parameter":[{"name":"name","valueString":"test-closure-table"}]}' \
+      "$BASE_URL/fhir/ConceptMap/\$closure" || echo "000")
+    check "\$closure init returns 200" "$([ "$CODE" = "200" ] && echo ok || echo "http $CODE")"
+    check "\$closure init returns ConceptMap" "$(grep -q '"resourceType":"ConceptMap"' /tmp/response.json && echo ok || echo "not found")"
+
+    # Add a concept to the closure table (uses the CodeSystem loaded above)
+    CODE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+      -X POST \
+      -H "Content-Type: application/fhir+json" \
+      -H "Accept: application/fhir+json" \
+      --data-binary '{"resourceType":"Parameters","parameter":[{"name":"name","valueString":"test-closure-table"},{"name":"concept","valueCoding":{"system":"http://example.org/fhir/CodeSystem/test-cs","code":"code-a"}}]}' \
+      "$BASE_URL/fhir/ConceptMap/\$closure" || echo "000")
+    check "\$closure update returns 200" "$([ "$CODE" = "200" ] && echo ok || echo "http $CODE")"
+    check "\$closure update returns ConceptMap" "$(grep -q '"resourceType":"ConceptMap"' /tmp/response.json && echo ok || echo "not found")"
+
     echo "=== Cleanup: Delete test resources ==="
     delete_by_url ConceptMap "http://example.org/fhir/ConceptMap/test-cm"
     delete_by_url ValueSet "http://example.org/fhir/ValueSet/test-vs"

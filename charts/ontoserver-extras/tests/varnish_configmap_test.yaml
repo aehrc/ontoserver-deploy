@@ -154,3 +154,4 @@ tests:
       - matchRegex:
           path: data["default.vcl"]
           pattern: 'ConceptMap/\\\$closure'
+

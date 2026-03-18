@@ -67,20 +67,6 @@ spec:
       name: {{ $.Release.Name }}-gw
   {{- end }}
   rules:
-    {{- if and (eq .Values.ontoserver.deployment.kind "StatefulSet") (eq .Values.ontoserver.deployment.type "scaled") }}
-    # Route $closure to a dedicated pod — this FHIR operation is stateful and requires
-    # all requests to always hit the same Ontoserver instance.
-    - backendRefs:
-        - group: ''
-          kind: Service
-          name: {{ .Release.Name }}-ontoserver-pod0-service
-          port: 80
-          weight: 1
-      matches:
-        - path:
-            type: PathPrefix
-            value: /fhir/ConceptMap/$closure
-    {{- end }}
     - backendRefs:
         - group: ''
           kind: Service
@@ -96,6 +82,38 @@ spec:
         request: "{{ .Values.ontoserver.gateway.requestTimeout }}"
         backendRequest: "{{ .Values.ontoserver.gateway.requestTimeout }}"
       {{- end }}
+{{- if and (eq .Values.ontoserver.deployment.kind "StatefulSet") (eq .Values.ontoserver.deployment.type "scaled") }}
+---
+# Dedicated HTTPRoute for $closure — this FHIR operation is stateful and requires all
+# requests to always hit the same Ontoserver instance.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Release.Name }}-closure-route
+spec:
+  hostnames:
+    {{- range .Values.ontoserver.hostNames }}
+    - {{ . | quote }}
+    {{- end }}
+  parentRefs:
+  {{- range $i := until (len .Values.ontoserver.hostNames) }}
+    - group: gateway.networking.k8s.io
+      sectionName: websecure-{{ $i }}
+      kind: Gateway
+      name: {{ $.Release.Name }}-gw
+  {{- end }}
+  rules:
+    - backendRefs:
+        - group: ''
+          kind: Service
+          name: {{ .Values.ontoserver.gateway.backendServiceNameOverride | default (printf "%s-ontoserver-pod0-service" .Release.Name) }}
+          port: 80
+          weight: 1
+      matches:
+        - path:
+            type: PathPrefix
+            value: /fhir/ConceptMap/$closure
+{{- end }}
 {{- if .Values.ontoserver.certmanager.enabled }}
 ---
 apiVersion: cert-manager.io/v1

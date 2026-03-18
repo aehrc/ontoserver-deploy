@@ -154,7 +154,7 @@ tests:
       - hasDocuments:
           count: 1
 
-  - it: Gateway HTTPRoute adds closure rule for scaled StatefulSet
+  - it: Gateway renders separate closure HTTPRoute for scaled StatefulSet
     templates:
       - templates/gateway.yaml
     set:
@@ -169,20 +169,52 @@ tests:
     values:
       - fixtures/external-db-values.yaml
     asserts:
+      - hasDocuments:
+          count: 3
+      - isKind:
+          of: HTTPRoute
+        documentIndex: 2
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-closure-route
+        documentIndex: 2
       - equal:
           path: spec.rules[0].matches[0].path.value
           value: /fhir/ConceptMap/$closure
-        documentIndex: 1
+        documentIndex: 2
       - equal:
           path: spec.rules[0].backendRefs[0].name
           value: RELEASE-NAME-ontoserver-pod0-service
-        documentIndex: 1
+        documentIndex: 2
       - equal:
-          path: spec.rules[1].matches[0].path.value
+          path: spec.rules[0].matches[0].path.value
           value: /
         documentIndex: 1
 
-  - it: Gateway HTTPRoute has no closure rule for single StatefulSet
+  - it: Gateway closure HTTPRoute uses backendServiceNameOverride when set with scaled StatefulSet
+    templates:
+      - templates/gateway.yaml
+    set:
+      ontoserver.gateway.enabled: true
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: false
+      ontoserver.hostNames:
+        - myserver.example.com
+      ontoserver.serverName: myserver.example.com
+      ontoserver.gateway.backendServiceNameOverride: my-varnish-service
+    values:
+      - fixtures/external-db-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 3
+      - equal:
+          path: spec.rules[0].backendRefs[0].name
+          value: my-varnish-service
+        documentIndex: 2
+
+  - it: Gateway HTTPRoute has no closure route for single StatefulSet
     templates:
       - templates/gateway.yaml
     set:
@@ -236,6 +268,29 @@ tests:
       - equal:
           path: spec.rules[0].http.paths[0].backend.service.name
           value: ontoserver-dev-varnish-service
+
+  - it: Ingress closure path uses backendServiceNameOverride when set with scaled StatefulSet
+    templates:
+      - templates/ingress.yaml
+    set:
+      ontoserver.ingress.enabled: true
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: false
+      ontoserver.hostNames:
+        - myserver.example.com
+      ontoserver.serverName: myserver.example.com
+      ontoserver.ingress.backendServiceNameOverride: my-varnish-service
+    values:
+      - fixtures/external-db-values.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /fhir/ConceptMap/$closure
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: my-varnish-service
 
   - it: Ingress has no closure path for single StatefulSet
     templates:
@@ -378,6 +433,29 @@ tests:
       - equal:
           path: spec.routes[1].services[0].name
           value: RELEASE-NAME-ontoserver-service
+
+  - it: IngressRoute closure route uses backendServiceNameOverride when set with scaled StatefulSet
+    templates:
+      - templates/traefik-ingressroute.yaml
+    set:
+      traefik.ingressRoute.enabled: true
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: false
+      ontoserver.hostNames:
+        - myserver.example.com
+      ontoserver.serverName: myserver.example.com
+      traefik.ingressRoute.backendServiceNameOverride: my-varnish-service
+    values:
+      - fixtures/external-db-values.yaml
+    asserts:
+      - matchRegex:
+          path: spec.routes[0].match
+          pattern: "\\$closure"
+      - equal:
+          path: spec.routes[0].services[0].name
+          value: my-varnish-service
 
   - it: IngressRoute has no closure route for single Deployment
     templates:
