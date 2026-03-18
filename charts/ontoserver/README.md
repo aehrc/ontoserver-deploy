@@ -343,6 +343,8 @@ The readiness probe calls `/healthcheck.sh` with the flag set in `ontoserver.hea
 
 ### Healthcheck and HTTPS mode (`ONTOSERVER_INSECURE: "false"`)
 
+> **Note:** This workaround is only needed for Ontoserver 6.24.2 and below.
+
 All three probes (startup, liveness, readiness) call `/healthcheck.sh` inside the container. On first run, the script checks the Spring Boot actuator health endpoint (`http://localhost:18080`) and, if Ontoserver has not yet been initialised (`initialized: false`), triggers initialization by calling the FHIR metadata endpoint on the main server port.
 
 When `ONTOSERVER_INSECURE: "false"`, the main server port is HTTPS on 8443. The script constructs the URL as `https://localhost:8443/fhir/metadata` and fetches it with `wget` — but `wget` inside the container rejects the bundled self-signed certificate, causing the initialization call to fail and the probe to exit non-zero. The pod then restarts in a loop and never becomes healthy.
@@ -729,7 +731,7 @@ By default (`ONTOSERVER_INSECURE: "true"`) Ontoserver serves plain HTTP on port 
 
 The client-to-Traefik leg remains plain HTTP via the `web` entrypoint; TLS is only on the Traefik-to-Ontoserver backend leg.
 
-> **Important — probe patch required:** When `ONTOSERVER_INSECURE: "false"`, the container's `/healthcheck.sh` uses `wget` to trigger FHIR initialization via `https://localhost:8443`. Because the certificate is self-signed, `wget` rejects it and the startup probe fails permanently. A `postStart` lifecycle hook is required to patch the script before the first probe fires. See [Healthcheck and HTTPS mode](#healthcheck-and-https-mode-ontoserver_insecure-false) for the full explanation.
+> **Important — probe patch required (Ontoserver 6.24.2 and below):** When `ONTOSERVER_INSECURE: "false"`, the container's `/healthcheck.sh` uses `wget` to trigger FHIR initialization via `https://localhost:8443`. Because the certificate is self-signed, `wget` rejects it and the startup probe fails permanently. A `postStart` lifecycle hook is required to patch the script before the first probe fires. See [Healthcheck and HTTPS mode](#healthcheck-and-https-mode-ontoserver_insecure-false) for the full explanation.
 
 ```yaml
 ontoserver:
