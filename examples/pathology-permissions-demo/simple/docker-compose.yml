@@ -124,8 +124,14 @@ services:
       spring.datasource.password: ontoserver
 
       # FHIR endpoint configuration
-      # Uses Docker-internal hostname so syndication feed resource URLs are
-      # reachable by the production container (localhost doesn't work between containers)
+      # Uses Docker-internal hostname so syndication feed entry URLs are
+      # reachable by the production container. OntoCommand's SMART login
+      # won't work for the authoring server because of this — the
+      # CapabilityStatement advertises the internal URL which browsers
+      # can't reach. This is an artefact of running everything on localhost
+      # with Docker Desktop; in a real deployment with proper hostnames,
+      # fhir.base would be the same URL internally and externally, and
+      # OntoCommand would work normally on all servers.
       ontoserver.fhir.base: http://authoring-ontoserver:8080/fhir
 
       # Security - fine-grained mode enables resource-level permissions.
