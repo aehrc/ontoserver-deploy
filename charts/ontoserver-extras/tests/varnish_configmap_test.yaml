@@ -153,5 +153,5 @@ tests:
           pattern: 'req\.backend_hint = closure'
       - matchRegex:
           path: data["default.vcl"]
-          pattern: 'ConceptMap/\\\$closure'
+          pattern: '/fhir/\\\$closure'
 

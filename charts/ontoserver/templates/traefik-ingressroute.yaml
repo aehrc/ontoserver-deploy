@@ -27,7 +27,7 @@ spec:
     {{- if and (eq $.Values.ontoserver.deployment.kind "StatefulSet") (eq $.Values.ontoserver.deployment.type "scaled") }}
     # Route $closure to a dedicated pod — this FHIR operation is stateful and requires
     # all requests to always hit the same Ontoserver instance.
-    - match: Host(`{{ . }}`) && PathPrefix(`/fhir/ConceptMap/$closure`)
+    - match: Host(`{{ . }}`) && PathPrefix(`/fhir/$closure`)
       kind: Rule
       services:
         - name: {{ $.Values.traefik.ingressRoute.backendServiceNameOverride | default (printf "%s-ontoserver-pod0-service" $releaseName) }}

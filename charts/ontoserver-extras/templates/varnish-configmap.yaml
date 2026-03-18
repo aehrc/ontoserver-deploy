@@ -34,7 +34,7 @@ data:
         {{- if .Values.varnish.closureBackend }}
         # Route $closure to a dedicated backend — $closure maintains per-session state
         # and must always hit the same Ontoserver instance.
-        if (req.url ~ "^/fhir/ConceptMap/\$closure") {
+        if (req.url ~ "^/fhir/\$closure") {
             set req.backend_hint = closure;
             return (pass);
         }

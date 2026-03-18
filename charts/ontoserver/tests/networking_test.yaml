@@ -180,7 +180,7 @@ tests:
         documentIndex: 2
       - equal:
           path: spec.rules[0].matches[0].path.value
-          value: /fhir/ConceptMap/$closure
+          value: /fhir/$closure
         documentIndex: 2
       - equal:
           path: spec.rules[0].backendRefs[0].name
@@ -247,7 +247,7 @@ tests:
     asserts:
       - equal:
           path: spec.rules[0].http.paths[0].path
-          value: /fhir/ConceptMap/$closure
+          value: /fhir/$closure
       - equal:
           path: spec.rules[0].http.paths[0].backend.service.name
           value: RELEASE-NAME-ontoserver-pod0-service
@@ -287,7 +287,7 @@ tests:
     asserts:
       - equal:
           path: spec.rules[0].http.paths[0].path
-          value: /fhir/ConceptMap/$closure
+          value: /fhir/$closure
       - equal:
           path: spec.rules[0].http.paths[0].backend.service.name
           value: my-varnish-service

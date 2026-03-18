@@ -112,7 +112,7 @@ spec:
       matches:
         - path:
             type: PathPrefix
-            value: /fhir/ConceptMap/$closure
+            value: /fhir/$closure
 {{- end }}
 {{- if .Values.ontoserver.certmanager.enabled }}
 ---

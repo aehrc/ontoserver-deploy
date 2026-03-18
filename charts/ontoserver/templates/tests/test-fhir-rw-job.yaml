@@ -139,7 +139,7 @@ data:
       -H "Content-Type: application/fhir+json" \
       -H "Accept: application/fhir+json" \
       --data-binary '{"resourceType":"Parameters","parameter":[{"name":"name","valueString":"test-closure-table"}]}' \
-      "$BASE_URL/fhir/ConceptMap/\$closure" || echo "000")
+      "$BASE_URL/fhir/\$closure" || echo "000")
     check "\$closure init returns 200" "$([ "$CODE" = "200" ] && echo ok || echo "http $CODE")"
     check "\$closure init returns ConceptMap" "$(grep -q '"resourceType":"ConceptMap"' /tmp/response.json && echo ok || echo "not found")"
 
@@ -149,7 +149,7 @@ data:
       -H "Content-Type: application/fhir+json" \
       -H "Accept: application/fhir+json" \
       --data-binary '{"resourceType":"Parameters","parameter":[{"name":"name","valueString":"test-closure-table"},{"name":"concept","valueCoding":{"system":"http://example.org/fhir/CodeSystem/test-cs","code":"code-a"}}]}' \
-      "$BASE_URL/fhir/ConceptMap/\$closure" || echo "000")
+      "$BASE_URL/fhir/\$closure" || echo "000")
     check "\$closure update returns 200" "$([ "$CODE" = "200" ] && echo ok || echo "http $CODE")"
     check "\$closure update returns ConceptMap" "$(grep -q '"resourceType":"ConceptMap"' /tmp/response.json && echo ok || echo "not found")"
 

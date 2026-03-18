@@ -23,6 +23,7 @@ This chart provides flexible deployment options for [Ontoserver](https://ontoser
 - [Testing](#testing)
   - [Unit Tests](#unit-tests)
   - [Integration Tests](#integration-tests)
+    - [Scaled StatefulSet integration test](#scaled-statefulset-integration-test)
 - [Persistence](#persistence)
   - [Pre-provisioned PersistentVolumes](#pre-provisioned-persistentvolumes)
 - [Health Checking](#health-checking)
@@ -234,7 +235,9 @@ The **metadata test** (always runs) checks the FHIR CapabilityStatement and, if 
 
 The **FHIR read-only test** (runs when `ontoserver.deployment.isReadOnly=true`) verifies that write requests are rejected and that basic read access remains available.
 
-The **FHIR read-write test** (only runs when `ontoserver.deployment.isReadOnly=false`) loads a CodeSystem, ValueSet, and ConceptMap, then exercises `$lookup`, `$validate-code`, `$expand`, and `$translate` operations.
+The **FHIR read-write test** (only runs when `ontoserver.deployment.isReadOnly=false`) loads a CodeSystem, ValueSet, and ConceptMap, then exercises `$lookup`, `$validate-code`, `$expand`, `$translate`, and `$closure` operations.
+
+The **`$closure` routing test** (only runs when `deployment.kind: StatefulSet` and `deployment.type: scaled`) validates that both pods are reachable via their headless DNS names, that `RELEASE-ontoserver-pod0-service` routes correctly to pod-0, and that the stateful closure table created via the pod-0 service is accessible in a subsequent call to both the service and pod-0 directly.
 
 By default, completed Helm test Jobs are retained for 30 minutes via `ontoserver.tests.ttlSecondsAfterFinished: 1800`, which leaves time to inspect pod logs before Kubernetes cleans them up. Set the value to `0` to delete them immediately after completion when the cluster TTL-after-finished controller processes them.
 
@@ -256,8 +259,15 @@ helm test my-ontoserver
 > kubectl logs -l job-name=my-ontoserver-ontoserver-test-metadata
 > kubectl logs -l job-name=my-ontoserver-ontoserver-test-fhir-ro
 > kubectl logs -l job-name=my-ontoserver-ontoserver-test-fhir-rw
+> kubectl logs -l job-name=my-ontoserver-ontoserver-test-closure-scaled   # scaled StatefulSet only
 > ```
 > These Jobs are retained for `ontoserver.tests.ttlSecondsAfterFinished` seconds after completion. The default is 1800 seconds (30 minutes).
+
+#### Scaled StatefulSet integration test
+
+The `$closure` routing test requires a scaled StatefulSet deployment with an external PostgreSQL database and ≥8 GB RAM (2 Ontoserver pods + PostgreSQL). Run it locally using a [k3d](https://k3d.io/) cluster.
+
+A complete local test procedure is documented in [`charts/ontoserver/tests/fixtures/scaled-values.yaml`](tests/fixtures/scaled-values.yaml).
 
 ## Persistence
 
@@ -669,11 +679,13 @@ The Envoy Gateway traffic policies (`envoygateway.*`) are specific to Envoy Gate
 
 ### `$closure` routing for scaled StatefulSet deployments
 
-The [`$closure` FHIR operation](https://www.hl7.org/fhir/conceptmap-operation-closure.html) is stateful — all requests for a given closure table must reach the same instance. For scaled StatefulSet deployments (`deployment.kind: StatefulSet` and `deployment.type: scaled`), the chart automatically creates a dedicated `RELEASE-ontoserver-pod0-service` selecting only pod-0, and renders a dedicated route matching `/fhir/ConceptMap/$closure` before the catchall `/` rule.
+The [`$closure` FHIR operation](https://www.hl7.org/fhir/conceptmap-operation-closure.html) is stateful — all requests for a given closure table must reach the same instance. For scaled StatefulSet deployments (`deployment.kind: StatefulSet` and `deployment.type: scaled`), the chart automatically creates a dedicated `RELEASE-ontoserver-pod0-service` selecting only pod-0, and renders a dedicated route matching `/fhir/$closure` before the catchall `/` rule.
 
 For Gateway API, this is a **separate `HTTPRoute` resource** (`RELEASE-closure-route`) rather than a rule in the main `RELEASE-route`, which ensures the more-specific path takes precedence regardless of Gateway implementation. For Ingress and Traefik IngressRoute it is a path rule within the same resource.
 
 The `$closure` route backend follows `backendServiceNameOverride` — defaulting to `RELEASE-ontoserver-pod0-service` when no override is set. If `backendServiceNameOverride` points to a proxy such as Varnish, `$closure` is also routed through it; ensure that proxy handles stateful sticky routing to a single upstream instance.
+
+The routing is validated by the `$closure` routing integration test (`helm test`) which is automatically included for scaled StatefulSet deployments. See [Scaled StatefulSet integration test](#scaled-statefulset-integration-test) for local test instructions.
 
 ## Envoy Gateway
 
