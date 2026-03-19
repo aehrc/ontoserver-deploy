@@ -175,6 +175,26 @@ graph LR
     style RC fill:#ab47bc,color:#fff
 ```
 
+## Networking and Docker Desktop
+
+### HTTPS Reverse Proxy (Caddy)
+
+All services run on HTTP internally within the Docker network. Caddy terminates TLS and provides HTTPS access from the browser, with self-signed certificates for local development.
+
+### Docker Desktop Limitation (Mac and Windows)
+
+On **Mac and Windows**, Docker Desktop runs containers inside a hidden Linux VM. This creates a networking asymmetry: `localhost` on the host refers to the host machine, but `localhost` inside a container refers to the container itself. Containers cannot reach the host's `localhost` ports.
+
+This affects the authoring server's `ontoserver.fhir.base` configuration. Ontoserver uses `fhir.base` to generate URLs in the FHIR CapabilityStatement and syndication feed entries. Ideally this would be the external HTTPS URL (e.g., `https://localhost:9081/fhir`), but then the production container can't fetch the syndication feed entries (which embed that URL) because it can't reach `localhost:9081`. Setting `fhir.base` to the internal Docker hostname (`http://authoring-ontoserver:8080/fhir`) fixes syndication but breaks OntoCommand's SMART login (which reads the CapabilityStatement URL).
+
+**This is a Docker Desktop limitation, not an architectural issue.** On Linux, Docker runs natively without a VM, so containers can reach the host's network interfaces directly. On a cloud VM (Linux), or in any production deployment with proper DNS hostnames, `fhir.base` can be the external URL and everything works — syndication, OntoCommand, all tools.
+
+For the local Docker Desktop demo:
+- The authoring server uses an internal `fhir.base` so syndication works
+- OntoCommand login works on production and UAT (which use external `fhir.base`)
+- OntoCommand login does not work on the authoring server — use Shrimp or Snapper instead
+- See the [cloud deployment guide](cloud-deployment-oracle.md) for running the demo on a cloud VM where this limitation does not apply
+
 ## Security Model
 
 ### Two-Layer Security

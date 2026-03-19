@@ -45,7 +45,7 @@ Server connections (append the appropriate `clientId` for the tool — `shrimp`,
 - **Authoring**: append `?iss=https://localhost:9081&clientId=<tool>`
 - **Production**: append `?iss=https://localhost:9082&clientId=<tool>`
 
-> **Note:** OntoCommand login does not work for the **authoring** server in this demo. The authoring server's `fhir.base` must use a Docker-internal hostname so that syndication feed entry URLs are reachable by the production container. This makes the CapabilityStatement URL unreachable from the browser, breaking OntoCommand's SMART login. Use **Shrimp or Snapper** for the authoring server, and **OntoCommand** for the production server. This is an artefact of running everything on `localhost` with Docker Desktop — in a real deployment with proper hostnames, `fhir.base` would be the same URL internally and externally, and OntoCommand would work normally on all servers.
+> **Note:** OntoCommand login does not work for the **authoring** server when running locally on Docker Desktop (Mac/Windows). This is a Docker Desktop networking limitation, not an architectural issue — see [Architecture: Docker Desktop Limitation](architecture.md#docker-desktop-limitation-mac-and-windows) for details. Use **Shrimp or Snapper** for the authoring server, and **OntoCommand** for the production server. On a Linux cloud VM with a proper hostname, OntoCommand works on all servers.
 
 Demo users (all passwords: **`demo`**):
 `admin`, `alpha-viewer`, `alpha-author`, `alpha-approver`, `beta-viewer`, `beta-author`, `beta-approver`, `national-admin`
