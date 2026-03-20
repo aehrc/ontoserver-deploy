@@ -87,6 +87,84 @@ tests:
           documentIndex: 0
           value: RELEASE-NAME-client-settings
 
+  - it: renders BackendTrafficPolicy with single global rate limit rule when no blockedUserAgents
+    templates:
+      - templates/envoy-gateway-policies.yaml
+    set:
+      ontoserver.gateway.enabled: true
+      envoygateway.backendTrafficPolicy.enabled: true
+    asserts:
+      - isKind:
+          of: BackendTrafficPolicy
+          documentIndex: 0
+      - equal:
+          path: spec.rateLimit.local.rules
+          documentIndex: 0
+          value:
+            - limit:
+                requests: 50
+                unit: Second
+
+  - it: renders BackendTrafficPolicy with bot-blocking rule when blockedUserAgents configured
+    templates:
+      - templates/envoy-gateway-policies.yaml
+    set:
+      ontoserver.gateway.enabled: true
+      envoygateway.backendTrafficPolicy.enabled: true
+      envoygateway.backendTrafficPolicy.blockedUserAgents[0]: SemrushBot
+    asserts:
+      - isKind:
+          of: BackendTrafficPolicy
+          documentIndex: 0
+      - equal:
+          path: spec.rateLimit.local.rules
+          documentIndex: 0
+          value:
+            - clientSelectors:
+                - headers:
+                    - name: User-Agent
+                      value: SemrushBot
+                      type: RegularExpression
+              limit:
+                requests: 1
+                unit: Hour
+            - limit:
+                requests: 50
+                unit: Second
+
+  - it: renders BackendTrafficPolicy with multiple bot-blocking rules when multiple blockedUserAgents configured
+    templates:
+      - templates/envoy-gateway-policies.yaml
+    values:
+      - fixtures/blocked-user-agents-values.yaml
+    asserts:
+      - isKind:
+          of: BackendTrafficPolicy
+          documentIndex: 0
+      - equal:
+          path: spec.rateLimit.local.rules
+          documentIndex: 0
+          value:
+            - clientSelectors:
+                - headers:
+                    - name: User-Agent
+                      value: SemrushBot
+                      type: RegularExpression
+              limit:
+                requests: 1
+                unit: Hour
+            - clientSelectors:
+                - headers:
+                    - name: User-Agent
+                      value: AhrefsBot
+                      type: RegularExpression
+              limit:
+                requests: 1
+                unit: Hour
+            - limit:
+                requests: 50
+                unit: Second
+
   - it: renders no PV by default
     templates:
       - templates/pv.yaml

@@ -38,6 +38,16 @@ spec:
     type: Local
     local:
       rules:
+        {{- range .Values.envoygateway.backendTrafficPolicy.blockedUserAgents }}
+        - clientSelectors:
+            - headers:
+                - name: User-Agent
+                  value: {{ . }}
+                  type: RegularExpression
+          limit:
+            requests: 1
+            unit: Hour
+        {{- end }}
         - limit:
             requests: {{ .Values.envoygateway.backendTrafficPolicy.rateLimit.requests }}
             unit: {{ .Values.envoygateway.backendTrafficPolicy.rateLimit.unit }}
