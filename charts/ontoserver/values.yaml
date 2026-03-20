@@ -365,8 +365,8 @@ envoygateway:
       requests: 50
       ## @param envoygateway.backendTrafficPolicy.rateLimit.unit       Rate limit unit (Second, Minute, Hour)
       unit: Second
-    ## @param envoygateway.backendTrafficPolicy.blockedUserAgents   List of User-Agent substrings to rate-limit aggressively (1 req/hour). Matched as regular expressions against the User-Agent header.
-    blockedUserAgents: []
+    ## @param envoygateway.backendTrafficPolicy.rateLimitUserAgents   List of User-Agent substrings to rate-limit aggressively (1 req/hour). Matched as regular expressions against the User-Agent header.
+    rateLimitUserAgents: []
   securityPolicy:
     ## @param envoygateway.securityPolicy.enabled          Enable Envoy SecurityPolicy (requires ontoserver.gateway.enabled)
     enabled: false

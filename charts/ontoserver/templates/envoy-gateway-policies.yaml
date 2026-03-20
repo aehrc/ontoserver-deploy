@@ -38,7 +38,7 @@ spec:
     type: Local
     local:
       rules:
-        {{- range .Values.envoygateway.backendTrafficPolicy.blockedUserAgents }}
+        {{- range .Values.envoygateway.backendTrafficPolicy.rateLimitUserAgents }}
         - clientSelectors:
             - headers:
                 - name: User-Agent

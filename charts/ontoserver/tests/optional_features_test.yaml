@@ -87,7 +87,7 @@ tests:
           documentIndex: 0
           value: RELEASE-NAME-client-settings
 
-  - it: renders BackendTrafficPolicy with single global rate limit rule when no blockedUserAgents
+  - it: renders BackendTrafficPolicy with single global rate limit rule when no rateLimitUserAgents
     templates:
       - templates/envoy-gateway-policies.yaml
     set:
@@ -105,13 +105,13 @@ tests:
                 requests: 50
                 unit: Second
 
-  - it: renders BackendTrafficPolicy with bot-blocking rule when blockedUserAgents configured
+  - it: renders BackendTrafficPolicy with bot-blocking rule when rateLimitUserAgents configured
     templates:
       - templates/envoy-gateway-policies.yaml
     set:
       ontoserver.gateway.enabled: true
       envoygateway.backendTrafficPolicy.enabled: true
-      envoygateway.backendTrafficPolicy.blockedUserAgents[0]: SemrushBot
+      envoygateway.backendTrafficPolicy.rateLimitUserAgents[0]: SemrushBot
     asserts:
       - isKind:
           of: BackendTrafficPolicy
@@ -132,11 +132,11 @@ tests:
                 requests: 50
                 unit: Second
 
-  - it: renders BackendTrafficPolicy with multiple bot-blocking rules when multiple blockedUserAgents configured
+  - it: renders BackendTrafficPolicy with multiple bot-blocking rules when multiple rateLimitUserAgents configured
     templates:
       - templates/envoy-gateway-policies.yaml
     values:
-      - fixtures/blocked-user-agents-values.yaml
+      - fixtures/rate-limit-user-agents-values.yaml
     asserts:
       - isKind:
           of: BackendTrafficPolicy

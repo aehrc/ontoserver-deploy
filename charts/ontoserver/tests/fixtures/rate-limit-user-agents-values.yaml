@@ -4,6 +4,6 @@ ontoserver:
 envoygateway:
   backendTrafficPolicy:
     enabled: true
-    blockedUserAgents:
+    rateLimitUserAgents:
       - SemrushBot
       - AhrefsBot

@@ -129,7 +129,7 @@ ontoserver:
 #     rateLimit:
 #       requests: 50
 #       unit: Second
-#     blockedUserAgents:       # throttle crawlers to 1 req/hour
+#     rateLimitUserAgents:       # throttle crawlers to 1 req/hour
 #       - SemrushBot
 #       - AhrefsBot
 #   securityPolicy:
