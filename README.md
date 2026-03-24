@@ -3,9 +3,7 @@
 
 [![Unit Tests](https://github.com/aehrc/ontoserver-deploy/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/aehrc/ontoserver-deploy/actions/workflows/unit-tests.yml)
 [![Integration Tests](https://github.com/aehrc/ontoserver-deploy/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/aehrc/ontoserver-deploy/actions/workflows/integration-tests.yml)
-[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/package/helm/ontoserver/ontoserver)](https://artifacthub.io/packages/helm/ontoserver/ontoserver)
-[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/package/helm/ontoserver/ontoserver-extras)](https://artifacthub.io/packages/helm/ontoserver/ontoserver-extras)
-[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/package/helm/ontoserver/ontoserver-indexer)](https://artifacthub.io/packages/helm/ontoserver/ontoserver-indexer)
+[![Helm Repo](https://img.shields.io/badge/helm-aehrc.github.io%2Fontoserver--deploy-0F1689?logo=helm)](https://aehrc.github.io/ontoserver-deploy)
 
 > **Note for GHCR visitors:** The packages under `ghcr.io/aehrc/ontoserver-helm` are **Helm charts**, not Docker images. Install them with Helm, not `docker pull`:
 > ```bash
