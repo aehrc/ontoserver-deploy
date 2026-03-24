@@ -203,6 +203,7 @@
     }
 
     .cmd .command { color: #c8d8e8; }
+    .cmd .command em { color: var(--amber); font-style: normal; }
 
     /* ── section ── */
     section {
@@ -451,7 +452,9 @@
     </div>
     <div class="cmd">
       <span class="prompt">$</span>
-      <span class="command">helm install ontoserver ontoserver/ontoserver</span>
+      <span class="command">helm install ontoserver ontoserver/ontoserver \
+  --set ontoserver.imageCredentials.username=<em>QUAY_USERNAME</em> \
+  --set ontoserver.imageCredentials.password=<em>QUAY_PASSWORD</em></span>
     </div>
   </div>
 </div>
