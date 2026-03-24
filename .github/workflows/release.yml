@@ -86,4 +86,4 @@ jobs:
           chart="${{ steps.chart.outputs.chart }}"
           helm dependency build charts/$chart
           helm package charts/$chart -d charts-pkg
-          helm push charts-pkg/$chart-*.tgz oci://ghcr.io/aehrc
+          helm push charts-pkg/$chart-*.tgz oci://ghcr.io/aehrc/$chart-helm
