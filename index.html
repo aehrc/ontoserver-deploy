@@ -202,7 +202,7 @@
       margin-right: .5rem;
     }
 
-    .cmd .command { color: #c8d8e8; }
+    .cmd .command { color: #c8d8e8; white-space: pre; }
     .cmd .command em { color: var(--amber); font-style: normal; }
 
     /* ── section ── */
@@ -453,8 +453,8 @@
     <div class="cmd">
       <span class="prompt">$</span>
       <span class="command">helm install ontoserver ontoserver/ontoserver \
-  --set ontoserver.imageCredentials.username=<em>QUAY_USERNAME</em> \
-  --set ontoserver.imageCredentials.password=<em>QUAY_PASSWORD</em></span>
+      --set ontoserver.imageCredentials.username=<em>QUAY_USERNAME</em> \
+      --set ontoserver.imageCredentials.password=<em>QUAY_PASSWORD</em></span>
     </div>
   </div>
 </div>
