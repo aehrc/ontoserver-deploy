@@ -3,7 +3,9 @@
 
 [![Unit Tests](https://github.com/aehrc/ontoserver-deploy/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/aehrc/ontoserver-deploy/actions/workflows/unit-tests.yml)
 [![Integration Tests](https://github.com/aehrc/ontoserver-deploy/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/aehrc/ontoserver-deploy/actions/workflows/integration-tests.yml)
-[![Helm Repo](https://img.shields.io/badge/helm-aehrc.github.io%2Fontoserver--deploy-0F1689?logo=helm)](https://aehrc.github.io/ontoserver-deploy)
+[![ontoserver](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Faehrc.github.io%2Fontoserver-deploy%2Findex.yaml&query=%24.entries.ontoserver%5B0%5D.version&label=ontoserver&logo=helm&color=0F1689)](https://aehrc.github.io/ontoserver-deploy)
+[![ontoserver-extras](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Faehrc.github.io%2Fontoserver-deploy%2Findex.yaml&query=%24.entries.ontoserver-extras%5B0%5D.version&label=ontoserver-extras&logo=helm&color=0F1689)](https://aehrc.github.io/ontoserver-deploy)
+[![ontoserver-indexer](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Faehrc.github.io%2Fontoserver-deploy%2Findex.yaml&query=%24.entries.ontoserver-indexer%5B0%5D.version&label=ontoserver-indexer&logo=helm&color=0F1689)](https://aehrc.github.io/ontoserver-deploy)
 
 > **Note for GHCR visitors:** The packages under `ghcr.io/aehrc/ontoserver-helm` are **Helm charts**, not Docker images. Install them with Helm, not `docker pull`:
 > ```bash
