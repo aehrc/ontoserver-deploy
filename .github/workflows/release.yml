@@ -77,5 +77,6 @@ jobs:
         run: |
           chart="${{ steps.chart.outputs.chart }}"
           version="${{ steps.chart.outputs.version }}"
+          helm dependency build charts/$chart
           helm package charts/$chart -d charts-pkg
           helm push charts-pkg/$chart-$version.tgz oci://ghcr.io/aehrc
