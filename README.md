@@ -1,17 +1,18 @@
 # Ontoserver Deployment
 
-> **Note for GHCR visitors:** The packages under `ghcr.io/aehrc/ontoserver-helm` are **Helm charts**, not Docker images. Install them with Helm, not `docker pull`:
-> ```bash
-> helm install ontoserver oci://ghcr.io/aehrc/ontoserver-helm/ontoserver --version <version> \
->   --set ontoserver.imageCredentials.username=<QUAY_USERNAME> \
->   --set ontoserver.imageCredentials.password=<QUAY_PASSWORD>
-> ```
 
 [![Unit Tests](https://github.com/aehrc/ontoserver-deploy/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/aehrc/ontoserver-deploy/actions/workflows/unit-tests.yml)
 [![Integration Tests](https://github.com/aehrc/ontoserver-deploy/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/aehrc/ontoserver-deploy/actions/workflows/integration-tests.yml)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/package/helm/ontoserver/ontoserver)](https://artifacthub.io/packages/helm/ontoserver/ontoserver)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/package/helm/ontoserver/ontoserver-extras)](https://artifacthub.io/packages/helm/ontoserver/ontoserver-extras)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/package/helm/ontoserver/ontoserver-indexer)](https://artifacthub.io/packages/helm/ontoserver/ontoserver-indexer)
+
+> **Note for GHCR visitors:** The packages under `ghcr.io/aehrc/ontoserver-helm` are **Helm charts**, not Docker images. Install them with Helm, not `docker pull`:
+> ```bash
+> helm install ontoserver oci://ghcr.io/aehrc/ontoserver-helm/ontoserver --version <version> \
+>   --set ontoserver.imageCredentials.username=<QUAY_USERNAME> \
+>   --set ontoserver.imageCredentials.password=<QUAY_PASSWORD>
+> ```
 
 Deployment resources for [Ontoserver](https://ontoserver.csiro.au) — a FHIR terminology server — across different platforms and technologies.
 
