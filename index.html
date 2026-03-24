@@ -510,9 +510,10 @@
     <div class="usage-card">
       <div class="usage-card-header">OCI registry</div>
       <pre><span class="kw">helm</span> install ontoserver \
-  oci://ghcr.io/aehrc/ontoserver-helm \
+  oci://ghcr.io/aehrc/ontoserver-helm/ontoserver \
   --version <span class="val" data-chart="ontoserver">0.2.0</span> \
-  --values values.yaml</pre>
+  --set ontoserver.imageCredentials.username=<em>QUAY_USERNAME</em> \
+  --set ontoserver.imageCredentials.password=<em>QUAY_PASSWORD</em></pre>
     </div>
   </div>
 </section>
