@@ -337,6 +337,29 @@
     .usage-card pre .val  { color: #e8c87a; }
     .usage-card pre .cmt  { color: var(--muted); }
 
+    /* ── verify block ── */
+    .verify-block {
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .verify-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .7rem;
+      color: var(--muted);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: .6rem;
+    }
+
+    .verify-desc {
+      font-size: .82rem;
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 560px;
+    }
+
     /* ── links ── */
     .links-row {
       display: flex;
@@ -510,6 +533,21 @@
   --version <span class="val" data-chart="ontoserver">0.2.0</span> \
   --set ontoserver.imageCredentials.username=<em>QUAY_USERNAME</em> \
   --set ontoserver.imageCredentials.password=<em>QUAY_PASSWORD</em></pre>
+    </div>
+  </div>
+
+  <div class="verify-block">
+    <div class="verify-label">Verify your installation</div>
+    <p class="verify-desc">Once Ontoserver is running, run the built-in Helm tests to confirm the FHIR endpoint is healthy. Allow a few minutes for the server to start before running.</p>
+    <div class="install-block" style="max-width:100%;margin-top:.75rem;">
+      <div class="install-block-header">
+        <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <span>Verify</span>
+      </div>
+      <div class="cmd">
+        <span class="prompt">$</span>
+        <span class="command">helm test ontoserver</span>
+      </div>
     </div>
   </div>
 </section>
