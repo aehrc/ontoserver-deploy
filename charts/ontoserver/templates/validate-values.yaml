@@ -78,6 +78,14 @@
   {{- fail "ontoserver.externalSecret.data or ontoserver.externalSecret.dataFrom must be specified when externalSecret.enabled" }}
 {{- end }}
 
+{{- /* cert-manager issues a Kubernetes TLS secret, but ALB only supports TLS termination via ACM
+     certificate ARNs — it cannot read Kubernetes TLS secrets. Enabling cert-manager with ALB
+     ingress will issue a cert that is never used, and HTTPS will not work. Use ACM instead, or
+     switch to nginx ingress which supports Kubernetes TLS secrets. */ -}}
+{{- if and .Values.ontoserver.certmanager.enabled .Values.ontoserver.ingress.enabled (eq .Values.ontoserver.ingress.className "alb") }}
+  {{- fail "certmanager is not compatible with ALB ingress: ALB only supports TLS via ACM certificate ARNs, not Kubernetes TLS secrets. Use alb.ingress.kubernetes.io/certificate-arn instead, or switch to nginx ingress." }}
+{{- end }}
+
 {{- /* Scaled deployments must use StatefulSet. A scaled Deployment with persistence enabled
      would share a single PVC across all replicas — Lucene cannot handle concurrent index
      writes from multiple instances and this would cause index corruption. StatefulSet

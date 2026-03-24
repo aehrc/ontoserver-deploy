@@ -177,3 +177,15 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "StatefulSet deployments do not support ontoserver.deployment.persistence.dbfiles.existingVolume. Each replica needs its own volume; use dynamic provisioning via storageClass or a Deployment for single-instance prebound volumes."
+
+  - it: fails when certmanager is enabled with ALB ingress
+    set:
+      ontoserver.certmanager.enabled: true
+      ontoserver.ingress.enabled: true
+      ontoserver.ingress.className: alb
+      ontoserver.serverName: localhost
+      ontoserver.hostNames:
+        - localhost
+    asserts:
+      - failedTemplate:
+          errorPattern: "certmanager is not compatible with ALB ingress"
