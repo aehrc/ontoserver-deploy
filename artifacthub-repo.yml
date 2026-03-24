@@ -1,0 +1,9 @@
+# Artifact Hub repository metadata
+# Register this repository at https://artifacthub.io/control-panel/repositories
+# pointing to: https://aehrc.github.io/ontoserver-deploy
+# Then fill in the repositoryID assigned by Artifact Hub.
+#
+# repositoryID: <uuid-assigned-by-artifacthub>
+owners:
+  - name: CSIRO AEHRC
+    email: ontoserver-support@csiro.au
