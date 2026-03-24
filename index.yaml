@@ -1,0 +1,100 @@
+apiVersion: v1
+entries:
+  ontoserver:
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/changes: |
+        - kind: added
+          description: Initial public release
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    appVersion: ctsa-6
+    created: "2026-03-24T03:03:48.08016177Z"
+    dependencies:
+    - condition: nginx-ingress.enabled
+      name: nginx-ingress
+      repository: https://helm.nginx.com/stable
+      version: 2.1.0
+    description: Ontoserver FHIR terminology server helm chart with various deployment
+      configurations
+    digest: a8eb650662e87a6a1e4600f3bce506c40fb844c89acbfcc547f86a0aba80a746
+    home: https://ontoserver.csiro.au
+    icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/main/icons/ontoserver.png
+    keywords:
+    - fhir
+    - terminology
+    - ontoserver
+    - hl7
+    maintainers:
+    - email: ontoserver-support@csiro.au
+      name: CSIRO
+    name: ontoserver
+    sources:
+    - https://github.com/aehrc/ontoserver-deploy
+    type: application
+    urls:
+    - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-0.1.0/ontoserver-0.1.0.tgz
+    version: 0.1.0
+  ontoserver-extras:
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/changes: |
+        - kind: added
+          description: Initial public release
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    appVersion: ctsa-6
+    created: "2026-03-24T03:03:48.276745222Z"
+    description: Optional infrastructure components for Ontoserver (Varnish cache,
+      OTel Collector, PV)
+    digest: 4a1b18e564a54e0cfd5ab673a5ef0ebff03c20a054367d7a203796195e830b8c
+    home: https://ontoserver.csiro.au
+    icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/main/icons/ontoserver-extras.png
+    keywords:
+    - fhir
+    - terminology
+    - ontoserver
+    - varnish
+    - opentelemetry
+    maintainers:
+    - email: ontoserver-support@csiro.au
+      name: CSIRO
+    name: ontoserver-extras
+    sources:
+    - https://github.com/aehrc/ontoserver-deploy
+    type: application
+    urls:
+    - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-extras-0.1.0/ontoserver-extras-0.1.0.tgz
+    version: 0.1.0
+  ontoserver-indexer:
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/changes: |
+        - kind: added
+          description: Initial public release
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    appVersion: ctsa-6
+    created: "2026-03-24T03:03:48.458861735Z"
+    description: Runs a Kubernetes Job to index a SNOMED CT (or other) code system
+      and publish to a syndication server
+    digest: 81b807c0ddd4c4137754c783c2391a7e3dd0daae5f251a41e02aeefa6175c76c
+    home: https://ontoserver.csiro.au
+    icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/main/icons/ontoserver-indexer.png
+    keywords:
+    - ontoserver
+    - fhir
+    - terminology
+    - snomed
+    - indexer
+    maintainers:
+    - email: ontoserver-support@csiro.au
+      name: CSIRO
+    name: ontoserver-indexer
+    sources:
+    - https://github.com/aehrc/ontoserver-deploy
+    type: application
+    urls:
+    - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-indexer-0.1.0/ontoserver-indexer-0.1.0.tgz
+    version: 0.1.0
+generated: "2026-03-24T03:03:48.458866424Z"
