@@ -115,6 +115,8 @@ helm install cert-manager jetstack/cert-manager --set crds.enabled=true
 ```
 Then create a `ClusterIssuer` resource — see [cert-manager docs](https://cert-manager.io/docs/configuration/acme/).
 
+> **Note:** cert-manager is not compatible with `ingress.className: alb`. AWS ALB only supports TLS via ACM certificate ARNs — it cannot use Kubernetes TLS secrets that cert-manager creates. Use `alb.ingress.kubernetes.io/certificate-arn` instead, or switch to nginx ingress.
+
 ## Docker
 
 [`docker/`](docker/) contains Docker Compose and container image sources:
