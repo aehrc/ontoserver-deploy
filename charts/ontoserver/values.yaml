@@ -317,6 +317,24 @@ ontoserver:
     ##   - extract:
     ##       key: /myapp/ontoserver-secrets
     dataFrom: []
+  ## @section External Secrets — Image Pull Secret
+  ## @param ontoserver.externalSecret.imagePullSecret.secretStoreRef.name   Override secret store name for pull secret (falls back to ontoserver.externalSecret.secretStoreRef.name)
+  ## @param ontoserver.externalSecret.imagePullSecret.secretStoreRef.kind   Override secret store kind (falls back to ontoserver.externalSecret.secretStoreRef.kind)
+  ## @param ontoserver.externalSecret.imagePullSecret.data.username.key     Secret store path containing the quay.io username
+  ## @param ontoserver.externalSecret.imagePullSecret.data.username.property   Property within the secret (for stores with multiple fields per key)
+  ## @param ontoserver.externalSecret.imagePullSecret.data.password.key     Secret store path containing the quay.io password
+  ## @param ontoserver.externalSecret.imagePullSecret.data.password.property   Property within the secret
+    imagePullSecret:
+      secretStoreRef:
+        name: ""
+        kind: ""
+      data:
+        username:
+          key: ""
+          property: username
+        password:
+          key: ""
+          property: password
 ## @section Envoy Gateway
 envoygateway:
   ## @param envoygateway.controlPlaneNamespace   Namespace where Envoy Gateway control plane is installed
