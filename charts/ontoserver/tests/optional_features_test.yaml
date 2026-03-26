@@ -316,3 +316,69 @@ tests:
       - equal:
           path: metadata.name
           value: RELEASE-NAME-ontoserver-gateway-servicemonitor
+
+  - it: renders no pull secret ExternalSecret by default
+    templates:
+      - templates/imagepullsecretexternal.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders pull secret ExternalSecret when both keys set
+    templates:
+      - templates/imagepullsecretexternal.yaml
+    set:
+      ontoserver.externalSecret.imagePullSecret.data.username.key: quay-creds
+      ontoserver.externalSecret.imagePullSecret.data.password.key: quay-creds
+      ontoserver.externalSecret.secretStoreRef.name: my-store
+    asserts:
+      - isKind:
+          of: ExternalSecret
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-pull-secret-external-sync
+      - equal:
+          path: spec.target.name
+          value: RELEASE-NAME-ontoserver-pull-secret-external
+      - equal:
+          path: spec.target.template.type
+          value: kubernetes.io/dockerconfigjson
+      - equal:
+          path: spec.secretStoreRef.name
+          value: my-store
+      - equal:
+          path: spec.secretStoreRef.kind
+          value: ClusterSecretStore
+      - equal:
+          path: spec.data[0].secretKey
+          value: username
+      - equal:
+          path: spec.data[1].secretKey
+          value: password
+
+  - it: uses imagePullSecret secretStoreRef override when set
+    templates:
+      - templates/imagepullsecretexternal.yaml
+    set:
+      ontoserver.externalSecret.imagePullSecret.data.username.key: quay-creds
+      ontoserver.externalSecret.imagePullSecret.data.password.key: quay-creds
+      ontoserver.externalSecret.secretStoreRef.name: parent-store
+      ontoserver.externalSecret.imagePullSecret.secretStoreRef.name: override-store
+      ontoserver.externalSecret.imagePullSecret.secretStoreRef.kind: SecretStore
+    asserts:
+      - equal:
+          path: spec.secretStoreRef.name
+          value: override-store
+      - equal:
+          path: spec.secretStoreRef.kind
+          value: SecretStore
+
+  - it: fails when imagePullSecret keys set but no secretStoreRef name
+    templates:
+      - templates/imagepullsecretexternal.yaml
+    set:
+      ontoserver.externalSecret.imagePullSecret.data.username.key: quay-creds
+      ontoserver.externalSecret.imagePullSecret.data.password.key: quay-creds
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.externalSecret.imagePullSecret: secretStoreRef.name (or ontoserver.externalSecret.secretStoreRef.name) is required"
