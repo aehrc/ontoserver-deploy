@@ -679,6 +679,49 @@
               "items": {
                 "type": "object"
               }
+            },
+            "imagePullSecret": {
+              "type": "object",
+              "properties": {
+                "secretStoreRef": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "username": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "property": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "password": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "property": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         }
