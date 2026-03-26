@@ -113,3 +113,14 @@ tests:
       - equal:
           path: spec.replicas
           value: 0
+
+  - it: includes external pull secret in imagePullSecrets when imagePullSecret keys set
+    set:
+      ontoserver.externalSecret.imagePullSecret.data.username.key: quay-creds
+      ontoserver.externalSecret.imagePullSecret.data.password.key: quay-creds
+      ontoserver.externalSecret.secretStoreRef.name: my-store
+    asserts:
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: RELEASE-NAME-ontoserver-pull-secret-external

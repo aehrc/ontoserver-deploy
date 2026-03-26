@@ -50,6 +50,9 @@ spec:
       {{- if and .Values.ontoserver.imageCredentials.username .Values.ontoserver.imageCredentials.password }}
         {{- $pullSecrets = append $pullSecrets (dict "name" (printf "%s-ontoserver-pull-secret" .Release.Name)) }}
       {{- end }}
+      {{- if and .Values.ontoserver.externalSecret.imagePullSecret.data.username.key .Values.ontoserver.externalSecret.imagePullSecret.data.password.key }}
+        {{- $pullSecrets = append $pullSecrets (dict "name" (printf "%s-ontoserver-pull-secret-external" .Release.Name)) }}
+      {{- end }}
       {{- if $pullSecrets }}
       imagePullSecrets: {{ toJson $pullSecrets }}
       {{- end }}
