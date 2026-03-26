@@ -189,3 +189,25 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "certmanager is not compatible with ALB ingress"
+
+  - it: passes when imagePullSecret both keys are set
+    set:
+      ontoserver.externalSecret.imagePullSecret.data.username.key: quay-creds
+      ontoserver.externalSecret.imagePullSecret.data.password.key: quay-creds
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when only username key is set
+    set:
+      ontoserver.externalSecret.imagePullSecret.data.username.key: quay-creds
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.externalSecret.imagePullSecret: both data.username.key and data.password.key must be set together"
+
+  - it: fails when only password key is set
+    set:
+      ontoserver.externalSecret.imagePullSecret.data.password.key: quay-creds
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.externalSecret.imagePullSecret: both data.username.key and data.password.key must be set together"

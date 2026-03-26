@@ -101,3 +101,11 @@
 {{- if and (eq .Values.ontoserver.deployment.kind "StatefulSet") .Values.ontoserver.deployment.persistence.dbfiles.existingVolume.enabled }}
   {{- fail "StatefulSet deployments do not support ontoserver.deployment.persistence.dbfiles.existingVolume. Each replica needs its own volume; use dynamic provisioning via storageClass or a Deployment for single-instance prebound volumes." }}
 {{- end }}
+
+{{- $ipsUsername := .Values.ontoserver.externalSecret.imagePullSecret.data.username.key }}
+{{- $ipsPassword := .Values.ontoserver.externalSecret.imagePullSecret.data.password.key }}
+{{- if or $ipsUsername $ipsPassword }}
+  {{- if not (and $ipsUsername $ipsPassword) }}
+    {{- fail "ontoserver.externalSecret.imagePullSecret: both data.username.key and data.password.key must be set together" }}
+  {{- end }}
+{{- end }}
