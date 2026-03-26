@@ -149,47 +149,46 @@ ontoserver:
     password: your-quay-password
 ```
 
-### Option B — External Secrets
+### Option B — External Secrets (chart-native)
 
-Use the [External Secrets Operator](https://external-secrets.io/) to sync credentials from your secrets manager. Store the quay.io username and password as separate keys in your secret store, then use an `ExternalSecret` with a `target.template` to produce a `kubernetes.io/dockerconfigjson` Secret:
-
-```yaml
-apiVersion: external-secrets.io/v1
-kind: ExternalSecret
-metadata:
-  name: quay-pull-secret-sync
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: my-cluster-secret-store   # your SecretStore or ClusterSecretStore
-    kind: ClusterSecretStore
-  target:
-    name: quay-pull-secret
-    creationPolicy: Owner
-    template:
-      type: kubernetes.io/dockerconfigjson
-      data:
-        .dockerconfigjson: |
-          {"auths":{"quay.io":{"username":"{{ .username }}","password":"{{ .password }}"}}}
-  data:
-    - secretKey: username
-      remoteRef:
-        key: quay-credentials    # secret path in your store
-        property: username
-    - secretKey: password
-      remoteRef:
-        key: quay-credentials
-        property: password
-```
-
-Then reference the secret in your values:
+Use the [External Secrets Operator](https://external-secrets.io/) to sync credentials from your secrets manager. Set the keys that locate your quay.io credentials in the store:
 
 ```yaml
 ontoserver:
-  deployment:
-    imagePullSecrets:
-      - name: quay-pull-secret
+  externalSecret:
+    secretStoreRef:
+      name: my-cluster-secret-store   # your SecretStore or ClusterSecretStore
+    imagePullSecret:
+      data:
+        username:
+          key: quay-credentials    # secret path in your store
+          property: username       # property within the secret (omit if the secret IS the value)
+        password:
+          key: quay-credentials
+          property: password
 ```
+
+The chart creates an `ExternalSecret` that syncs the credentials and produces a `kubernetes.io/dockerconfigjson` Secret, which is automatically added to `imagePullSecrets` on the pod.
+
+To use a different store for the pull secret than for other external secrets, set `imagePullSecret.secretStoreRef.name` (and optionally `.kind`):
+
+```yaml
+ontoserver:
+  externalSecret:
+    imagePullSecret:
+      secretStoreRef:
+        name: another-store
+        kind: SecretStore
+      data:
+        username:
+          key: quay-credentials
+          property: username
+        password:
+          key: quay-credentials
+          property: password
+```
+
+Both `data.username.key` and `data.password.key` must be set together — setting only one is a validation error.
 
 ### Option C — pre-created secret
 
