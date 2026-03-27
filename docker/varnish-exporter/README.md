@@ -23,15 +23,52 @@ ghcr.io/aehrc/varnish-exporter:7.7-1
 
 Tag format: `<varnish-version>-<build-revision>`
 
-## Build
+Published release images are multi-arch and include:
+
+- `linux/amd64` for AKS and other standard x86_64 Kubernetes worker nodes
+- `linux/arm64` for local Apple Silicon development and ARM Kubernetes nodes
+
+## Build and release
+
+### Local build on Apple Silicon Mac
+
+Build a local image you can run on your Mac:
 
 ```bash
-docker build -t ghcr.io/aehrc/varnish-exporter:7.7-1 .
-docker push ghcr.io/aehrc/varnish-exporter:7.7-1
+docker buildx build \
+  --platform linux/arm64 \
+  -t ghcr.io/aehrc/varnish-exporter:7.7-1 \
+  --load \
+  docker/varnish-exporter
 ```
 
-The image is intended to be built and pushed automatically via GitHub Actions (see
-`.github/workflows/` in this repository).
+### Multi-arch release build
+
+Build and push a multi-arch manifest for both `amd64` and `arm64`:
+
+```bash
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t ghcr.io/aehrc/varnish-exporter:7.7-1 \
+  -t ghcr.io/aehrc/varnish-exporter:latest \
+  --push \
+  docker/varnish-exporter
+```
+
+### GitHub Actions release
+
+The repository includes a dedicated multi-arch release workflow in
+`/.github/workflows/release-varnish-exporter.yml`.
+
+Pushing a tag named `varnish-exporter-v<version>` publishes both `linux/amd64` and
+`linux/arm64` images to GHCR and updates `latest`.
+
+Example:
+
+```bash
+git tag varnish-exporter-v7.7-1
+git push origin varnish-exporter-v7.7-1
+```
 
 ## Components
 

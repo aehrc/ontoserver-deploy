@@ -112,6 +112,7 @@ resolve_chart() {
     [[ -f "$CHART_YAML" ]] || die "Chart.yaml not found: $CHART_YAML"
 }
 
+# Note: checks the entire repo for cleanliness, not just the chart being released.
 check_git_clean() {
     # Block on staged or modified tracked files; allow untracked
     local dirty
@@ -124,7 +125,7 @@ check_git_clean() {
 }
 
 read_current_version() {
-    CURRENT_VERSION=$(grep -E '^version:' "$CHART_YAML" | head -1 | sed 's/version:[[:space:]]*//')
+    CURRENT_VERSION=$(grep -E '^version:' "$CHART_YAML" | head -1 | sed 's/version:[[:space:]]*//; s/[[:space:]]*$//')
     [[ -n "$CURRENT_VERSION" ]] || die "Could not read version from $CHART_YAML"
 
     # Validate it looks like semver X.Y.Z
