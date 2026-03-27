@@ -7,10 +7,8 @@
 
 set -euo pipefail
 
-echo "DEBUG: Script starting" >&2
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || echo "DEBUG: SCRIPT_DIR failed" >&2
-SCRIPT_NAME="$(basename "$0")" || echo "DEBUG: SCRIPT_NAME failed" >&2
-echo "DEBUG: SCRIPT_DIR=$SCRIPT_DIR SCRIPT_NAME=$SCRIPT_NAME" >&2
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_NAME="$(basename "$0")"
 
 # Defaults
 CHART=""
@@ -20,20 +18,17 @@ AUTO=false          # true = no prompt
 DRY_RUN=false
 
 # Colors (disabled if not a terminal)
-echo "DEBUG: Before color setup" >&2
 if [[ -t 1 ]]; then
     RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 else
     RED=''; GREEN=''; YELLOW=''; CYAN=''; NC=''
 fi
-echo "DEBUG: After color setup" >&2
 
 log_info()  { echo -e "${GREEN}[INFO]${NC}  $*"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC}  $*" >&2; }
 log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 log_dry()   { echo -e "${CYAN}[DRY RUN]${NC} $*"; }
 die()       { log_error "$*"; exit 1; }
-echo "DEBUG: After function definitions" >&2
 
 usage() {
     cat <<EOF
@@ -75,20 +70,17 @@ EOF
 }
 
 parse_args() {
-    echo "DEBUG: parse_args called with $# args" >&2
     [[ $# -eq 0 ]] && { usage; exit 0; }
 
     # First positional arg is the chart name
     case "$1" in
         -h|--help) usage; exit 0 ;;
         -*) die "Expected chart name as first argument. Got: $1. Use --help for usage." ;;
-        *)  CHART="$1"; echo "DEBUG: Set CHART=$CHART" >&2; shift ;;
+        *)  CHART="$1"; shift ;;
     esac
 
     local bump_count=0
-    echo "DEBUG: Entering while loop" >&2
     while [[ $# -gt 0 ]]; do
-        echo "DEBUG: Processing arg=$1" >&2
         case "$1" in
             --auto-increment|--minor) BUMP_MODE="minor"; AUTO=true; bump_count=$((bump_count + 1)); shift ;;
             --patch)                  BUMP_MODE="patch";  AUTO=true; bump_count=$((bump_count + 1)); shift ;;
@@ -96,24 +88,18 @@ parse_args() {
             --next-version)
                 [[ -z "${2:-}" ]] && die "--next-version requires a value"
                 NEXT_VERSION="$2"; AUTO=true; bump_count=$((bump_count + 1)); shift 2 ;;
-            --dry-run) DRY_RUN=true; echo "DEBUG: Set DRY_RUN=true" >&2; shift ;;
+            --dry-run) DRY_RUN=true; shift ;;
             -h|--help) usage; exit 0 ;;
             *) die "Unknown option: $1. Use --help for usage." ;;
         esac
     done
-    echo "DEBUG: Exited while loop" >&2
 
     [[ $bump_count -gt 1 ]] && die "Specify at most one of --patch, --minor, --major, --auto-increment, --next-version"
-    echo "DEBUG: parse_args done" >&2
 }
 
 main() {
-    echo "DEBUG: main() called" >&2
     parse_args "$@"
-    echo "DEBUG: parse_args returned" >&2
     echo "Chart: $CHART, Bump: ${BUMP_MODE:-interactive}, NextVersion: ${NEXT_VERSION:-auto}, DryRun: $DRY_RUN"
 }
 
-echo "DEBUG: About to call main with args: $@" >&2
 main "$@"
-echo "DEBUG: main returned" >&2
