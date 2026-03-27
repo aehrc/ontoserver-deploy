@@ -17,6 +17,11 @@ NEXT_VERSION=""     # explicit next version, overrides BUMP_MODE
 AUTO=false          # true = no prompt
 DRY_RUN=false
 
+# Chart state variables
+CHART_DIR=""
+CHART_YAML=""
+CURRENT_VERSION=""
+
 # Colors (disabled if not a terminal)
 if [[ -t 1 ]]; then
     RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -99,9 +104,45 @@ parse_args() {
     fi
 }
 
+resolve_chart() {
+    CHART_DIR="${SCRIPT_DIR}/${CHART}"
+    CHART_YAML="${CHART_DIR}/Chart.yaml"
+
+    [[ -d "$CHART_DIR" ]] || die "Chart directory not found: $CHART_DIR"
+    [[ -f "$CHART_YAML" ]] || die "Chart.yaml not found: $CHART_YAML"
+}
+
+check_git_clean() {
+    # Block on staged or modified tracked files; allow untracked
+    local dirty
+    dirty=$(git -C "$SCRIPT_DIR" status --porcelain | grep -v '^??' || true)
+    if [[ -n "$dirty" ]]; then
+        log_error "Working tree has uncommitted changes:"
+        echo "$dirty" >&2
+        die "Commit or stash changes before releasing."
+    fi
+}
+
+read_current_version() {
+    CURRENT_VERSION=$(grep -E '^version:' "$CHART_YAML" | head -1 | sed 's/version:[[:space:]]*//')
+    [[ -n "$CURRENT_VERSION" ]] || die "Could not read version from $CHART_YAML"
+
+    # Validate it looks like semver X.Y.Z
+    if ! [[ "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        die "version '$CURRENT_VERSION' in Chart.yaml is not valid semver (X.Y.Z)"
+    fi
+}
+
 main() {
     parse_args "$@"
-    echo "Chart: $CHART, Bump: ${BUMP_MODE:-interactive}, NextVersion: ${NEXT_VERSION:-auto}, DryRun: $DRY_RUN"
+    resolve_chart
+    if [[ "$DRY_RUN" == false ]]; then
+        check_git_clean
+    fi
+    read_current_version
+    log_info "Chart:           $CHART"
+    log_info "Chart.yaml:      $CHART_YAML"
+    log_info "Current version: $CURRENT_VERSION"
 }
 
 main "$@"
