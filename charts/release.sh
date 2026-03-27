@@ -94,7 +94,9 @@ parse_args() {
         esac
     done
 
-    [[ $bump_count -gt 1 ]] && die "Specify at most one of --patch, --minor, --major, --auto-increment, --next-version"
+    if [[ $bump_count -gt 1 ]]; then
+        die "Specify at most one of --patch, --minor, --major, --auto-increment, --next-version"
+    fi
 }
 
 main() {
