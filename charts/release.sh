@@ -194,12 +194,16 @@ compute_tag() {
 
 check_tag_not_exists() {
     # Check local tags
-    if git -C "$SCRIPT_DIR" tag --list | grep -qx "$TAG"; then
+    local local_tags
+    local_tags=$(git -C "$SCRIPT_DIR" tag --list)
+    if echo "$local_tags" | grep -qx "$TAG"; then
         die "Tag '$TAG' already exists locally. Has this version already been released?"
     fi
 
     # Check remote tags
-    if git -C "$SCRIPT_DIR" ls-remote --tags origin "refs/tags/${TAG}" | grep -q "$TAG"; then
+    local remote_tag
+    remote_tag=$(git -C "$SCRIPT_DIR" ls-remote --tags origin "refs/tags/${TAG}")
+    if [[ -n "$remote_tag" ]]; then
         die "Tag '$TAG' already exists on remote. Has this version already been released?"
     fi
 }
