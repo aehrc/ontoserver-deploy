@@ -21,6 +21,7 @@ DRY_RUN=false
 CHART_DIR=""
 CHART_YAML=""
 CURRENT_VERSION=""
+TAG=""
 
 # Colors (disabled if not a terminal)
 if [[ -t 1 ]]; then
@@ -187,6 +188,37 @@ resolve_next_version() {
     fi
 }
 
+compute_tag() {
+    TAG="${CHART}-v${CURRENT_VERSION}"
+}
+
+check_tag_not_exists() {
+    # Check local tags
+    if git -C "$SCRIPT_DIR" tag --list | grep -qx "$TAG"; then
+        die "Tag '$TAG' already exists locally. Has this version already been released?"
+    fi
+
+    # Check remote tags
+    if git -C "$SCRIPT_DIR" ls-remote --tags origin "refs/tags/${TAG}" | grep -q "$TAG"; then
+        die "Tag '$TAG' already exists on remote. Has this version already been released?"
+    fi
+}
+
+create_and_push_tag() {
+    compute_tag
+    check_tag_not_exists
+
+    log_info "Creating tag:    $TAG"
+    if [[ "$DRY_RUN" == true ]]; then
+        log_dry "git tag -a \"$TAG\" -m \"Release ${CHART} ${CURRENT_VERSION}\""
+        log_dry "git push origin \"$TAG\""
+    else
+        git -C "$SCRIPT_DIR" tag -a "$TAG" -m "Release ${CHART} ${CURRENT_VERSION}"
+        git -C "$SCRIPT_DIR" push origin "$TAG"
+        log_info "Pushed tag:      $TAG  → triggers GitHub Actions release"
+    fi
+}
+
 main() {
     parse_args "$@"
     resolve_chart
@@ -198,6 +230,7 @@ main() {
     log_info "Chart.yaml:      $CHART_YAML"
     log_info "Current version: $CURRENT_VERSION"
     resolve_next_version
+    create_and_push_tag
 }
 
 main "$@"
