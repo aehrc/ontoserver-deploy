@@ -93,6 +93,7 @@ parse_args() {
             --next-version)
                 [[ -z "${2:-}" ]] && die "--next-version requires a value"
                 [[ "${2:-}" == --* ]] && die "--next-version requires a version value, not a flag: $2"
+                [[ "$2" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Invalid semver: '$2'. Expected X.Y.Z"
                 NEXT_VERSION="$2"; AUTO=true; bump_count=$((bump_count + 1)); shift 2 ;;
             --dry-run) DRY_RUN=true; shift ;;
             -h|--help) usage; exit 0 ;;
@@ -138,6 +139,7 @@ read_current_version() {
 bump_version() {
     local version="$1"
     local mode="$2"   # patch | minor | major
+    [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "bump_version: invalid version: '$version'"
     local major minor patch
     IFS='.' read -r major minor patch <<< "$version"
     case "$mode" in
