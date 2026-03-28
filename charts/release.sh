@@ -258,6 +258,12 @@ commit_and_push() {
 
 main() {
     parse_args "$@"
+    echo ""
+    echo "=== Helm Chart Release ==="
+    if [[ "$DRY_RUN" == true ]]; then
+        echo "(dry run — no changes will be made)"
+    fi
+    echo ""
     resolve_chart
     if [[ "$DRY_RUN" == false ]]; then
         check_git_clean

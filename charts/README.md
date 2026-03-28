@@ -28,7 +28,31 @@ Pushing one of those tags triggers the chart release workflow, which:
 - updates `artifacthub-repo.yml` on the `gh-pages` branch
 - pushes the packaged chart to `ghcr.io/aehrc` as a secondary OCI artifact
 
-Example:
+### Using release.sh (recommended)
+
+Use `release.sh` to automate the full release cycle — tagging the current version, triggering the release workflow, then bumping `Chart.yaml` for the next cycle:
+
+```bash
+# Interactive — tags current version, prompts for next (default: minor bump)
+./charts/release.sh ontoserver
+
+# Fully automated minor bump, no prompt
+./charts/release.sh ontoserver --auto-increment
+
+# Patch or major bump
+./charts/release.sh ontoserver --patch
+./charts/release.sh ontoserver --major
+
+# Set next version explicitly
+./charts/release.sh ontoserver --next-version 1.0.0
+
+# Preview without making changes
+./charts/release.sh ontoserver --dry-run
+```
+
+Replace `ontoserver` with `ontoserver-extras` or `ontoserver-indexer` for the other charts.
+
+### Manual release (alternative)
 
 ```bash
 git tag ontoserver-v0.1.0
