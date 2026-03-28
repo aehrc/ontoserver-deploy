@@ -223,6 +223,39 @@ create_and_push_tag() {
     fi
 }
 
+update_chart_version() {
+    log_info "Updating Chart.yaml: $CURRENT_VERSION → $NEXT_VERSION"
+    if [[ "$DRY_RUN" == true ]]; then
+        log_dry "sed -i '' 's/^version: .*/version: ${NEXT_VERSION}/' \"$CHART_YAML\""
+    else
+        # macOS sed requires '' after -i; GNU sed on Linux does not
+        if sed --version 2>/dev/null | grep -q GNU; then
+            sed -i "s/^version: .*/version: ${NEXT_VERSION}/" "$CHART_YAML"
+        else
+            sed -i '' "s/^version: .*/version: ${NEXT_VERSION}/" "$CHART_YAML"
+        fi
+        # Verify the change landed
+        local updated
+        updated=$(grep -E '^version:' "$CHART_YAML" | sed 's/version:[[:space:]]*//; s/[[:space:]]*$//')
+        [[ "$updated" == "$NEXT_VERSION" ]] || die "Failed to update version in $CHART_YAML (got: $updated)"
+    fi
+}
+
+commit_and_push() {
+    local commit_msg="chore(chart): bump ${CHART} version to ${NEXT_VERSION}"
+    log_info "Committing:      $commit_msg"
+    if [[ "$DRY_RUN" == true ]]; then
+        log_dry "git add \"$CHART_YAML\""
+        log_dry "git commit -m \"$commit_msg\""
+        log_dry "git push origin HEAD"
+    else
+        git -C "$SCRIPT_DIR" add "$CHART_YAML"
+        git -C "$SCRIPT_DIR" commit -m "$commit_msg"
+        git -C "$SCRIPT_DIR" push origin HEAD
+        log_info "Pushed branch."
+    fi
+}
+
 main() {
     parse_args "$@"
     resolve_chart
@@ -235,6 +268,10 @@ main() {
     log_info "Current version: $CURRENT_VERSION"
     resolve_next_version
     create_and_push_tag
+    update_chart_version
+    commit_and_push
+    echo ""
+    log_info "Done! Tagged ${CHART} ${CURRENT_VERSION} and bumped Chart.yaml to ${NEXT_VERSION}."
 }
 
 main "$@"
