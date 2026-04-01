@@ -213,10 +213,16 @@ spec:
                   name: {{ $.Release.Name }}-ontoserver-secrets
                   key: {{ $key }}
             {{- end }}
-          {{- if .Values.ontoserver.externalSecret.enabled }}
+          {{- if or .Values.ontoserver.externalSecret.enabled .Values.ontoserver.existingSecretConfig }}
           envFrom:
+            {{- if .Values.ontoserver.externalSecret.enabled }}
             - secretRef:
                 name: {{ .Release.Name }}-ontoserver-external-secrets
+            {{- end }}
+            {{- if .Values.ontoserver.existingSecretConfig }}
+            - secretRef:
+                name: {{ .Values.ontoserver.existingSecretConfig }}
+            {{- end }}
           {{- end }}
           {{- if or .Values.ontoserver.customization .Values.ontoserver.deployment.persistence.enabledForDeployment }}
           volumeMounts:

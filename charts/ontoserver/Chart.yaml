@@ -27,3 +27,5 @@ annotations:
   artifacthub.io/changes: |
     - kind: added
       description: Initial public release
+    - kind: added
+      description: "existingSecretConfig: reference a pre-existing Secret as envFrom instead of having the chart create one"

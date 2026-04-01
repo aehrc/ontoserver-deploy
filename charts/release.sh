@@ -20,6 +20,7 @@ DRY_RUN=false
 # Chart state variables
 CHART_DIR=""
 CHART_YAML=""
+CHANGELOG_FILE=""
 CURRENT_VERSION=""
 TAG=""
 
@@ -110,6 +111,7 @@ parse_args() {
 resolve_chart() {
     CHART_DIR="${SCRIPT_DIR}/${CHART}"
     CHART_YAML="${CHART_DIR}/Chart.yaml"
+    CHANGELOG_FILE="${CHART_DIR}/changelog.md"
 
     [[ -d "$CHART_DIR" ]] || die "Chart directory not found: $CHART_DIR"
     [[ -f "$CHART_YAML" ]] || die "Chart.yaml not found: $CHART_YAML"
@@ -241,15 +243,78 @@ update_chart_version() {
     fi
 }
 
+# stamp_changelog_for_release: replaces "## [Unreleased]" with "## [X.Y.Z] - YYYY-MM-DD"
+# and commits the changelog so the release tag points to a commit with correct changelog.
+stamp_changelog_for_release() {
+    if [[ ! -f "$CHANGELOG_FILE" ]]; then
+        log_warn "No changelog.md found — skipping changelog stamp"
+        return
+    fi
+    if ! grep -q "^## \[Unreleased\]" "$CHANGELOG_FILE"; then
+        log_warn "No '## [Unreleased]' section in changelog.md — skipping stamp"
+        return
+    fi
+
+    local today
+    today=$(date +%Y-%m-%d)
+    local commit_msg="chore(chart): release ${CHART} ${CURRENT_VERSION}"
+
+    log_info "Stamping changelog: [Unreleased] → [$CURRENT_VERSION] - $today"
+    if [[ "$DRY_RUN" == true ]]; then
+        log_dry "sed: [Unreleased] → [$CURRENT_VERSION] - $today in $CHANGELOG_FILE"
+        log_dry "git add \"$CHANGELOG_FILE\""
+        log_dry "git commit -m \"$commit_msg\""
+        return
+    fi
+
+    if sed --version 2>/dev/null | grep -q GNU; then
+        sed -i "s|^## \[Unreleased\]|## [$CURRENT_VERSION] - $today|" "$CHANGELOG_FILE"
+    else
+        sed -i '' "s|^## \[Unreleased\]|## [$CURRENT_VERSION] - $today|" "$CHANGELOG_FILE"
+    fi
+
+    git -C "$SCRIPT_DIR" add "$CHANGELOG_FILE"
+    git -C "$SCRIPT_DIR" commit -m "$commit_msg"
+    log_info "Committed changelog stamp."
+}
+
+# add_unreleased_section: inserts a blank "## [Unreleased]" heading above the
+# just-released version section, ready for the next development cycle.
+add_unreleased_section() {
+    if [[ ! -f "$CHANGELOG_FILE" ]]; then
+        return
+    fi
+
+    log_info "Adding [Unreleased] section to changelog"
+    if [[ "$DRY_RUN" == true ]]; then
+        log_dry "Insert '## [Unreleased]' above ## [$CURRENT_VERSION] in $CHANGELOG_FILE"
+        return
+    fi
+
+    local tmpfile
+    tmpfile=$(mktemp)
+    awk -v ver="$CURRENT_VERSION" '
+        /^\#\# \[/ && !inserted {
+            print "## [Unreleased]"
+            print ""
+            inserted = 1
+        }
+        { print }
+    ' "$CHANGELOG_FILE" > "$tmpfile"
+    mv "$tmpfile" "$CHANGELOG_FILE"
+}
+
 commit_and_push() {
     local commit_msg="chore(chart): bump ${CHART} version to ${NEXT_VERSION}"
     log_info "Committing:      $commit_msg"
     if [[ "$DRY_RUN" == true ]]; then
         log_dry "git add \"$CHART_YAML\""
+        [[ -f "$CHANGELOG_FILE" ]] && log_dry "git add \"$CHANGELOG_FILE\""
         log_dry "git commit -m \"$commit_msg\""
         log_dry "git push origin HEAD"
     else
         git -C "$SCRIPT_DIR" add "$CHART_YAML"
+        [[ -f "$CHANGELOG_FILE" ]] && git -C "$SCRIPT_DIR" add "$CHANGELOG_FILE"
         git -C "$SCRIPT_DIR" commit -m "$commit_msg"
         git -C "$SCRIPT_DIR" push origin HEAD
         log_info "Pushed branch."
@@ -273,9 +338,11 @@ main() {
     log_info "Chart.yaml:      $CHART_YAML"
     log_info "Current version: $CURRENT_VERSION"
     resolve_next_version
-    create_and_push_tag
-    update_chart_version
-    commit_and_push
+    stamp_changelog_for_release   # [Unreleased] → [current] - date; commits changelog
+    create_and_push_tag           # tag points to the stamped changelog commit
+    update_chart_version          # bump Chart.yaml to next version
+    add_unreleased_section        # add blank [Unreleased] above released version
+    commit_and_push               # commit Chart.yaml + changelog, push branch
     echo ""
     log_info "Done! Tagged ${CHART} ${CURRENT_VERSION} and bumped Chart.yaml to ${NEXT_VERSION}."
 }

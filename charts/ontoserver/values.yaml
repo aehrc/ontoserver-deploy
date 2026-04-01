@@ -290,8 +290,10 @@ ontoserver:
   config:
     ## @param ontoserver.config.ONTOSERVER_INSECURE        Disable Ontoserver's inbound TLS listener — set to "true" to serve plain HTTP, "false" (or omit) to serve HTTPS using the bundled self-signed keystore
     ONTOSERVER_INSECURE: "true"
-  ## @param ontoserver.secretConfig                      Secret-backed Ontoserver config entries
+  ## @param ontoserver.secretConfig                      Secret-backed Ontoserver config entries — chart creates a Secret from these key/value pairs
   secretConfig: {}
+  ## @param ontoserver.existingSecretConfig              Name of a pre-existing Secret whose keys are injected as environment variables — use this instead of secretConfig when managing secrets outside the chart (e.g. ArgoCD + kubectl, Sealed Secrets)
+  existingSecretConfig: ""
   ## @section External Secrets
   externalSecret:
     ## @param ontoserver.externalSecret.enabled           Enable ExternalSecret resource (requires External Secrets Operator)
