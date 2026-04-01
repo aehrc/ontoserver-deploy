@@ -6,6 +6,78 @@ entries:
       artifacthub.io/changes: |
         - kind: added
           description: Initial public release
+        - kind: added
+          description: "existingSecretConfig: reference a pre-existing Secret as envFrom instead of having the chart create one"
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    appVersion: ctsa-6
+    created: "2026-04-02T00:04:02.036809+10:00"
+    dependencies:
+    - condition: nginx-ingress.enabled
+      name: nginx-ingress
+      repository: https://helm.nginx.com/stable
+      version: 2.1.0
+    description: Ontoserver FHIR terminology server helm chart with various deployment
+      configurations
+    digest: 2744ec5d6ec946a12fad13936c74d0c7a9d73fb9f5ec3bcd1cc80b04984c0fac
+    home: https://ontoserver.csiro.au
+    icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/main/icons/ontoserver.png
+    keywords:
+    - fhir
+    - terminology
+    - ontoserver
+    - hl7
+    maintainers:
+    - email: ontoserver-support@csiro.au
+      name: CSIRO
+    name: ontoserver
+    sources:
+    - https://github.com/aehrc/ontoserver-deploy
+    type: application
+    urls:
+    - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-v0.3.0/ontoserver-0.3.1.tgz
+    version: 0.3.1
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/changes: |
+        - kind: added
+          description: Initial public release
+        - kind: added
+          description: "existingSecretConfig: reference a pre-existing Secret as envFrom instead of having the chart create one"
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    appVersion: ctsa-6
+    created: "2026-04-02T00:04:02.033783+10:00"
+    dependencies:
+    - condition: nginx-ingress.enabled
+      name: nginx-ingress
+      repository: https://helm.nginx.com/stable
+      version: 2.1.0
+    description: Ontoserver FHIR terminology server helm chart with various deployment
+      configurations
+    digest: 800857d45e118430a8e258b7ac157ee18c5568cff63f1855fc01ae53893cdca4
+    home: https://ontoserver.csiro.au
+    icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/main/icons/ontoserver.png
+    keywords:
+    - fhir
+    - terminology
+    - ontoserver
+    - hl7
+    maintainers:
+    - email: ontoserver-support@csiro.au
+      name: CSIRO
+    name: ontoserver
+    sources:
+    - https://github.com/aehrc/ontoserver-deploy
+    type: application
+    urls:
+    - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-v0.3.0/ontoserver-0.3.0.tgz
+    version: 0.3.0
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/changes: |
+        - kind: added
+          description: Initial public release
       artifacthub.io/license: Apache-2.0
     apiVersion: v2
     appVersion: ctsa-6
@@ -97,4 +169,4 @@ entries:
     urls:
     - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-indexer-0.1.0/ontoserver-indexer-0.1.0.tgz
     version: 0.1.0
-generated: "2026-03-24T04:02:30.547502115Z"
+generated: "2026-04-02T00:04:02.030898+10:00"
