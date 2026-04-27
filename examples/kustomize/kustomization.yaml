@@ -7,15 +7,24 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# In a real workflow, you might use the 'helmCharts' feature of Kustomize v5+,
-# or pipe helm template output into kustomize build.
-#
-# Note: The labelSelector below assumes the default label pattern from the chart.
-# If your release name is 'my-ontoserver', the label will be 'app=my-ontoserver-ontoserver'.
+# helmGlobals.chartHome defines the base directory for local Helm charts.
+# This avoids path resolution bugs in some Kustomize versions when name contains slashes.
+helmGlobals:
+  chartHome: ../../charts
+
+# This block enables Kustomize to inflate the Helm chart directly.
+# Requires 'kubectl kustomize . --enable-helm --load-restrictor LoadRestrictionsNone'
+helmCharts:
+  - name: ontoserver
+    releaseName: ontoserver
+    # Explicitly providing a values file avoids a Kustomize bug with local charts
+    valuesFile: values.yaml
 
 patches:
   - target:
       kind: Deployment
+      # The chart generates labels as 'app: {{ .Release.Name }}-ontoserver'
+      # With releaseName 'ontoserver', the label is 'app=ontoserver-ontoserver'
       labelSelector: "app=ontoserver-ontoserver"
     patch: |
       - op: add
