@@ -1,0 +1,30 @@
+# kustomization.yaml
+# Example showing how to use Kustomize to add a priorityClassName to Ontoserver.
+#
+# Since priorityClassName is not currently a direct value in the Helm chart,
+# Kustomize is an excellent tool for post-processing the Helm output.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# In a real workflow, you might use the 'helmCharts' feature of Kustomize v5+,
+# or pipe helm template output into kustomize build.
+#
+# Note: The labelSelector below assumes the default label pattern from the chart.
+# If your release name is 'my-ontoserver', the label will be 'app=my-ontoserver-ontoserver'.
+
+patches:
+  - target:
+      kind: Deployment
+      labelSelector: "app=ontoserver-ontoserver"
+    patch: |
+      - op: add
+        path: /spec/template/spec/priorityClassName
+        value: system-cluster-critical
+  - target:
+      kind: StatefulSet
+      labelSelector: "app=ontoserver-ontoserver"
+    patch: |
+      - op: add
+        path: /spec/template/spec/priorityClassName
+        value: system-cluster-critical

@@ -60,40 +60,15 @@ See each chart's README for full configuration reference:
 Maintainer-facing release instructions live in [`charts/README.md`](charts/README.md).
 Use that document for chart tag formats, workflow triggers, and post-release checks.
 
-### ArgoCD Examples
+### Deployment Examples
 
-Example ArgoCD manifests are in [`examples/argocd/`](examples/argocd/):
+A comprehensive set of examples for various platforms and tools is available in the [**`examples/`**](examples/) directory:
 
-> **Production note:** The examples source charts directly from this Git repository for simplicity. For production deployments, replace the Git source with a released chart version from the Helm repository — this gives you pinned, immutable versions and faster ArgoCD sync:
-> ```yaml
-> - repoURL: https://aehrc.github.io/ontoserver-deploy
->   chart: ontoserver
->   targetRevision: 0.1.0
-> # or OCI
-> - repoURL: oci://ghcr.io/aehrc
->   chart: ontoserver
->   targetRevision: 0.1.0
-> ```
+- [**ArgoCD**](examples/argocd/) — Ready-to-use Application and ApplicationSet manifests.
+- [**Kustomize**](examples/kustomize/) — Post-processing examples, such as adding a `priorityClassName`.
+- [**Cloud & Networking**](charts/ontoserver/examples/) — Infrastructure-specific Helm values for AKS, EKS, and local clusters.
 
-| File | How to use | Description |
-|------|------------|-------------|
-| [`dev-readonly.yaml`](examples/argocd/dev-readonly.yaml) | App-of-Apps inner app | Ready to use. Read-only dev server — sidecar PostgreSQL, ephemeral storage, Varnish. Expects a `quay-pull-secret` in the destination namespace (see below). No networking config — add your own gateway/ingress. |
-| [`app-of-apps.yaml`](examples/argocd/app-of-apps.yaml) | App-of-Apps outer wrapper | Requires customisation. Deploys `dev-readonly.yaml` from Git. Add a second source pointing to a path in your private repo that creates the `quay-pull-secret`. |
-| [`dev-readonly-envoy-appset.yaml`](examples/argocd/dev-readonly-envoy-appset.yaml) | ApplicationSet | Requires customisation. Two-instance setup: read/write StatefulSet (content development) + scaled read-only StatefulSet (production serving). Envoy Gateway, cert-manager TLS, external PostgreSQL, per-pod attached disks, Varnish with `$closure` routing. Hostname, namespace, and database URL are parameterised per instance. |
-
-#### Image pull credentials for ArgoCD
-
-The `dev-readonly.yaml` and `dev-readonly-envoy-appset.yaml` examples use
-`deployment.imagePullSecrets` to reference a pre-existing `kubernetes.io/dockerconfigjson`
-Secret named `quay-pull-secret`.  Credentials must **not** be stored inline in the
-Application manifest.  Create the secret in the destination namespace using whichever
-mechanism your cluster provides:
-
-- **ExternalSecret** — use [External Secrets Operator](https://external-secrets.io/) to sync from your secrets manager (see `charts/ontoserver/README.md` for an example ExternalSecret)
-- **SealedSecret** — encrypt with [Sealed Secrets](https://sealed-secrets.netlify.app/) and commit to your private cluster-config repo
-- **Manual** — `kubectl create secret docker-registry quay-pull-secret --docker-server=quay.io --docker-username=… --docker-password=… -n <namespace>`
-
-In an App-of-Apps, supply the credentials as a second `source` in your outer Application pointing to a path in your own (private) repository, as shown in [`app-of-apps.yaml`](examples/argocd/app-of-apps.yaml).
+See [**`examples/README.md`**](examples/README.md) for a full overview of all available deployment scenarios.
 
 ### Prerequisites
 

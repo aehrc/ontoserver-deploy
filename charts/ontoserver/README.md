@@ -555,16 +555,15 @@ kubectl rollout status deployment/my-ontoserver-ontoserver
 
 See [`examples/k3d-traefik-values.yaml`](examples/k3d-traefik-values.yaml) for the complete quick-start values file and [`examples/local-values.yaml`](examples/local-values.yaml) for a general local cluster reference.
 
-### ArgoCD
+### Examples
 
-Ready-to-use ArgoCD Application manifests are in [`examples/argocd/`](../../examples/argocd/) at the root of this repository. Reference them directly from your ArgoCD instance or use them as a starting point.
+Additional examples for specific infrastructure and GitOps workflows are available:
 
-| File | How to use | Description |
-|------|------------|-------------|
-| [`dev-readonly.yaml`](../../examples/argocd/dev-readonly.yaml) | App-of-Apps | Read-only dev server — sidecar PostgreSQL, ephemeral storage, Varnish. No networking — reference directly from an App-of-Apps and add your own gateway/ingress. |
-| [`dev-readonly-envoy-appset.yaml`](../../examples/argocd/dev-readonly-envoy-appset.yaml) | ApplicationSet | Same topology with Envoy Gateway. Hostname and namespace are parameterised — supports multiple instances from a single manifest. |
+- [**Cloud & Networking Examples**](./examples/) — AKS, EKS, and local cluster values files (included in this chart).
+- [**ArgoCD Manifests**](https://github.com/aehrc/ontoserver-deploy/tree/main/examples/argocd) — Ready-to-use Application and ApplicationSet manifests (GitHub).
+- [**Kustomize Overrides**](https://github.com/aehrc/ontoserver-deploy/tree/main/examples/kustomize) — Advanced post-processing examples, such as adding a `priorityClassName` (GitHub).
 
-The ArgoCD examples use multi-source Applications with both the `ontoserver` and `ontoserver-extras` charts as sources, wired together so that enabling Varnish automatically routes the Ingress through it. See the [extras chart README](../../charts/ontoserver-extras/README.md#deploying-alongside-the-ontoserver-chart) for the wiring details.
+See the [top-level examples directory](https://github.com/aehrc/ontoserver-deploy/tree/main/examples) for a complete overview.
 
 > **Note:** The GitHub Actions integration workflow uses a similar k3d setup (single agent, no load balancer, Traefik disabled) to run `helm install` followed by `helm test` in both read-only and read-write modes. See [`.github/workflows/integration-tests.yml`](../../.github/workflows/integration-tests.yml) for details.
 

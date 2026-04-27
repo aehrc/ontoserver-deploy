@@ -1,0 +1,21 @@
+# priority-class-patch.yaml
+# This patch adds a priorityClassName to the Ontoserver pod template.
+# It can be applied to both Deployment and StatefulSet kinds.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ontoserver-deployment # This will be matched by the target in kustomization.yaml
+spec:
+  template:
+    spec:
+      priorityClassName: high-priority
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ontoserver-statefulset
+spec:
+  template:
+    spec:
+      priorityClassName: high-priority
