@@ -75,6 +75,25 @@ spec:
           name: varnish-stats
         - containerPort: 8080
           name: http
+        {{- if .Values.varnish.probes.enabled }}
+        {{- /* tcpSocket, not httpGet: an HTTP probe is proxied to Ontoserver, so it would put
+             backend traffic on every period and would mark the cache unready whenever the backend
+             was down — turning a backend outage into a cache outage, defeating graceSeconds. */}}
+        readinessProbe:
+          tcpSocket:
+            port: http
+          initialDelaySeconds: {{ .Values.varnish.probes.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.varnish.probes.readiness.periodSeconds }}
+          timeoutSeconds: {{ .Values.varnish.probes.readiness.timeoutSeconds }}
+          failureThreshold: {{ .Values.varnish.probes.readiness.failureThreshold }}
+        livenessProbe:
+          tcpSocket:
+            port: http
+          initialDelaySeconds: {{ .Values.varnish.probes.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.varnish.probes.liveness.periodSeconds }}
+          timeoutSeconds: {{ .Values.varnish.probes.liveness.timeoutSeconds }}
+          failureThreshold: {{ .Values.varnish.probes.liveness.failureThreshold }}
+        {{- end }}
         volumeMounts:
         - name: varnish-config
           mountPath: /etc/varnish

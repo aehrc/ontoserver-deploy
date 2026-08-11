@@ -32,6 +32,15 @@ All features are disabled by default — installing the chart with no overrides 
 | `varnish.podSecurityContext`                       | Pod-level securityContext for the Varnish pod, passed through as-is (e.g. runAsNonRoot, runAsUser, fsGroup, seccompProfile)                                                                                                                                                                                                  | `{}`                                   |
 | `varnish.containerSecurityContext`                 | Container-level securityContext, applied to every container in the Varnish pod (varnish, metrics exporter, trace converter, trace forwarder). They share a process namespace, so per-container isolation would be misleading.                                                                                                | `{}`                                   |
 | `varnish.automountServiceAccountToken`             | Mount the ServiceAccount token into the Varnish pod. Varnish does not call the Kubernetes API, so false is safe. Leave unset (null) for the cluster default.                                                                                                                                                                 | `nil`                                  |
+| `varnish.probes.enabled`                           | Add readiness and liveness probes to the varnish container. Enabling this rolls the pod once on upgrade.                                                                                                                                                                                                                     | `true`                                 |
+| `varnish.probes.readiness.initialDelaySeconds`     | Readiness probe initial delay                                                                                                                                                                                                                                                                                                | `3`                                    |
+| `varnish.probes.readiness.periodSeconds`           | Readiness probe period                                                                                                                                                                                                                                                                                                       | `5`                                    |
+| `varnish.probes.readiness.timeoutSeconds`          | Readiness probe timeout                                                                                                                                                                                                                                                                                                      | `2`                                    |
+| `varnish.probes.readiness.failureThreshold`        | Readiness probe failure threshold                                                                                                                                                                                                                                                                                            | `3`                                    |
+| `varnish.probes.liveness.initialDelaySeconds`      | Liveness probe initial delay                                                                                                                                                                                                                                                                                                 | `10`                                   |
+| `varnish.probes.liveness.periodSeconds`            | Liveness probe period                                                                                                                                                                                                                                                                                                        | `10`                                   |
+| `varnish.probes.liveness.timeoutSeconds`           | Liveness probe timeout                                                                                                                                                                                                                                                                                                       | `2`                                    |
+| `varnish.probes.liveness.failureThreshold`         | Liveness probe failure threshold. Restarting varnishd discards the whole cache, so this is deliberately tolerant.                                                                                                                                                                                                            | `6`                                    |
 | `varnish.opentelemetry.enabled`                    | Enable tracing VCL and sidecar containers (trace-converter + trace-forwarder)                                                                                                                                                                                                                                                | `false`                                |
 | `varnish.opentelemetry.collectorEndpoint`          | Zipkin endpoint for trace forwarding (required when opentelemetry enabled)                                                                                                                                                                                                                                                   | `""`                                   |
 | `varnish.metrics.enabled`                          | Enable Prometheus metrics exporter sidecar                                                                                                                                                                                                                                                                                   | `false`                                |
@@ -65,13 +74,15 @@ All features are disabled by default — installing the chart with no overrides 
 
 ### OpenTelemetry Collector
 
-| Name                       | Description                                                                        | Value   |
-| -------------------------- | ---------------------------------------------------------------------------------- | ------- |
-| `collector.enabled`        | Enable OpenTelemetryCollector CRD (Instrumentation CRD is in the ontoserver chart) | `false` |
-| `collector.otlpEndpoint`   | OTLP gRPC exporter endpoint (required when enabled)                                | `""`    |
-| `collector.zipkinEndpoint` | Zipkin exporter endpoint (required when enabled)                                   | `""`    |
-| `collector.tolerations`    | Pod tolerations for the OpenTelemetryCollector                                     | `[]`    |
-| `collector.debug`          | Enable debug exporter with detailed verbosity (not suitable for production)        | `false` |
+| Name                            | Description                                                                                                                                                                                     | Value   |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `collector.enabled`             | Enable OpenTelemetryCollector CRD (Instrumentation CRD is in the ontoserver chart)                                                                                                              | `false` |
+| `collector.otlpEndpoint`        | OTLP gRPC exporter endpoint (required when enabled)                                                                                                                                             | `""`    |
+| `collector.zipkinEndpoint`      | Zipkin exporter endpoint (required when enabled)                                                                                                                                                | `""`    |
+| `collector.tolerations`         | Pod tolerations for the OpenTelemetryCollector                                                                                                                                                  | `[]`    |
+| `collector.debug`               | Enable debug exporter with detailed verbosity (not suitable for production)                                                                                                                     | `false` |
+| `collector.batch.sendBatchSize` | Spans per batch before the batch processor flushes                                                                                                                                              | `1000`  |
+| `collector.batch.timeout`       | Maximum time a span waits before being flushed regardless of batch size. Must not be 0s — that disables the timer entirely, so on a quiet server spans wait indefinitely for the batch to fill. | `5s`    |
 
 ## Deploying alongside the ontoserver chart
 
@@ -184,6 +195,27 @@ The Varnish Deployment therefore carries a `checksum/config` pod annotation hold
 the rendered VCL, so any change to a `varnish.*` value that appears in the VCL (or to the VCL
 template itself) rolls the Deployment. The hash covers the VCL text only, so releasing a new
 chart version does not restart Varnish and discard a warm cache.
+
+### Probes
+
+The `varnish` container carries a readiness and a liveness probe (`varnish.probes.enabled`, on by default). Previously only the metrics exporter sidecar had one, so the Service began routing to a pod whose `varnishd` was not yet accepting connections — every rolling update dropped requests.
+
+Both are **`tcpSocket` on the `http` port**, deliberately rather than `httpGet`:
+
+- An HTTP probe is *proxied to Ontoserver*. It would put backend traffic on the wire every period, and — worse — it would mark the cache unready whenever the backend was down. That converts a backend outage into a cache outage, which is exactly what `varnish.graceSeconds` exists to prevent: Varnish should keep serving stale content, not be pulled from the Service.
+- The VCL defines no synthetic health endpoint, so there is no path that answers without reaching the backend.
+
+`varnishd` accepting connections on `:8080` is the thing this pod is actually responsible for, and that is what the probes check.
+
+The liveness probe is deliberately more tolerant than the readiness probe (`failureThreshold` 6 vs 3): a restart discards the entire cache, so it should take longer to trigger than removal from the Service.
+
+> **Upgrade note:** enabling probes changes the pod template, so the first `helm upgrade` after adopting this rolls the Varnish Deployment once and the cache starts cold. Set `varnish.probes.enabled: false` to keep the old behaviour.
+
+### Trace batching
+
+`collector.batch.timeout` must not be zero. A zero timeout does not mean "flush immediately" — it disables the flush timer, so spans are held until `collector.batch.sendBatchSize` accumulates. A terminology server is usually quiet, so the practical effect is that traces never ship while everything appears configured correctly. The chart rejects a zero value at render time in any unit, and defaults to `5s`.
+
+The `filter/health_checks` processor runs with `error_mode: ignore`. Its default, `propagate`, fails the whole batch when a single condition errors — so one span missing `http.url` would discard every span batched alongside it. The individual conditions are also nil-guarded, since a condition that errors is a condition that never matches, and the span it should have filtered gets exported instead.
 
 ### Scaled Ontoserver deployments
 

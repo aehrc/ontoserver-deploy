@@ -18,6 +18,35 @@ varnish:
   containerSecurityContext: {}
   ## @param varnish.automountServiceAccountToken                Mount the ServiceAccount token into the Varnish pod. Varnish does not call the Kubernetes API, so false is safe. Leave unset (null) for the cluster default.
   automountServiceAccountToken: ~
+  ## Probes for the varnish container itself. Only the metrics exporter sidecar had one before, so
+  ## the Service began routing to a pod whose varnishd was not yet accepting connections.
+  ##
+  ## Both are tcpSocket rather than httpGet, deliberately. An HTTP probe would be proxied to
+  ## Ontoserver: it would generate backend traffic on every period, and it would mark the cache
+  ## unready whenever the backend was down — turning a backend outage into a cache outage, which
+  ## is the opposite of what graceSeconds exists to do. varnishd accepting TCP on :8080 is the
+  ## thing this pod is responsible for. The VCL defines no synthetic health endpoint to use.
+  probes:
+    ## @param varnish.probes.enabled                              Add readiness and liveness probes to the varnish container. Enabling this rolls the pod once on upgrade.
+    enabled: true
+    readiness:
+      ## @param varnish.probes.readiness.initialDelaySeconds      Readiness probe initial delay
+      initialDelaySeconds: 3
+      ## @param varnish.probes.readiness.periodSeconds            Readiness probe period
+      periodSeconds: 5
+      ## @param varnish.probes.readiness.timeoutSeconds           Readiness probe timeout
+      timeoutSeconds: 2
+      ## @param varnish.probes.readiness.failureThreshold         Readiness probe failure threshold
+      failureThreshold: 3
+    liveness:
+      ## @param varnish.probes.liveness.initialDelaySeconds       Liveness probe initial delay
+      initialDelaySeconds: 10
+      ## @param varnish.probes.liveness.periodSeconds             Liveness probe period
+      periodSeconds: 10
+      ## @param varnish.probes.liveness.timeoutSeconds            Liveness probe timeout
+      timeoutSeconds: 2
+      ## @param varnish.probes.liveness.failureThreshold          Liveness probe failure threshold. Restarting varnishd discards the whole cache, so this is deliberately tolerant.
+      failureThreshold: 6
   opentelemetry:
     ## @param varnish.opentelemetry.enabled                     Enable tracing VCL and sidecar containers (trace-converter + trace-forwarder)
     enabled: false
@@ -107,4 +136,9 @@ collector:
   tolerations: []
   ## @param collector.debug  Enable debug exporter with detailed verbosity (not suitable for production)
   debug: false
+  batch:
+    ## @param collector.batch.sendBatchSize                       Spans per batch before the batch processor flushes
+    sendBatchSize: 1000
+    ## @param collector.batch.timeout                             Maximum time a span waits before being flushed regardless of batch size. Must not be 0s — that disables the timer entirely, so on a quiet server spans wait indefinitely for the batch to fill.
+    timeout: 5s
 

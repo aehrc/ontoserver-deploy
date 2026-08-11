@@ -106,6 +106,20 @@
           ],
           "description": "Mount the ServiceAccount token into the Varnish pod. Null leaves it to the cluster default."
         },
+        "probes": {
+          "type": "object",
+          "description": "Readiness and liveness probes for the varnish container. tcpSocket on the http port.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Add readiness and liveness probes to the varnish container"
+            },
+            "readiness": { "$ref": "#/$defs/varnishProbe" },
+            "liveness": { "$ref": "#/$defs/varnishProbe" }
+          },
+          "additionalProperties": false
+        },
         "image": {
           "type": "string",
           "default": "varnish:7.7.1",
@@ -232,6 +246,25 @@
           "type": "boolean",
           "default": false,
           "description": "Enable debug exporter with detailed verbosity. Not suitable for production."
+        },
+        "batch": {
+          "type": "object",
+          "description": "Batch processor settings for the traces pipeline",
+          "properties": {
+            "sendBatchSize": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1000,
+              "description": "Spans per batch before the processor flushes"
+            },
+            "timeout": {
+              "type": "string",
+              "pattern": "^[0-9]+(ns|us|ms|s|m|h)$",
+              "default": "5s",
+              "description": "Maximum time a span waits before being flushed regardless of batch size. A zero value is rejected at render time — it disables the flush timer."
+            }
+          },
+          "additionalProperties": false
         }
       },
       "required": ["enabled"],
@@ -279,6 +312,17 @@
           "description": "Memory resource quantity (e.g. 64Mi, 1Gi)",
           "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$"
         }
+      },
+      "additionalProperties": false
+    },
+    "varnishProbe": {
+      "type": "object",
+      "description": "Timing for one of the varnish container's tcpSocket probes",
+      "properties": {
+        "initialDelaySeconds": { "type": "integer", "minimum": 0 },
+        "periodSeconds": { "type": "integer", "minimum": 1 },
+        "timeoutSeconds": { "type": "integer", "minimum": 1 },
+        "failureThreshold": { "type": "integer", "minimum": 1 }
       },
       "additionalProperties": false
     }

@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Readiness and liveness probes on the `varnish` container (`varnish.probes.*`, on by default).
+  Only the metrics exporter sidecar had one before, so the Service began routing to a pod whose
+  `varnishd` was not yet accepting connections and every rolling update dropped requests.
+
+  Both are `tcpSocket` on the http port rather than `httpGet`. An HTTP probe would be proxied to
+  Ontoserver: backend traffic on every period, and — worse — the cache marked unready whenever the
+  backend was down, turning a backend outage into a cache outage and defeating the point of
+  `varnish.graceSeconds`. The liveness probe is deliberately more tolerant than the readiness probe
+  because a restart discards the whole cache.
+
+  Note this is the one change here that is *not* pod-spec-neutral: the first upgrade rolls the
+  Varnish Deployment once and the cache starts cold. Set `varnish.probes.enabled: false` to keep
+  the previous behaviour.
+- `collector.batch.sendBatchSize` and `collector.batch.timeout`, previously hardcoded.
+
 - Opt-in security context: `varnish.podSecurityContext`, `varnish.containerSecurityContext` and
   `varnish.automountServiceAccountToken`. All default to unset, so upgrading an existing release
   leaves the pod spec byte-identical and does not discard a warm cache. The container-level value
@@ -16,6 +31,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   because they share a process namespace and are not independently isolatable.
 
 ### Fixed
+
+- Traces now actually ship. The batch processor was configured with `timeout: 0s`, which does not
+  mean "flush immediately" — it disables the flush timer, so spans were held until
+  `send_batch_size` (1000) accumulated. A terminology server is usually quiet, so the practical
+  effect was that tracing appeared configured and nothing arrived. Now defaults to `5s`, and a zero
+  value is rejected at render time in any unit.
+- The `filter/health_checks` processor now runs with `error_mode: ignore`. Its default,
+  `propagate`, fails the entire batch when one condition errors, so a single span missing
+  `http.url` would discard every span batched with it. The three `cache_lookup` conditions were
+  also missing the nil guard the surrounding conditions already had — and a condition that errors
+  is one that never matches, so the spans it should have filtered were being exported.
 
 - Varnish now restarts when its VCL changes. `varnishd` parses `/etc/varnish/default.vcl` once
   at startup and never re-reads the mounted ConfigMap, so a `helm upgrade` that changed only a

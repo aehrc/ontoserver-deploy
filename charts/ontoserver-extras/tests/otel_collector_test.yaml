@@ -119,3 +119,64 @@ tests:
       - contains:
           path: spec.config.service.pipelines.traces.exporters
           content: zipkin
+
+  # Regression test. `timeout: 0s` does not mean "flush immediately" — it disables the flush timer,
+  # so spans are held until send_batch_size accumulates. A terminology server is usually quiet, so
+  # 1000 spans could take a very long time and the symptom is "tracing is on but nothing arrives".
+  - it: sets a non-zero batch flush timeout
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - equal:
+          path: spec.config.processors.batch.timeout
+          value: "5s"
+      - notEqual:
+          path: spec.config.processors.batch.timeout
+          value: "0s"
+      - equal:
+          path: spec.config.processors.batch.send_batch_size
+          value: 1000
+
+  - it: allows the batch settings to be overridden
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+      collector.batch.timeout: 200ms
+      collector.batch.sendBatchSize: 50
+    asserts:
+      - equal:
+          path: spec.config.processors.batch.timeout
+          value: "200ms"
+      - equal:
+          path: spec.config.processors.batch.send_batch_size
+          value: 50
+
+  # The filter processor's default error_mode is `propagate`, which fails the entire batch on a
+  # single condition error — so one span missing http.url would discard every span batched with it.
+  - it: sets error_mode ignore on the filter processor
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - equal:
+          path: spec.config.processors["filter/health_checks"].error_mode
+          value: ignore
+
+  # Every IsMatch() call must be nil-guarded. error_mode: ignore is the safety net, but a condition
+  # that errors is still a condition that never matches, so the span it should have dropped gets
+  # exported instead — the guards are what make the filter actually work.
+  - it: nil-guards every IsMatch condition
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - contains:
+          path: spec.config.processors["filter/health_checks"].traces.span
+          content: 'name == "cache_lookup" and attributes["http.url"] != nil and IsMatch(attributes["http.url"], "/fhir/metadata")'
+      - contains:
+          path: spec.config.processors["filter/health_checks"].traces.span
+          content: 'name == "cache_lookup" and attributes["http.url"] != nil and IsMatch(attributes["http.url"], "/actuator/health")'
+      - notContains:
+          path: spec.config.processors["filter/health_checks"].traces.span
+          content: 'name == "cache_lookup" and IsMatch(attributes["http.url"], "/fhir/metadata")'
