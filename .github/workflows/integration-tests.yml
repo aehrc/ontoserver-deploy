@@ -197,10 +197,18 @@ jobs:
       #
       # Pinned rather than tracking latest, like the k3s, k3d and Helm versions above — an
       # upstream release should never be able to fail a run that contains no chart change.
+      #
+      # --force-conflicts is required, not incidental: k3s installs its own copy of the Gateway
+      # API CRDs through the bundled Traefik HelmChart, so the apply collides with field manager
+      # "helm" on .spec.versions and the bundle-version/channel annotations. Without it the
+      # cluster keeps Traefik's CRD version and Envoy Gateway may be programming against a
+      # schema it was not built for. Taking ownership pins the CRDs to the version this pinned
+      # controller ships with. (Traefik's own Gateway API support is unused here — the chart's
+      # GatewayClass names the Envoy controller, so only Envoy Gateway claims it.)
       - name: Install Envoy Gateway
         if: matrix.mode.needsEnvoyGateway
         run: |
-          kubectl apply --server-side -f https://github.com/envoyproxy/gateway/releases/download/v1.8.3/install.yaml
+          kubectl apply --server-side --force-conflicts -f https://github.com/envoyproxy/gateway/releases/download/v1.8.3/install.yaml
           kubectl wait --for=condition=Available --timeout=5m \
             -n envoy-gateway-system deployment/envoy-gateway
           # The GatewayClass the chart creates references gateway.envoyproxy.io CRDs; wait for
