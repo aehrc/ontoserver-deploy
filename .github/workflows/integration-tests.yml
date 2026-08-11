@@ -314,10 +314,32 @@ jobs:
           set -o pipefail
           GW=${{ matrix.mode.release }}-gw
 
-          # Programmed=True is the assertion a CRDs-only install cannot make: it means the
-          # controller accepted every listener and actually provisioned an Envoy fleet for it.
-          # A protocol/tls mismatch or a bad certificateRef fails here, not at apply time.
-          kubectl wait --for=condition=Programmed --timeout=5m gateway/"$GW"
+          # Accepted, plus the per-listener conditions below — deliberately NOT the Gateway-level
+          # Programmed condition. Envoy Gateway exposes the proxy through a LoadBalancer Service,
+          # and this cluster is created with --no-lb, so no address is ever assigned and the
+          # Gateway sits at Programmed=False/AddressNotAssigned forever even when everything the
+          # chart renders is correct. That condition reports on the cluster's load balancer, not
+          # on the chart.
+          kubectl wait --for=condition=Accepted --timeout=5m gateway/"$GW"
+
+          # The per-listener conditions are the real assertion a CRDs-only install cannot make:
+          # Programmed here means the controller translated this listener and pushed it to the
+          # data plane. A protocol/tls mismatch or a bad certificateRef fails at this level, and
+          # attachedRoutes proves the HTTPRoute's sectionName actually bound to the listener
+          # rather than silently matching nothing.
+          for i in $(seq 45); do
+            lprog=$(kubectl get gateway "$GW" \
+              -o jsonpath='{.status.listeners[0].conditions[?(@.type=="Programmed")].status}' 2>/dev/null || true)
+            lres=$(kubectl get gateway "$GW" \
+              -o jsonpath='{.status.listeners[0].conditions[?(@.type=="ResolvedRefs")].status}' 2>/dev/null || true)
+            attached=$(kubectl get gateway "$GW" \
+              -o jsonpath='{.status.listeners[0].attachedRoutes}' 2>/dev/null || true)
+            [[ "$lprog" == "True" && "$lres" == "True" && "${attached:-0}" -ge 1 ]] && break
+            sleep 4
+          done
+          echo "listener: Programmed=$lprog ResolvedRefs=$lres attachedRoutes=$attached"
+          [[ "$lprog" == "True" && "$lres" == "True" && "${attached:-0}" -ge 1 ]] \
+            || { kubectl get gateway "$GW" -o yaml; exit 1; }
 
           # HTTPRoute conditions live under status.parents[], per parent Gateway — there is no
           # top-level status.conditions, so `kubectl wait --for=condition=Accepted` would hang
