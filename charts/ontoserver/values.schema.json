@@ -68,6 +68,21 @@
             "podLabels": {
               "type": "object"
             },
+            "podSecurityContext": {
+              "type": "object",
+              "description": "Pod-level securityContext, passed through as-is. Empty means unset."
+            },
+            "containerSecurityContext": {
+              "type": "object",
+              "description": "Container-level securityContext for the Ontoserver container, passed through as-is. Empty means unset."
+            },
+            "automountServiceAccountToken": {
+              "type": [
+                "boolean",
+                "null"
+              ],
+              "description": "Mount the ServiceAccount token into the pod. Null leaves it to the cluster default."
+            },
             "deploymentStrategy": {
               "type": "string",
               "enum": [
@@ -324,6 +339,10 @@
                     "string",
                     "integer"
                   ]
+                },
+                "containerSecurityContext": {
+                  "type": "object",
+                  "description": "Container-level securityContext for the Postgres sidecar, passed through as-is. Empty means unset."
                 }
               }
             }

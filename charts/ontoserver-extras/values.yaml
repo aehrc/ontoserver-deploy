@@ -10,6 +10,14 @@ varnish:
   replicas: 1
   ## @param varnish.graceSeconds                               Seconds to serve stale cached content when the backend is unavailable (e.g. during a rolling update). Set to 0 to disable grace mode.
   graceSeconds: 30
+  ## Security context. All three default to unset, so upgrading an existing release changes
+  ## nothing. See the chart README ("Security context") for a verified hardened configuration.
+  ## @param varnish.podSecurityContext                          Pod-level securityContext for the Varnish pod, passed through as-is (e.g. runAsNonRoot, runAsUser, fsGroup, seccompProfile)
+  podSecurityContext: {}
+  ## @param varnish.containerSecurityContext                    Container-level securityContext, applied to every container in the Varnish pod (varnish, metrics exporter, trace converter, trace forwarder). They share a process namespace, so per-container isolation would be misleading.
+  containerSecurityContext: {}
+  ## @param varnish.automountServiceAccountToken                Mount the ServiceAccount token into the Varnish pod. Varnish does not call the Kubernetes API, so false is safe. Leave unset (null) for the cluster default.
+  automountServiceAccountToken: ~
   opentelemetry:
     ## @param varnish.opentelemetry.enabled                     Enable tracing VCL and sidecar containers (trace-converter + trace-forwarder)
     enabled: false

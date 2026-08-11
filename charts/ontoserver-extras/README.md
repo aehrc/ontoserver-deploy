@@ -29,6 +29,9 @@ All features are disabled by default — installing the chart with no overrides 
 | `varnish.closureBackend`                           | Kubernetes hostname for the $closure operation backend. The $closure FHIR operation is stateful — it requires all requests to hit the same instance. Set to a stable pod hostname (e.g. RELEASE-statefulset-0.RELEASE-ontoserver-headless) when using a scaled deployment. Empty string disables dedicated $closure routing. | `""`                                   |
 | `varnish.replicas`                                 | Number of Varnish pod replicas. For a scaled Ontoserver deployment consider 2+ to avoid a single point of failure. Note: multiple replicas each maintain their own independent cache.                                                                                                                                        | `1`                                    |
 | `varnish.graceSeconds`                             | Seconds to serve stale cached content when the backend is unavailable (e.g. during a rolling update). Set to 0 to disable grace mode.                                                                                                                                                                                        | `30`                                   |
+| `varnish.podSecurityContext`                       | Pod-level securityContext for the Varnish pod, passed through as-is (e.g. runAsNonRoot, runAsUser, fsGroup, seccompProfile)                                                                                                                                                                                                  | `{}`                                   |
+| `varnish.containerSecurityContext`                 | Container-level securityContext, applied to every container in the Varnish pod (varnish, metrics exporter, trace converter, trace forwarder). They share a process namespace, so per-container isolation would be misleading.                                                                                                | `{}`                                   |
+| `varnish.automountServiceAccountToken`             | Mount the ServiceAccount token into the Varnish pod. Varnish does not call the Kubernetes API, so false is safe. Leave unset (null) for the cluster default.                                                                                                                                                                 | `nil`                                  |
 | `varnish.opentelemetry.enabled`                    | Enable tracing VCL and sidecar containers (trace-converter + trace-forwarder)                                                                                                                                                                                                                                                | `false`                                |
 | `varnish.opentelemetry.collectorEndpoint`          | Zipkin endpoint for trace forwarding (required when opentelemetry enabled)                                                                                                                                                                                                                                                   | `""`                                   |
 | `varnish.metrics.enabled`                          | Enable Prometheus metrics exporter sidecar                                                                                                                                                                                                                                                                                   | `false`                                |
@@ -205,6 +208,38 @@ When Varnish fronts a scaled StatefulSet Ontoserver cluster, two additional sett
 > Replace `RELEASE` with your Helm release name.
 >
 > **Varnish exposed directly** (no `ontoserver` chart Gateway/Ingress in front): Same requirement as above — set `varnish.closureBackend` to the pod-0 headless DNS name.
+
+## Security context
+
+By default the chart sets no `securityContext`, so containers run as whatever their images specify. Hardening is opt-in:
+
+| Value | Applies to |
+| --- | --- |
+| `varnish.podSecurityContext` | the Varnish pod |
+| `varnish.containerSecurityContext` | **every** container in the pod — `varnish`, `varnish-exporter`, `varnish-trace-converter`, `trace-forwarder` and the `init-trace-pipe` init container |
+| `varnish.automountServiceAccountToken` | the pod — safe to set `false`; Varnish never calls the Kubernetes API |
+
+Both default to unset, so upgrading an existing release leaves the pod spec byte-identical and does not discard a warm cache.
+
+There is one container-level value rather than one per container because these containers are a single unit: they share a process namespace (`shareProcessNamespace: true`, which is what lets the exporter and `varnishlog` see the `varnishd` process), so per-container isolation settings would be misleading.
+
+This chart is in better shape than the `ontoserver` chart to begin with: `varnish:7.7.1` already runs as **uid 1000 (`varnish`)** rather than root, and `/var/lib/varnish` is an `emptyDir`, which the kubelet creates world-writable. So a hardened context mostly makes an existing guarantee explicit to your admission policy:
+
+```yaml
+varnish:
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000        # the uid the varnish image already uses
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+  automountServiceAccountToken: false
+```
+
+`readOnlyRootFilesystem` is left out deliberately: `varnishd` compiles the VCL into a shared object at startup and needs a writable working directory, and the exporter and trace sidecars have not been verified under it. The `ghcr.io/aehrc/varnish-exporter` image was not reachable for inspection when this was written, so treat the exporter sidecar in particular as unverified and test before relying on it.
 
 ## Resource Naming
 

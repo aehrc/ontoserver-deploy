@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   limit, which guarantees an eventual OOMKill.
 - Validation rejecting a heap that meets or exceeds `resources.memoryGb`, so the misconfiguration
   fails at install time rather than as an OOMKill mid-index.
+- Opt-in security context: `job.podSecurityContext`, `job.containerSecurityContext` and
+  `job.automountServiceAccountToken`, all unset by default so existing users see no change. The
+  README documents a hardened configuration; note a non-root Job needs an `fsGroup` that can
+  write the output PVC, and `readOnlyRootFilesystem` is not supported because the JVM writes to
+  `/tmp`.
 
 ### Fixed
 

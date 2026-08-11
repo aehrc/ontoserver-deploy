@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in security context: `varnish.podSecurityContext`, `varnish.containerSecurityContext` and
+  `varnish.automountServiceAccountToken`. All default to unset, so upgrading an existing release
+  leaves the pod spec byte-identical and does not discard a warm cache. The container-level value
+  applies to every container in the pod — varnish, the metrics exporter and both trace sidecars —
+  because they share a process namespace and are not independently isolatable.
+
 ### Fixed
 
 - Varnish now restarts when its VCL changes. `varnishd` parses `/etc/varnish/default.vcl` once

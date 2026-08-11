@@ -23,3 +23,5 @@ annotations:
   artifacthub.io/changes: |
     - kind: fixed
       description: Varnish now restarts when the VCL changes (checksum/config pod annotation)
+    - kind: added
+      description: Opt-in pod and container securityContext values for the Varnish pod (unset by default)

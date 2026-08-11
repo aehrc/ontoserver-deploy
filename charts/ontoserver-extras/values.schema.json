@@ -91,6 +91,21 @@
           "minimum": 0,
           "description": "Seconds to serve stale cached content when the backend is unavailable"
         },
+        "podSecurityContext": {
+          "type": "object",
+          "description": "Pod-level securityContext for the Varnish pod, passed through as-is. Empty means unset."
+        },
+        "containerSecurityContext": {
+          "type": "object",
+          "description": "Container-level securityContext applied to every container in the Varnish pod, passed through as-is. Empty means unset."
+        },
+        "automountServiceAccountToken": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Mount the ServiceAccount token into the Varnish pod. Null leaves it to the cluster default."
+        },
         "image": {
           "type": "string",
           "default": "varnish:7.7.1",

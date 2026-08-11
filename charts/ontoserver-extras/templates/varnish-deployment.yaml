@@ -28,6 +28,14 @@ spec:
         checksum/config: {{ include "ontoserver-extras.varnish.vcl" . | sha256sum }}
     spec:
       shareProcessNamespace: true
+      {{- with .Values.varnish.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- /* Tri-state: an explicit false must not be treated as unset, so `with` is wrong here. */}}
+      {{- if not (kindIs "invalid" .Values.varnish.automountServiceAccountToken) }}
+      automountServiceAccountToken: {{ .Values.varnish.automountServiceAccountToken }}
+      {{- end }}
       {{- if .Values.varnish.tolerations }}
       tolerations: {{ toJson .Values.varnish.tolerations }}
       {{- end }}
@@ -35,6 +43,7 @@ spec:
       initContainers:
       - name: init-trace-pipe
         image: {{ .Values.varnish.image }}
+        {{- include "ontoserver-extras.varnish.containerSecurity" . | nindent 8 }}
         command: ["sh", "-c", "touch /traces/spans.log && chmod 666 /traces/spans.log"]
         volumeMounts:
         - name: trace-pipe
@@ -43,6 +52,7 @@ spec:
       containers:
       - name: varnish
         image: {{ .Values.varnish.image }}
+        {{- include "ontoserver-extras.varnish.containerSecurity" . | nindent 8 }}
         command:
           - varnishd
           - -F
@@ -81,6 +91,7 @@ spec:
       {{- if .Values.varnish.metrics.enabled }}
       - name: varnish-exporter
         image: {{ .Values.varnish.exporterImage }}
+        {{- include "ontoserver-extras.varnish.containerSecurity" . | nindent 8 }}
         env:
           - name: VARNISH_STAT_PATH
             value: "/usr/bin/varnishstat"
@@ -112,6 +123,7 @@ spec:
       {{- if .Values.varnish.opentelemetry.enabled }}
       - name: varnish-trace-converter
         image: {{ .Values.varnish.image }}
+        {{- include "ontoserver-extras.varnish.containerSecurity" . | nindent 8 }}
         command:
           - /bin/sh
           - -c
@@ -133,6 +145,7 @@ spec:
 
       - name: trace-forwarder
         image: {{ .Values.varnish.traceForwarderImage }}
+        {{- include "ontoserver-extras.varnish.containerSecurity" . | nindent 8 }}
         env:
           - name: COLLECTOR_URL
             value: {{ required "varnish.opentelemetry.collectorEndpoint is required when varnish.opentelemetry.enabled" .Values.varnish.opentelemetry.collectorEndpoint | quote }}

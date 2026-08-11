@@ -38,6 +38,15 @@ ontoserver:
     podAnnotations: {}
     ## @param ontoserver.deployment.podLabels           Pod labels
     podLabels: {}
+    ## Security context. All three default to unset, so upgrading an existing release changes
+    ## nothing. See the chart README ("Security context") for a hardened configuration verified
+    ## against the images this chart ships, and for why it is not the default.
+    ## @param ontoserver.deployment.podSecurityContext          Pod-level securityContext, passed through as-is (e.g. runAsNonRoot, runAsUser, fsGroup, seccompProfile)
+    podSecurityContext: {}
+    ## @param ontoserver.deployment.containerSecurityContext    Container-level securityContext for the Ontoserver container, passed through as-is (e.g. allowPrivilegeEscalation, capabilities, readOnlyRootFilesystem)
+    containerSecurityContext: {}
+    ## @param ontoserver.deployment.automountServiceAccountToken Mount the ServiceAccount token into the pod. Ontoserver does not call the Kubernetes API — scaled clustering uses DNS, not the API — so false is safe. Leave unset (null) for the cluster default.
+    automountServiceAccountToken: ~
     ## @param ontoserver.deployment.deploymentStrategy  K8s update strategy when using Deployment Kind
     deploymentStrategy: RollingUpdate
     startupProbe:
@@ -163,6 +172,8 @@ ontoserver:
       enabled: true
       ## @param ontoserver.deployment.db.postgresVersion    Version of Postgres
       postgresVersion: 16
+      ## @param ontoserver.deployment.db.containerSecurityContext  Container-level securityContext for the Postgres sidecar, passed through as-is. Kept separate from the Ontoserver container's because the two differ: the postgres image entrypoint requires uid 999 (it refuses to run as root) and initdb needs its data directory writable.
+      containerSecurityContext: {}
   ## @section Registry Credentials
   ## @param ontoserver.imageCredentials.registry   Registry hostname (default quay.io)
   ## @param ontoserver.imageCredentials.username   quay.io username; when set with password the chart creates a pull secret automatically

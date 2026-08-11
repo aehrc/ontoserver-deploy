@@ -29,3 +29,5 @@ annotations:
       description: Initial public release
     - kind: added
       description: "existingSecretConfig: reference a pre-existing Secret as envFrom instead of having the chart create one"
+    - kind: added
+      description: Opt-in pod and container securityContext values (unset by default, so upgrades roll no pods)

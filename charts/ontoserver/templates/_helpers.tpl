@@ -71,6 +71,34 @@ checksum/external-secret: {{ dict "data" .Values.ontoserver.externalSecret.data 
 {{- end }}
 
 {{/*
+Pod-level security settings for the Ontoserver pod template.
+
+Emitted by both deployment.yaml and statefulset.yaml, which must stay identical here — a
+setting that applied to only one kind would be a trap for anyone switching between them.
+
+Everything is opt-in and defaults to unset, so an upgrade of an existing release produces a
+byte-identical pod spec and does not roll any pods. That is deliberate: the charts have run
+without a securityContext since they were written, and imposing one by default would break
+releases in ways this chart cannot predict — the Ontoserver image's uid, whether the
+persistent volume's existing files are readable under a new fsGroup, and whether the mounted
+customization ConfigMap is still readable are all deployment-specific. See the README for a
+hardened configuration that has been verified against the images this chart ships.
+
+automountServiceAccountToken is a tri-state, so `with` is wrong: it treats an explicit false
+as absent and would silently drop the setting that actually matters. Only a nil value means
+"leave it to the cluster default".
+*/}}
+{{- define "ontoserver.podSecurity" -}}
+{{- with .Values.ontoserver.deployment.podSecurityContext }}
+securityContext:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- if not (kindIs "invalid" .Values.ontoserver.deployment.automountServiceAccountToken) }}
+automountServiceAccountToken: {{ .Values.ontoserver.deployment.automountServiceAccountToken }}
+{{- end }}
+{{- end }}
+
+{{/*
 Is a PodDisruptionBudget field set?
 
 `empty` cannot be used here: empty 0 is true, so it conflates a deliberate 0 with an unset

@@ -20,6 +20,26 @@ app: {{ .Release.Name }}-varnish-cache
 {{- end }}
 
 {{/*
+Container-level security context for the Varnish pod.
+
+One value covers every container in the pod — varnish, the metrics exporter, the trace
+converter and the trace forwarder — rather than one value per container. They are a single
+unit: they share a process namespace (shareProcessNamespace: true, needed so the exporter and
+varnishlog can see varnishd), so per-container isolation settings would be misleading anyway.
+
+Defaults to unset, so an upgrade of an existing release leaves the pod spec byte-identical.
+Unlike the Ontoserver image, varnish:7.7.1 already runs as a non-root user (uid 1000, varnish)
+out of the box, and /var/lib/varnish is mounted from an emptyDir, which the kubelet creates
+world-writable — so a hardened context is a smaller step here.
+*/}}
+{{- define "ontoserver-extras.varnish.containerSecurity" -}}
+{{- with .Values.varnish.containerSecurityContext }}
+securityContext:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{/*
 The Varnish VCL, as a named template rather than inline in varnish-configmap.yaml.
 
 It lives here so that varnish-deployment.yaml can hash the exact VCL text for its

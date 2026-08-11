@@ -1,0 +1,203 @@
+suite: Security context tests
+templates:
+  - templates/deployment.yaml
+  - templates/statefulset.yaml
+tests:
+  # The whole point of the design: an existing release must not change on upgrade. If any of
+  # these three fields appeared by default, upgrading would roll every pod — and on a chart that
+  # has never run with a securityContext, would likely roll them into CrashLoopBackOff.
+  - it: sets no security context by default on the Deployment
+    template: templates/deployment.yaml
+    asserts:
+      - isNull:
+          path: spec.template.spec.securityContext
+      - isNull:
+          path: spec.template.spec.automountServiceAccountToken
+      - isNull:
+          path: spec.template.spec.containers[0].securityContext
+      - isNull:
+          path: spec.template.spec.initContainers[0].securityContext
+
+  - it: sets no security context by default on the StatefulSet
+    template: templates/statefulset.yaml
+    values:
+      - fixtures/scaled-values.yaml
+    asserts:
+      - isNull:
+          path: spec.template.spec.securityContext
+      - isNull:
+          path: spec.template.spec.automountServiceAccountToken
+      - isNull:
+          path: spec.template.spec.containers[0].securityContext
+
+  - it: renders a pod security context on the Deployment
+    template: templates/deployment.yaml
+    set:
+      ontoserver.deployment.podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 7531
+        fsGroup: 7531
+        seccompProfile:
+          type: RuntimeDefault
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      # 7531 is the uid of the `ontoserver` user that exists in the image; see the README.
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 7531
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 7531
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+
+  - it: renders a pod security context on the StatefulSet
+    template: templates/statefulset.yaml
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.podSecurityContext:
+        runAsUser: 7531
+        fsGroup: 7531
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 7531
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 7531
+
+  - it: renders a container security context on the Ontoserver container
+    template: templates/deployment.yaml
+    set:
+      ontoserver.deployment.containerSecurityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value:
+            - ALL
+      # Must not leak onto the Postgres sidecar, which has different requirements.
+      - isNull:
+          path: spec.template.spec.initContainers[0].securityContext
+
+  # The sidecar gets its own value because the postgres image entrypoint refuses to run as root
+  # and requires uid 999 — a single shared container context could not satisfy both containers.
+  - it: renders a container security context on the Postgres sidecar independently
+    template: templates/deployment.yaml
+    set:
+      ontoserver.deployment.db.containerSecurityContext:
+        runAsUser: 999
+        allowPrivilegeEscalation: false
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.runAsUser
+          value: 999
+      - isNull:
+          path: spec.template.spec.containers[0].securityContext
+
+  - it: renders both container security contexts on the StatefulSet
+    template: templates/statefulset.yaml
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.containerSecurityContext.readOnlyRootFilesystem: true
+      ontoserver.deployment.db.containerSecurityContext.runAsUser: 999
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.runAsUser
+          value: 999
+
+  # automountServiceAccountToken is a tri-state. `with` would treat false as unset and silently
+  # drop the only value anyone sets this field to, so the template uses an explicit nil check.
+  # These two cases are what distinguishes the two implementations.
+  - it: renders automountServiceAccountToken false
+    template: templates/deployment.yaml
+    set:
+      ontoserver.deployment.automountServiceAccountToken: false
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+
+  - it: renders automountServiceAccountToken true
+    template: templates/deployment.yaml
+    set:
+      ontoserver.deployment.automountServiceAccountToken: true
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+
+  - it: renders automountServiceAccountToken false on the StatefulSet
+    template: templates/statefulset.yaml
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.automountServiceAccountToken: false
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+
+  # The hardened configuration the README documents, asserted end to end so the recipe cannot
+  # drift from something that renders. Every value in the fixture was established by running the
+  # images, not inferred — see the fixture's own header for the failure each one avoids.
+  - it: renders the documented hardened configuration
+    template: templates/deployment.yaml
+    values:
+      - fixtures/hardened-values.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      # 7531 is the uid of the `ontoserver` user that exists in the image.
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 7531
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 7531
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value:
+            - ALL
+      # readOnlyRootFilesystem must NOT appear: Spring Boot opens /tmp/spring.log for writing and
+      # the chart cannot yet mount a writable /tmp, so enabling it crashes the pod at startup.
+      - isNull:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+      # The Postgres sidecar must be off. It refuses to start unless it owns its data directory,
+      # and fsGroup only sets group ownership — so one pod cannot satisfy both uids on one volume.
+      - isNull:
+          path: spec.template.spec.initContainers
+      # A hardened non-root pod requires a writable /var/onto: as uid 7531 the image's own
+      # /var/onto (root:root 0755) is not writable and Ontoserver dies at startup with
+      # "The folder /var/onto/lucene could not be created!". Persistence supplies it, and
+      # fsGroup makes the volume writable — so the fixture must keep it enabled.
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: RELEASE-NAME-ontoserver-files

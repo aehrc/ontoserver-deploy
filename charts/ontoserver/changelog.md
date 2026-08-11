@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the replica that served the write, and `$expand`/`$validate-code` then fail on the others.
 - `ontoserver.deployment.podDisruptionBudget.maxUnavailable` and `.unhealthyPodEvictionPolicy`
   as real values rather than commented-out suggestions.
+- Opt-in security context: `ontoserver.deployment.podSecurityContext`,
+  `.containerSecurityContext`, `.db.containerSecurityContext` and `.automountServiceAccountToken`.
+  The chart previously set no security context anywhere, so pods ran as root. All four default to
+  unset, so upgrading an existing release renders a byte-identical pod spec and rolls no pods —
+  hardening has to be requested. The Postgres sidecar has its own value because it cannot share
+  the Ontoserver container's: the postgres entrypoint requires uid 999.
+
+  A verified hardened configuration is documented in the README, along with the three
+  combinations that cannot be made to work non-root (the Postgres sidecar, `readOnlyRootFilesystem`,
+  and Ontoserver's own HTTPS mode). Those constraints were established by running the shipped
+  images under each setting, not inferred — each failure is a crash at startup.
 
 ### Fixed
 

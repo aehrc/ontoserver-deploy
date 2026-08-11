@@ -192,6 +192,32 @@ tolerations:
     effect: "NoSchedule"
 ```
 
+## Security context
+
+By default the Job sets no `securityContext`, so the indexer runs as root — the image default. Hardening is opt-in via `job.podSecurityContext`, `job.containerSecurityContext` and `job.automountServiceAccountToken`, all unset by default.
+
+The indexer uses the same image as the server (`quay.io/aehrc/ontoserver`), which contains a dedicated **`ontoserver` user, uid 7531**. Running as that user works, but note the Job writes its output ZIP to the mounted output PVC, so `fsGroup` must make that volume writable — a Job that cannot write its output fails outright after doing all the indexing work, which is expensive to discover late:
+
+```yaml
+job:
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 7531
+    runAsGroup: 7531
+    fsGroup: 7531          # required when output.pvcName is set
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+  automountServiceAccountToken: false
+```
+
+`readOnlyRootFilesystem` is not supported: the JVM writes to `/tmp` (Spring Boot opens `/tmp/spring.log`), and the chart has no way to mount a writable `/tmp`.
+
+Validate on a non-production run before adopting this — in particular that an existing output PVC's contents are writable under the new `fsGroup`, and that the input PVC (mounted read-only) is still readable.
+
 ## Monitoring
 
 After installing, the NOTES output prints the namespace-qualified commands to follow the submitted Job.
@@ -227,11 +253,14 @@ kubectl get job snomed-au-index -n <namespace>
 
 ### Job parameters
 
-| Name                          | Description                                                                                           | Value  |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------- | ------ |
-| `job.name`                    | Override for the Kubernetes Job name; defaults to the release name suffixed with the release revision | `""`   |
-| `job.activeDeadlineSeconds`   | Maximum duration in seconds before the Job is forcibly terminated                                     | `7200` |
-| `job.ttlSecondsAfterFinished` | Seconds after Job completion before it is automatically deleted                                       | `3600` |
+| Name                               | Description                                                                                                                                                  | Value  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| `job.name`                         | Override for the Kubernetes Job name; defaults to the release name suffixed with the release revision                                                        | `""`   |
+| `job.activeDeadlineSeconds`        | Maximum duration in seconds before the Job is forcibly terminated                                                                                            | `7200` |
+| `job.ttlSecondsAfterFinished`      | Seconds after Job completion before it is automatically deleted                                                                                              | `3600` |
+| `job.podSecurityContext`           | Pod-level securityContext for the indexer Job pod, passed through as-is (e.g. runAsNonRoot, runAsUser, fsGroup, seccompProfile)                              | `{}`   |
+| `job.containerSecurityContext`     | Container-level securityContext for the indexer container, passed through as-is (e.g. allowPrivilegeEscalation, capabilities, readOnlyRootFilesystem)        | `{}`   |
+| `job.automountServiceAccountToken` | Mount the ServiceAccount token into the Job pod. The indexer does not call the Kubernetes API, so false is safe. Leave unset (null) for the cluster default. | `nil`  |
 
 ### Resources parameters
 

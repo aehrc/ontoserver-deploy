@@ -44,6 +44,10 @@ This chart provides flexible deployment options for [Ontoserver](https://ontoser
 - [Configuring an external database](#configuring-an-external-database)
 - [Customisation](#customisation)
 - [Labels](#labels)
+- [Security context](#security-context)
+  - [What was verified](#what-was-verified)
+  - [Hardened configuration](#hardened-configuration)
+  - [What is not supported non-root](#what-is-not-supported-non-root)
 - [Outbound HTTP proxy](#outbound-http-proxy)
 - [Gateway API vs Ingress](#gateway-api-vs-ingress)
   - [$closure routing for scaled StatefulSet deployments](#closure-routing-for-scaled-statefulset-deployments)
@@ -727,6 +731,80 @@ When selecting these resources from outside the chart (Kustomize patches, `kubec
 
 Extra labels can be added via `ontoserver.deployment.labels` (on the workload) and `ontoserver.deployment.podLabels` (on the pods).
 
+## Security context
+
+By default the chart sets **no** `securityContext` at all, so pods run with whatever the image and the cluster's admission policy give them — which for `quay.io/aehrc/ontoserver` means **uid 0 (root)**. Hardening is opt-in through three values:
+
+| Value | Applies to |
+| --- | --- |
+| `ontoserver.deployment.podSecurityContext` | the pod (`runAsUser`, `runAsNonRoot`, `fsGroup`, `seccompProfile`, …) |
+| `ontoserver.deployment.containerSecurityContext` | the Ontoserver container |
+| `ontoserver.deployment.db.containerSecurityContext` | the Postgres sidecar |
+| `ontoserver.deployment.automountServiceAccountToken` | the pod — safe to set `false`; Ontoserver never calls the Kubernetes API (scaled clustering uses DNS) |
+
+All default to unset, so **upgrading an existing release changes nothing** and rolls no pods. That is deliberate rather than timid: these charts have always run as root, and a default securityContext would break existing releases in ways the chart cannot detect — see the failures below, each of which is a hard crash at startup, not a warning.
+
+### What was verified
+
+The constraints below were established by running the images this chart ships (`quay.io/aehrc/ontoserver:ctsa-6` and `postgres:16`) under each candidate setting, not inferred from the manifests.
+
+| Configuration | Result |
+| --- | --- |
+| root, as the chart ships today | healthy |
+| uid 7531, no writable `/var/onto` | **crash** — `InvalidIndexFolderException: The folder /var/onto/lucene could not be created!` |
+| uid 7531, writable `/var/onto` | healthy |
+| uid 7531 + `readOnlyRootFilesystem` + writable `/tmp` | healthy |
+| uid 7531 + `readOnlyRootFilesystem`, no writable `/tmp` | **crash** — `openFile(/tmp/spring.log) … Read-only file system` |
+| uid 7531 + `ONTOSERVER_INSECURE: "false"` | **crash** — `keytool error: /keystore.p12 (Permission denied)` |
+| Postgres sidecar as uid 999, owned data dir | ready |
+| Postgres sidecar as uid 999, `fsGroup`-style data dir | **crash** — `FATAL: data directory … has wrong ownership` |
+
+Useful facts that follow from this:
+
+- The image contains a dedicated **`ontoserver` user, uid 7531** — it is clearly intended to be runnable as non-root, but the image does not default to it.
+- `/var/onto` in the image is `root:root 0755`, so a non-root pod **must** get a writable `/var/onto` from somewhere. Enabling persistence plus `fsGroup` is the supported way.
+
+### Hardened configuration
+
+Verified end to end against the images. A test (`tests/security_context_test.yaml`) renders exactly this fixture, so it cannot silently drift.
+
+```yaml
+ontoserver:
+  deployment:
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 7531        # the `ontoserver` user present in the image
+      runAsGroup: 7531
+      fsGroup: 7531          # makes the files PVC writable by that user
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: [ALL]
+    automountServiceAccountToken: false
+    db:
+      enabled: false         # required — see below
+    persistence:
+      enabledForDeployment: true   # required — supplies a writable /var/onto
+  config:
+    ONTOSERVER_INSECURE: "true"    # required — see below
+```
+
+### What is not supported non-root
+
+Three combinations cannot be made to work with the chart as it stands. Each fails closed — the pod crashes at startup rather than running degraded — so you will find out immediately, but it is cheaper to read it here.
+
+1. **The Postgres sidecar** (`ontoserver.deployment.db.enabled: true`) together with a non-root Ontoserver. The postgres entrypoint refuses to start unless it **owns** its data directory, and `fsGroup` only sets *group* ownership. Ontoserver needs uid 7531 to write `/var/onto` while Postgres needs uid 999 to own its data dir — and in the default `shared` persistence mode both live on the same volume. Use an [external database](#configuring-an-external-database), which production deployments need anyway.
+
+   The sidecar's own `containerSecurityContext` is still useful for `allowPrivilegeEscalation: false` and dropping capabilities; it is just the non-root part that conflicts.
+
+2. **`readOnlyRootFilesystem: true`.** Spring Boot opens `/tmp/spring.log` for writing, and this chart has no way to mount an `emptyDir` at `/tmp`. Leave it unset until the chart grows `extraVolumes`/`extraVolumeMounts`.
+
+3. **Ontoserver's own HTTPS mode** (`ONTOSERVER_INSECURE: "false"`, see [Healthcheck and HTTPS mode](#healthcheck-and-https-mode-ontoserver_insecure-false)). `/run.sh` generates a self-signed keystore at `/keystore.p12` — in the root-owned `/` — so `keytool` fails with `Permission denied`. Terminate TLS at the ingress or gateway instead, which is the chart's default posture.
+
+> **Validate before rolling this out.** The table above was produced from the container images, which settles the image's own requirements. It does not cover your cluster's specifics: whether an existing PVC's files are readable under a new `fsGroup` (Kubernetes only relabels the volume it mounts, and a large pre-existing Lucene index can take a long time to chown), whether a mounted `ontoserver.customization` ConfigMap is still readable, or how your admission policy (Pod Security Standards, Gatekeeper, Kyverno) reacts. Test on a non-production release first.
+
 ## Outbound HTTP proxy
 
 If Ontoserver needs to route outbound internet traffic through an HTTP proxy — for example to reach SNOMED CT syndication feeds or external FHIR terminology servers — you can set the relevant environment variables via `ontoserver.config`:
@@ -971,6 +1049,9 @@ Requires the [External Secrets Operator](https://external-secrets.io/) installed
 | `ontoserver.deployment.labels`                                                              | Deployment/Statefulset manifest labels                                                                                                                                                                                                                                                                                                                       | `{}`                              |
 | `ontoserver.deployment.podAnnotations`                                                      | Pod annotations                                                                                                                                                                                                                                                                                                                                              | `{}`                              |
 | `ontoserver.deployment.podLabels`                                                           | Pod labels                                                                                                                                                                                                                                                                                                                                                   | `{}`                              |
+| `ontoserver.deployment.podSecurityContext`                                                  | Pod-level securityContext, passed through as-is (e.g. runAsNonRoot, runAsUser, fsGroup, seccompProfile)                                                                                                                                                                                                                                                      | `{}`                              |
+| `ontoserver.deployment.containerSecurityContext`                                            | Container-level securityContext for the Ontoserver container, passed through as-is (e.g. allowPrivilegeEscalation, capabilities, readOnlyRootFilesystem)                                                                                                                                                                                                     | `{}`                              |
+| `ontoserver.deployment.automountServiceAccountToken`                                        | Mount the ServiceAccount token into the pod. Ontoserver does not call the Kubernetes API — scaled clustering uses DNS, not the API — so false is safe. Leave unset (null) for the cluster default.                                                                                                                                                           | `nil`                             |
 | `ontoserver.deployment.deploymentStrategy`                                                  | K8s update strategy when using Deployment Kind                                                                                                                                                                                                                                                                                                               | `RollingUpdate`                   |
 | `ontoserver.deployment.startupProbe.initialDelaySeconds`                                    | Startup probe initial delay                                                                                                                                                                                                                                                                                                                                  | `5`                               |
 | `ontoserver.deployment.startupProbe.periodSeconds`                                          | Startup probe period                                                                                                                                                                                                                                                                                                                                         | `2`                               |
@@ -1022,6 +1103,7 @@ Requires the [External Secrets Operator](https://external-secrets.io/) installed
 | `ontoserver.deployment.podDisruptionBudget.unhealthyPodEvictionPolicy`                      | IfHealthyBudget or AlwaysAllow. Empty uses the cluster default (IfHealthyBudget).                                                                                                                                                                                                                                                                            | `""`                              |
 | `ontoserver.deployment.db.enabled`                                                          | Enable Postgres sidecar                                                                                                                                                                                                                                                                                                                                      | `true`                            |
 | `ontoserver.deployment.db.postgresVersion`                                                  | Version of Postgres                                                                                                                                                                                                                                                                                                                                          | `16`                              |
+| `ontoserver.deployment.db.containerSecurityContext`                                         | Container-level securityContext for the Postgres sidecar, passed through as-is. Kept separate from the Ontoserver container's because the two differ: the postgres image entrypoint requires uid 999 (it refuses to run as root) and initdb needs its data directory writable.                                                                               | `{}`                              |
 
 ### Registry Credentials
 

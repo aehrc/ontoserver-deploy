@@ -14,6 +14,14 @@ spec:
         app: {{ include "ontoserver-indexer.jobName" . }}
     spec:
       restartPolicy: Never
+      {{- with .Values.job.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- /* Tri-state: an explicit false must not be treated as unset, so `with` is wrong here. */}}
+      {{- if not (kindIs "invalid" .Values.job.automountServiceAccountToken) }}
+      automountServiceAccountToken: {{ .Values.job.automountServiceAccountToken }}
+      {{- end }}
       {{- if .Values.tolerations }}
       tolerations: {{ toJson .Values.tolerations }}
       {{- end }}
@@ -41,6 +49,10 @@ spec:
       containers:
         - name: indexer
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          {{- with .Values.job.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           command: ["/run.sh"]
           args:
             - indexCodeSystemDebug

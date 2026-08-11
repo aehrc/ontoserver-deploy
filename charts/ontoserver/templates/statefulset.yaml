@@ -72,6 +72,7 @@ spec:
       {{- if or .Values.ontoserver.serviceAccount.create .Values.ontoserver.serviceAccount.name }}
       serviceAccountName: {{ .Values.ontoserver.serviceAccount.name | default (printf "%s-ontoserver" .Release.Name) }}
       {{- end }}
+      {{- include "ontoserver.podSecurity" . | nindent 6 }}
       {{- if .Values.ontoserver.deployment.db.enabled }}
         {{- if eq .Values.ontoserver.deployment.type "scaled" }}
           {{- fail "Scaled deployments require shared database and cannot have the default sidecar database. Set ontoserver.deployment.db.enabled to false and set spring.datasource.url in ontoserver.config to an external db jdbc URL." }}
@@ -80,6 +81,10 @@ spec:
         - name: {{ .Release.Name }}-ontoserver-db
           image: "postgres:{{ required "ontoserver.deployment.db.postgresVersion is required" .Values.ontoserver.deployment.db.postgresVersion }}"
           restartPolicy: Always
+          {{- with .Values.ontoserver.deployment.db.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - containerPort: 5432
           resources:
@@ -123,6 +128,10 @@ spec:
         - name: {{ .Release.Name }}-ontoserver
           image: {{ required "ontoserver.deployment.image is required " .Values.ontoserver.deployment.image }}
           imagePullPolicy: {{ required "ontoserver.deployment.imagePullPolicy is required" .Values.ontoserver.deployment.imagePullPolicy }}
+          {{- with .Values.ontoserver.deployment.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - containerPort: {{ .Values.ontoserver.deployment.containerPort }}
           resources:

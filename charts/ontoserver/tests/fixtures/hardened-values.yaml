@@ -1,0 +1,56 @@
+# A hardened, non-root securityContext for the Ontoserver chart.
+#
+# Every constraint below was established by running the images this chart ships
+# (quay.io/aehrc/ontoserver:ctsa-6, postgres:16), not inferred. See the chart README,
+# "Security context", for the failure each one avoids.
+#
+# The three hard requirements:
+#   1. db.enabled must be false (external PostgreSQL). The Postgres sidecar refuses to start
+#      unless it *owns* its data directory, and fsGroup only sets group ownership — so a pod
+#      that runs Ontoserver as 7531 cannot also give Postgres an owned data directory on the
+#      same volume.
+#   2. persistence must be enabled. As uid 7531 the image's own /var/onto (root:root 0755) is
+#      not writable, and Ontoserver dies at startup with
+#      "The folder /var/onto/lucene could not be created!". fsGroup makes the PVC writable.
+#   3. ONTOSERVER_INSECURE must stay "true". In HTTPS mode /run.sh generates a keystore at
+#      /keystore.p12, in the root-owned /, and keytool fails with "Permission denied".
+#
+# readOnlyRootFilesystem is deliberately absent: Spring Boot opens /tmp/spring.log for writing,
+# so it needs a writable /tmp, and this chart has no way to mount an emptyDir there yet.
+ontoserver:
+  serverName: onto.example.com
+  deployment:
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 7531        # the `ontoserver` user that exists in the image
+      runAsGroup: 7531
+      fsGroup: 7531          # makes the files PVC writable by that user
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+    automountServiceAccountToken: false
+    db:
+      enabled: false
+      # Retained to show the sidecar can still be hardened where it is used — but note it
+      # cannot be made non-root alongside a persistent data directory (requirement 1).
+      containerSecurityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+    persistence:
+      enabledForDeployment: true
+      mode: split
+      files:
+        storageClass:
+          provided:
+            enabled: false
+          name: default
+  config:
+    ONTOSERVER_INSECURE: "true"
+    spring.datasource.url: jdbc:postgresql://postgres.example.com/ontoserver
+    spring.datasource.username: ontoserver

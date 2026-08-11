@@ -26,6 +26,16 @@ job:
   activeDeadlineSeconds: 7200
 ## @param job.ttlSecondsAfterFinished Seconds after Job completion before it is automatically deleted
   ttlSecondsAfterFinished: 3600
+  ## Security context. All three default to unset, so nothing changes for existing users. See the
+  ## chart README ("Security context") for a verified hardened configuration.
+  ## Note the indexer writes its output to the mounted output PVC, so a hardened context needs an
+  ## fsGroup that can write it — the Job fails outright rather than degrading if it cannot.
+## @param job.podSecurityContext Pod-level securityContext for the indexer Job pod, passed through as-is (e.g. runAsNonRoot, runAsUser, fsGroup, seccompProfile)
+  podSecurityContext: {}
+## @param job.containerSecurityContext Container-level securityContext for the indexer container, passed through as-is (e.g. allowPrivilegeEscalation, capabilities, readOnlyRootFilesystem)
+  containerSecurityContext: {}
+## @param job.automountServiceAccountToken Mount the ServiceAccount token into the Job pod. The indexer does not call the Kubernetes API, so false is safe. Leave unset (null) for the cluster default.
+  automountServiceAccountToken: ~
 
 
 ## @section Resources parameters

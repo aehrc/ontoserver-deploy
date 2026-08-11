@@ -1,0 +1,126 @@
+suite: Varnish security context tests
+templates:
+  - templates/varnish-deployment.yaml
+tests:
+  # Nothing may appear by default — an existing release must be byte-identical on upgrade.
+  - it: sets no security context by default
+    set:
+      varnish.enabled: true
+    asserts:
+      - isNull:
+          path: spec.template.spec.securityContext
+      - isNull:
+          path: spec.template.spec.automountServiceAccountToken
+      - isNull:
+          path: spec.template.spec.containers[0].securityContext
+
+  - it: renders a pod security context
+    set:
+      varnish.enabled: true
+      varnish.podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      # 1000 is the uid varnish:7.7.1 already runs as by default, so this is a no-op at runtime
+      # and only makes the guarantee explicit to the cluster's admission policy.
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1000
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+
+  # One value covers every container in the pod. These assertions pin that: all four sidecars
+  # and the init container must carry it, or a hardened deployment would have gaps that the
+  # cluster's admission policy would reject (or worse, silently allow).
+  - it: applies the container security context to varnish and every sidecar
+    set:
+      varnish.enabled: true
+      varnish.metrics.enabled: true
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: http://collector:9411/api/v2/spans
+      varnish.containerSecurityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: init-trace-pipe
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: varnish
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value:
+            - ALL
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: varnish-exporter
+      - equal:
+          path: spec.template.spec.containers[1].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[2].name
+          value: varnish-trace-converter
+      - equal:
+          path: spec.template.spec.containers[2].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[3].name
+          value: trace-forwarder
+      - equal:
+          path: spec.template.spec.containers[3].securityContext.allowPrivilegeEscalation
+          value: false
+
+  # Tri-state: `with` would treat false as unset and drop the only value anyone sets here.
+  - it: renders automountServiceAccountToken false
+    set:
+      varnish.enabled: true
+      varnish.automountServiceAccountToken: false
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+
+  - it: renders automountServiceAccountToken true
+    set:
+      varnish.enabled: true
+      varnish.automountServiceAccountToken: true
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+
+  # The security context must not disturb the checksum/config annotation, which is what rolls the
+  # pod when the VCL changes. The hash covers the VCL text only, so adding a security context must
+  # leave it untouched — otherwise hardening a release would needlessly discard a warm cache.
+  #
+  # The expected value is deliberately the same constant as the "time200=60s" tests in
+  # varnish_deployment_test.yaml, hence the matching cache TTL here: asserting a fresh constant
+  # would prove nothing, whereas reusing that one shows the hash is genuinely unchanged.
+  - it: does not affect the VCL config checksum
+    set:
+      varnish.enabled: true
+      varnish.cache.time200: 60s
+      varnish.podSecurityContext:
+        runAsUser: 1000
+      varnish.containerSecurityContext:
+        allowPrivilegeEscalation: false
+      varnish.automountServiceAccountToken: false
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/config"]
+          value: 554536abf5022be2c28fd4f1f0600f2d439e09c8c4e9dda9bd11de1345095c83
