@@ -1,0 +1,117 @@
+suite: EnvoyProxy GatewayClass tests
+templates:
+  - templates/envoy-gateway-class.yaml
+values:
+  - fixtures/gateway-values.yaml
+tests:
+  # Opt-in: a shared cluster usually already has a GatewayClass, so the chart must not create one
+  # unless asked. createGatewayClass is true in the fixture, so it is explicitly disabled here.
+  - it: renders nothing unless createGatewayClass is set
+    set:
+      envoygateway.createGatewayClass: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Document order is asserted because every other test in this suite selects by documentIndex.
+  - it: renders a GatewayClass and an EnvoyProxy
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: GatewayClass
+        documentIndex: 0
+      - equal:
+          path: apiVersion
+          value: gateway.networking.k8s.io/v1
+        documentIndex: 0
+      - isKind:
+          of: EnvoyProxy
+        documentIndex: 1
+      - equal:
+          path: apiVersion
+          value: gateway.envoyproxy.io/v1alpha1
+        documentIndex: 1
+
+  # Regression test. Both fields were rendered with `| default`, and 0 is falsy in Go templates,
+  # so a deliberate 0 was silently replaced — the Envoy fleet could not be scaled to 0 and the PDB
+  # could not be set to permit full eviction. Same `empty 0` class of bug as the PDB fix in #8.
+  - it: honours a deliberate zero rather than coercing it to the default
+    documentIndex: 1
+    set:
+      envoygateway.envoyProxy.replicas: 0
+      envoygateway.envoyProxy.pdbMinAvailable: 0
+    asserts:
+      - equal:
+          path: spec.provider.kubernetes.envoyDeployment.replicas
+          value: 0
+      - equal:
+          path: spec.provider.kubernetes.envoyPDB.minAvailable
+          value: 0
+
+  - it: falls back to the built-in defaults when the values are explicitly null
+    documentIndex: 1
+    set:
+      envoygateway.envoyProxy.replicas: null
+      envoygateway.envoyProxy.pdbMinAvailable: null
+    asserts:
+      - equal:
+          path: spec.provider.kubernetes.envoyDeployment.replicas
+          value: 2
+      - equal:
+          path: spec.provider.kubernetes.envoyPDB.minAvailable
+          value: 1
+
+  - it: passes an ordinary count through unchanged
+    documentIndex: 1
+    set:
+      envoygateway.envoyProxy.replicas: 3
+      envoygateway.envoyProxy.pdbMinAvailable: 2
+    asserts:
+      - equal:
+          path: spec.provider.kubernetes.envoyDeployment.replicas
+          value: 3
+      - equal:
+          path: spec.provider.kubernetes.envoyPDB.minAvailable
+          value: 2
+
+  # minAvailable is a Kubernetes IntOrString, so a percentage must arrive as a string and a count
+  # as an integer. Note this test pins the *parsed* value, which is all the API server sees — an
+  # unquoted 25% parses to the same string, so it does not detect the quoting itself. The template
+  # still routes through the shared pdbValue helper for consistency with the PodDisruptionBudget.
+  - it: renders a percentage as a string and a count as an integer
+    documentIndex: 1
+    set:
+      envoygateway.envoyProxy.pdbMinAvailable: 25%
+    asserts:
+      - equal:
+          path: spec.provider.kubernetes.envoyPDB.minAvailable
+          value: "25%"
+      - isType:
+          path: spec.provider.kubernetes.envoyPDB.minAvailable
+          type: string
+
+  - it: names the EnvoyProxy in the control-plane namespace
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: envoy-gateway-system
+      - equal:
+          path: metadata.name
+          value: default
+
+  # The GatewayClass must point at the EnvoyProxy the chart just created, in the same namespace —
+  # a mismatch here leaves the GatewayClass referencing parameters that do not exist.
+  - it: points the GatewayClass parametersRef at that EnvoyProxy
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.parametersRef.kind
+          value: EnvoyProxy
+      - equal:
+          path: spec.parametersRef.name
+          value: default
+      - equal:
+          path: spec.parametersRef.namespace
+          value: envoy-gateway-system

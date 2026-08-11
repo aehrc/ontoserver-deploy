@@ -679,6 +679,10 @@
           "type": "object",
           "additionalProperties": {}
         },
+        "existingSecretConfig": {
+          "type": "string",
+          "description": "Name of a pre-existing Secret whose keys are injected as environment variables. Empty means unused."
+        },
         "externalSecret": {
           "type": "object",
           "properties": {

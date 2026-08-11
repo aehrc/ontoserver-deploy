@@ -39,9 +39,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   load-bearing rather than just a log destination — a running server writes `spring.log`,
   `hsperfdata`, Tomcat's work directories and `downlaod-*` scratch files there. The hardened
   README recipe now includes both, asserted together by a test so it cannot ship half-applied.
+- Schema validation and test coverage for `ontoserver.existingSecretConfig`, a 0.3.0 feature that
+  shipped with neither. The value was accepted before (the schema has no `additionalProperties`
+  restriction at that level) so this is validation and documentation rather than a functional fix:
+  a non-string is now rejected with a message naming the key.
 
 ### Fixed
 
+- `ontoserver.secretConfig` no longer fails to render on a non-string value. `b64enc` rejects
+  anything but a string, so a numeric port or a boolean flag aborted the whole release with
+  `wrong type for value; expected string; got int64` — and the error named only `<b64enc>`, not the
+  key at fault. Values are now coerced with `toString`, matching the sibling `ontoserver.config`,
+  which has always accepted them via `| quote`. Note that Helm parses YAML numbers as float64, so
+  quote any value whose exact form matters; that is true of both keys and is not new.
+- `envoygateway.envoyProxy.pdbMinAvailable: 0` and `.replicas: 0` are no longer silently coerced to
+  1 and 2. Both were rendered with `| default`, and 0 is falsy in Go templates, so the Envoy fleet
+  could not be scaled to 0 and its PodDisruptionBudget could not be set to permit full eviction.
+  Same class of bug as the PodDisruptionBudget fix above. `minAvailable` now also routes through the
+  shared IntOrString helper for consistency, though the quoting is not load-bearing in this field.
 - `podDisruptionBudget.minAvailable`/`.maxUnavailable` now accept percentages. The previous guard
   compared `int` against 1, and `int "25%"` is 0, so every percentage — including the `25%` form
   the values file suggested — was rejected. Percentages are emitted quoted and counts unquoted,

@@ -47,8 +47,8 @@ envoygateway:
   envoyProxy:
     name: default
     # One proxy pod rather than the default 2: it shares a single GitHub runner with Ontoserver
-    # and the Envoy Gateway control plane. pdbMinAvailable is left at 1 — the template does
-    # `| default 1`, so 0 would be silently coerced back to 1 anyway (see tracker item 24).
+    # and the Envoy Gateway control plane. Kept at 1 so the integration mode has a proxy to route
+    # through; 0 is now honoured rather than coerced, so it would leave nothing serving.
     replicas: 1
     pdbMinAvailable: 1
     accessLog:

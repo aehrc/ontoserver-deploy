@@ -26,9 +26,18 @@ spec:
     type: Kubernetes
     kubernetes:
       envoyDeployment:
-        replicas: {{ .Values.envoygateway.envoyProxy.replicas | default 2 }}
+        {{- /* `| default` is wrong for both fields below: 0 is falsy in Go templates, so a
+             deliberate 0 was silently replaced by the default. Scaling the Envoy fleet to 0 and
+             a PDB that permits full eviction are both legitimate, and values.yaml supplies the
+             defaults anyway — so use the value as given and only fall back when it is genuinely
+             unset. `pdbIsSet` exists because `empty 0` is true and would conflate the two. */}}
+        replicas: {{ if include "ontoserver.pdbIsSet" .Values.envoygateway.envoyProxy.replicas }}{{ .Values.envoygateway.envoyProxy.replicas }}{{ else }}2{{ end }}
       envoyPDB:
-        minAvailable: {{ .Values.envoygateway.envoyProxy.pdbMinAvailable | default 1 }}
+        {{- /* Rendered through pdbValue, the same IntOrString helper the PodDisruptionBudget
+             template uses, so there is one code path for this field type. Unlike there, the
+             quoting is not load-bearing here — an unquoted 25% parses to the same string — so
+             this is consistency and future-proofing, not a fix. */}}
+        minAvailable: {{ if include "ontoserver.pdbIsSet" .Values.envoygateway.envoyProxy.pdbMinAvailable }}{{ include "ontoserver.pdbValue" .Values.envoygateway.envoyProxy.pdbMinAvailable }}{{ else }}1{{ end }}
       envoyService:
         annotations:
           prometheus.io/scrape: "true"
