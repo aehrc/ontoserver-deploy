@@ -4,6 +4,11 @@
 charts/*/charts/
 charts/*/*.tgz
 charts/*/Chart.lock
-test.yaml
+
+# A bare `test.yaml` rule used to live here, which silently ignored that filename anywhere in the
+# repo — including any future chart's tests. Scoped to the one local scratch file it was actually
+# hiding. That file holds a real (expired) Azure SAS token and should be deleted; it stays ignored
+# until then so scoping this rule cannot accidentally stage a secret.
+charts/ontoserver-indexer/examples/test.yaml
 
 .env

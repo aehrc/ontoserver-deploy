@@ -1,0 +1,104 @@
+suite: Closure HTTPRoute timeout tests
+templates:
+  - templates/gateway.yaml
+values:
+  - fixtures/gateway-values.yaml
+set:
+  # The dedicated $closure route only renders for a scaled StatefulSet.
+  ontoserver.deployment.kind: StatefulSet
+  ontoserver.deployment.type: scaled
+  ontoserver.deployment.replicas: 2
+tests:
+  # gateway.yaml emits the Gateway first, then the main HTTPRoute, then the closure route — so the
+  # closure route is document 2, not 1. Asserted explicitly so the documentIndex selections below
+  # cannot silently drift onto the wrong route.
+  - it: renders the closure route as the third document
+    asserts:
+      - isKind:
+          of: Gateway
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-route
+        documentIndex: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-closure-route
+        documentIndex: 2
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /fhir/$closure
+        documentIndex: 2
+
+  # Regression test. This route carried no timeouts block at all, so it inherited whatever the
+  # Gateway implementation defaults to — typically shorter than the chart's own requestTimeout.
+  # $closure builds a transitive closure table and is the longest-running operation the chart
+  # routes, making it the one route that least tolerates an implicit timeout.
+  - it: sets a timeout on the closure route
+    documentIndex: 2
+    asserts:
+      - equal:
+          path: spec.rules[0].timeouts.request
+          value: 300s
+      - equal:
+          path: spec.rules[0].timeouts.backendRequest
+          value: 300s
+
+  # Its default is deliberately longer than the general route's, which is the whole point of
+  # giving it a separate value rather than reusing requestTimeout.
+  - it: defaults the closure timeout longer than the main route timeout
+    asserts:
+      - equal:
+          path: spec.rules[0].timeouts.request
+          value: 120s
+        documentIndex: 1
+      - equal:
+          path: spec.rules[0].timeouts.request
+          value: 300s
+        documentIndex: 2
+
+  - it: falls back to requestTimeout when closureRequestTimeout is empty
+    documentIndex: 2
+    set:
+      ontoserver.gateway.closureRequestTimeout: ""
+    asserts:
+      - equal:
+          path: spec.rules[0].timeouts.request
+          value: 120s
+
+  - it: honours an explicit closure timeout
+    documentIndex: 2
+    set:
+      ontoserver.gateway.closureRequestTimeout: 10m
+    asserts:
+      - equal:
+          path: spec.rules[0].timeouts.request
+          value: 10m
+      - equal:
+          path: spec.rules[0].timeouts.backendRequest
+          value: 10m
+
+  # The template guards against both values being empty, but that state is unreachable through
+  # valid values: requestTimeout's schema pattern requires a duration and rejects "". Asserted here
+  # so the guard is understood as defensive rather than deleted as dead code — and so that if the
+  # pattern is ever loosened, this test starts describing a reachable case.
+  - it: rejects an empty requestTimeout, making the no-timeout case unreachable
+    set:
+      ontoserver.gateway.requestTimeout: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "values don't meet the specifications of the schema(s) in the following chart(s):\nontoserver:\n- ontoserver.gateway.requestTimeout: Does not match pattern '^([0-9]{1,5}(h|m|s|ms)){1,4}$'\n"
+
+  - it: does not render a closure route for a single instance
+    set:
+      ontoserver.deployment.kind: Deployment
+      ontoserver.deployment.type: single
+      ontoserver.deployment.replicas: 1
+    asserts:
+      # Gateway + main route only — no closure route.
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-route
+        documentIndex: 1

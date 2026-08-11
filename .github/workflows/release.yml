@@ -12,6 +12,15 @@ permissions:
   pages: write
   packages: write
 
+# Serialise releases. Every run rewrites index.yaml on the gh-pages branch, so two tags pushed
+# close together race: both clone the same index.yaml, each adds only its own chart, and whichever
+# pushes second either fails or drops the other's entry — leaving a published release that the Helm
+# repo index does not list. Not cancel-in-progress: a half-finished release must be allowed to
+# finish, since the tag and the GitHub Release are already created by then.
+concurrency:
+  group: release-charts
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 

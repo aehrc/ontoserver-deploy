@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Chart description corrected — it still advertised a PV template, which now lives in the
+  `ontoserver` chart.
+
 - `collector.podSecurityContext` and `collector.containerSecurityContext`. The collector pod is
   built by the OpenTelemetry Operator from the `OpenTelemetryCollector` CR, so these render as CR
   fields rather than pod-spec fields: `spec.podSecurityContext` and `spec.securityContext` — the

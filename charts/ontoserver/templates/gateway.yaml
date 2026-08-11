@@ -125,6 +125,16 @@ spec:
         - path:
             type: PathPrefix
             value: /fhir/$closure
+      {{- /* This route had no timeouts block, so it inherited the Gateway implementation's
+           default — typically shorter than the chart's own requestTimeout. $closure builds a
+           transitive closure table and is the longest-running operation the chart routes, so it
+           is the one that least tolerates an implicit timeout. Falls back to requestTimeout. */}}
+      {{- $closureTimeout := .Values.ontoserver.gateway.closureRequestTimeout | default .Values.ontoserver.gateway.requestTimeout }}
+      {{- if $closureTimeout }}
+      timeouts:
+        request: "{{ $closureTimeout }}"
+        backendRequest: "{{ $closureTimeout }}"
+      {{- end }}
 {{- end }}
 {{- if .Values.ontoserver.certmanager.enabled }}
 ---

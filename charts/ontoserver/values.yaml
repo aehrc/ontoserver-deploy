@@ -267,6 +267,12 @@ ontoserver:
     className: envoy-gateway-class
     ## @param ontoserver.gateway.requestTimeout            Request timeout duration
     requestTimeout: 120s
+    ## Applied to the dedicated $closure HTTPRoute, which previously carried no timeout at all and
+    ## so inherited whatever the Gateway implementation defaults to. $closure is the long-running
+    ## operation here — it builds a transitive closure table — so it is the one route that most
+    ## needs a generous timeout, not none. Empty string falls back to requestTimeout.
+    ## @param ontoserver.gateway.closureRequestTimeout     Request timeout for the $closure route. Empty means use requestTimeout.
+    closureRequestTimeout: 300s
     ## @param ontoserver.gateway.backendServiceNameOverride  Override HTTPRoute backend service name (e.g. for varnish proxy)
     backendServiceNameOverride: ""
   ingress:
@@ -286,6 +292,17 @@ ontoserver:
     serviceMonitor:
       ## @param ontoserver.metrics.serviceMonitor.enabled   Enable Prometheus ServiceMonitor (requires managementService.enabled and Prometheus Operator CRDs)
       enabled: false
+      ## Most Prometheus installations set a non-empty `serviceMonitorSelector`, and a ServiceMonitor
+      ## carrying no matching label is simply never discovered — no error anywhere, metrics just do
+      ## not appear. Set this to whatever your Prometheus selects on (commonly `release: kube-prometheus-stack`).
+      ## @param ontoserver.metrics.serviceMonitor.labels     Extra labels for Prometheus's serviceMonitorSelector to match
+      labels: {}
+      ## @param ontoserver.metrics.serviceMonitor.interval   Scrape interval. Empty uses the Prometheus global default.
+      interval: ""
+      ## @param ontoserver.metrics.serviceMonitor.scrapeTimeout Scrape timeout. Must be less than interval. Empty uses the Prometheus default.
+      scrapeTimeout: ""
+      ## @param ontoserver.metrics.serviceMonitor.namespaceSelector Namespaces to search for the management Service. Empty means the release namespace only, which is correct unless Prometheus restricts discovery by namespace.
+      namespaceSelector: []
   tests:
     ## @param ontoserver.tests.ttlSecondsAfterFinished   Time to retain Helm test Jobs after completion so logs remain available
     ttlSecondsAfterFinished: 1800

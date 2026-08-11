@@ -136,3 +136,33 @@
     {{- fail "ontoserver.externalSecret.imagePullSecret: both data.username.key and data.password.key must be set together" }}
   {{- end }}
 {{- end }}
+
+{{- /* Resource names must fit within Kubernetes' limits, and the release name is a prefix on
+     every one of them. Helm caps a release name at 53 characters, which is NOT low enough to keep
+     the chart's longest names legal, so the gap has to be checked here.
+
+     Verified on a cluster rather than assumed, because the obvious guess is wrong:
+       - Service names are DNS *labels*, hard-capped at 63. "<release>-ontoserver-clustering-service"
+         adds 30, so a release name over 33 produces a Service the API server rejects.
+       - StatefulSet names are also capped at 63; "<release>-statefulset" adds 12, so the limit
+         there is 51.
+       - PVC names are NOT capped at 63 — they are DNS subdomains (253). A 108-character
+         volumeClaimTemplate PVC name was created and Bound successfully, so the release name
+         appearing twice in it is harmless.
+       - Deployment names are likewise not capped at 63; a 120-character one was accepted.
+
+     Failing here matters because the partial-apply is the bad outcome: Helm creates what it can
+     and rejects one Service, leaving a half-installed release. */}}
+{{- $r := len .Release.Name }}
+{{- /* The longest Service name the chart can emit. Both the clustering and management Services
+     add 30 characters; keep this in step if a longer Service name is ever added. */}}
+{{- $svcMax := sub 63 (len "-ontoserver-clustering-service") }}
+{{- if gt $r $svcMax }}
+  {{- fail (printf "release name '%s' is %d characters; this chart allows at most %d. Service names are limited to 63 characters and the chart appends up to %d ('<release>-ontoserver-clustering-service'), so a longer release name produces a Service the API server rejects — leaving a partially installed release. Use a shorter release name." .Release.Name $r $svcMax (len "-ontoserver-clustering-service")) }}
+{{- end }}
+{{- if eq .Values.ontoserver.deployment.kind "StatefulSet" }}
+  {{- $stsMax := sub 63 (len "-statefulset") }}
+  {{- if gt $r $stsMax }}
+    {{- fail (printf "release name '%s' is %d characters; a StatefulSet deployment allows at most %d, because the StatefulSet is named '<release>-statefulset' and that is limited to 63 characters. Use a shorter release name." .Release.Name $r $stsMax) }}
+  {{- end }}
+{{- end }}

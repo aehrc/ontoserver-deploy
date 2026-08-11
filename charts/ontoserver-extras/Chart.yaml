@@ -1,6 +1,6 @@
 apiVersion: v2
 name: ontoserver-extras
-description: Optional infrastructure components for Ontoserver (Varnish cache, OTel Collector, PV)
+description: Optional infrastructure components for Ontoserver (Varnish cache, OpenTelemetry Collector)
 type: application
 version: 0.1.1
 appVersion: "ctsa-6"
@@ -20,8 +20,15 @@ maintainers:
 annotations:
   artifacthub.io/category: integration-delivery
   artifacthub.io/license: Apache-2.0
+  # Describes the version in `version:` above. Keep in step with the changelog's [Unreleased].
   artifacthub.io/changes: |
     - kind: fixed
       description: Varnish now restarts when the VCL changes (checksum/config pod annotation)
+    - kind: fixed
+      description: Traces now ship on a quiet server; the batch processor had a zero flush timeout
     - kind: added
       description: Opt-in pod and container securityContext values for the Varnish pod (unset by default)
+    - kind: added
+      description: Readiness and liveness probes on the varnish container
+    - kind: added
+      description: securityContext passthrough for the OpenTelemetry Collector CR

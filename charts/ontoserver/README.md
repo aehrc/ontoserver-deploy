@@ -8,7 +8,7 @@ This chart provides flexible deployment options for [Ontoserver](https://ontoser
 > - **[Envoy Gateway](https://gateway.envoyproxy.io/)** — required when `ontoserver.gateway.enabled: true` (Gateway API networking, and any Envoy traffic/security policies)
 > - **[F5 Nginx Ingress Controller](https://docs.nginx.com/nginx-ingress-controller/)** — required when `ontoserver.ingress.enabled: true` and you are **not** using the bundled `nginx-ingress` subchart (`nginx-ingress.enabled: false`)
 > - **[Traefik](https://doc.traefik.io/traefik/)** with CRD support — required when `traefik.ingressRoute.enabled: true`
-> - **[External Secrets Operator](https://external-secrets.io/)** — required when `ontoserver.externalSecret.enabled: true`
+> - **[External Secrets Operator](https://external-secrets.io/) 0.16.0+** — required when `ontoserver.externalSecret.enabled: true`. The version floor is real: the chart uses `external-secrets.io/v1`, which does not exist before 0.16.0. See [External Secrets](#external-secrets).
 
 ## Table of Contents
 
@@ -44,6 +44,7 @@ This chart provides flexible deployment options for [Ontoserver](https://ontoser
 - [Postgres sidecar](#postgres-sidecar)
 - [Configuring an external database](#configuring-an-external-database)
 - [Customisation](#customisation)
+- [Release name length](#release-name-length)
 - [Labels](#labels)
 - [Security context](#security-context)
   - [What was verified](#what-was-verified)
@@ -755,6 +756,23 @@ Then set:
 ontoserver.customization: "ontoserver-customization"
 ```
 
+## Release name length
+
+**Keep the release name to 33 characters or fewer.** The chart validates this and fails at render time rather than part-way through an install.
+
+Helm's own cap is 53 characters, which is not low enough. Every resource name is the release name plus a suffix, and Kubernetes limits differ by kind — each of the following was checked against a live API server rather than inferred:
+
+| Name | Limit | Effective release-name budget |
+| --- | --- | --- |
+| `<release>-ontoserver-clustering-service` (Service) | **63** — Service names are DNS *labels* | **33** |
+| `<release>-statefulset` (StatefulSet) | **63** | 51 |
+| `<release>-ontoserver-deployment` (Deployment) | 253 — DNS subdomain | no practical limit |
+| `<release>-ontoserver-files-<release>-statefulset-0` (PVC) | 253 — DNS subdomain | no practical limit |
+
+The Service names are what bind. Note the PVC row in particular: it looks like the tightest case, because the release name appears in it *twice* — a 38-character release name produces a 108-character PVC name — but PVC names are DNS subdomains, and a 108-character one was created and bound without complaint.
+
+Without the check, an over-long release name produces a **partially installed release**: Helm creates everything it can and the API server rejects one Service.
+
 ## Labels
 
 Every resource the chart creates carries the standard Kubernetes labels:
@@ -1069,6 +1087,8 @@ Set `ontoserver.opentelemetry.instrumentation.enabled: true` to create an OpenTe
 
 ## External Secrets
 
+> **Requires External Secrets Operator 0.16.0 or later.** The chart emits `apiVersion: external-secrets.io/v1`, which first appears in ESO **0.16.0** — where it is also the storage version. On 0.15.x and earlier the API does not exist and the resource is rejected outright (`no matches for kind "ExternalSecret" in version "external-secrets.io/v1"`). Verified against the CRD bundles for both releases. If you are pinned to an older ESO, manage the `ExternalSecret` outside the chart and use [`ontoserver.existingSecretConfig`](#parameters) to reference the Secret it produces.
+
 Set `ontoserver.externalSecret.enabled: true` to create an `ExternalSecret` resource that syncs secrets from an external store (e.g. AWS Secrets Manager, Azure Key Vault, HashiCorp Vault) into a Kubernetes Secret, which is then injected as environment variables into the Ontoserver pod.
 
 Required fields:
@@ -1223,6 +1243,7 @@ Requires the [External Secrets Operator](https://external-secrets.io/) installed
 | `ontoserver.gateway.infrastructureAnnotations`  | Infrastructure annotations                                                                                                                                                                                                                                         | `{}`                  |
 | `ontoserver.gateway.className`                  | GatewayClass name                                                                                                                                                                                                                                                  | `envoy-gateway-class` |
 | `ontoserver.gateway.requestTimeout`             | Request timeout duration                                                                                                                                                                                                                                           | `120s`                |
+| `ontoserver.gateway.closureRequestTimeout`      | Request timeout for the $closure route. Empty means use requestTimeout.                                                                                                                                                                                            | `300s`                |
 | `ontoserver.gateway.backendServiceNameOverride` | Override HTTPRoute backend service name (e.g. for varnish proxy)                                                                                                                                                                                                   | `""`                  |
 | `ontoserver.ingress.enabled`                    | Enable Ingress                                                                                                                                                                                                                                                     | `false`               |
 | `ontoserver.ingress.annotations`                | Ingress annotations                                                                                                                                                                                                                                                | `{}`                  |
@@ -1231,18 +1252,22 @@ Requires the [External Secrets Operator](https://external-secrets.io/) installed
 
 ### Observability
 
-| Name                                                         | Description                                                                                        | Value                                  |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| `ontoserver.managementService.enabled`                       | Enable management service (exposes Spring Boot actuator on port 18080)                             | `false`                                |
-| `ontoserver.metrics.serviceMonitor.enabled`                  | Enable Prometheus ServiceMonitor (requires managementService.enabled and Prometheus Operator CRDs) | `false`                                |
-| `ontoserver.tests.ttlSecondsAfterFinished`                   | Time to retain Helm test Jobs after completion so logs remain available                            | `1800`                                 |
-| `ontoserver.opentelemetry.instrumentation.enabled`           | Enable OpenTelemetry Java auto-instrumentation (requires OpenTelemetry Operator)                   | `false`                                |
-| `ontoserver.opentelemetry.instrumentation.image`             | Auto-instrumentation agent image                                                                   | `otel/autoinstrumentation-java:latest` |
-| `ontoserver.opentelemetry.instrumentation.serviceName`       | OTel service name (defaults to releaseName/releaseName-ontoserver)                                 | `""`                                   |
-| `ontoserver.opentelemetry.instrumentation.propagators`       | Trace context propagators                                                                          | `tracecontext,baggage,b3multi`         |
-| `ontoserver.opentelemetry.instrumentation.excludedClasses`   | Classes to exclude from instrumentation                                                            | `ca.uhn.fhir.*Interceptor*`            |
-| `ontoserver.opentelemetry.instrumentation.exporter.type`     | Exporter type (zipkin, otlp, etc.)                                                                 | `zipkin`                               |
-| `ontoserver.opentelemetry.instrumentation.exporter.endpoint` | Exporter endpoint URL (required when enabled)                                                      | `""`                                   |
+| Name                                                         | Description                                                                                                                                                   | Value                                  |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `ontoserver.managementService.enabled`                       | Enable management service (exposes Spring Boot actuator on port 18080)                                                                                        | `false`                                |
+| `ontoserver.metrics.serviceMonitor.enabled`                  | Enable Prometheus ServiceMonitor (requires managementService.enabled and Prometheus Operator CRDs)                                                            | `false`                                |
+| `ontoserver.metrics.serviceMonitor.labels`                   | Extra labels for Prometheus's serviceMonitorSelector to match                                                                                                 | `{}`                                   |
+| `ontoserver.metrics.serviceMonitor.interval`                 | Scrape interval. Empty uses the Prometheus global default.                                                                                                    | `""`                                   |
+| `ontoserver.metrics.serviceMonitor.scrapeTimeout`            | Scrape timeout. Must be less than interval. Empty uses the Prometheus default.                                                                                | `""`                                   |
+| `ontoserver.metrics.serviceMonitor.namespaceSelector`        | Namespaces to search for the management Service. Empty means the release namespace only, which is correct unless Prometheus restricts discovery by namespace. | `[]`                                   |
+| `ontoserver.tests.ttlSecondsAfterFinished`                   | Time to retain Helm test Jobs after completion so logs remain available                                                                                       | `1800`                                 |
+| `ontoserver.opentelemetry.instrumentation.enabled`           | Enable OpenTelemetry Java auto-instrumentation (requires OpenTelemetry Operator)                                                                              | `false`                                |
+| `ontoserver.opentelemetry.instrumentation.image`             | Auto-instrumentation agent image                                                                                                                              | `otel/autoinstrumentation-java:latest` |
+| `ontoserver.opentelemetry.instrumentation.serviceName`       | OTel service name (defaults to releaseName/releaseName-ontoserver)                                                                                            | `""`                                   |
+| `ontoserver.opentelemetry.instrumentation.propagators`       | Trace context propagators                                                                                                                                     | `tracecontext,baggage,b3multi`         |
+| `ontoserver.opentelemetry.instrumentation.excludedClasses`   | Classes to exclude from instrumentation                                                                                                                       | `ca.uhn.fhir.*Interceptor*`            |
+| `ontoserver.opentelemetry.instrumentation.exporter.type`     | Exporter type (zipkin, otlp, etc.)                                                                                                                            | `zipkin`                               |
+| `ontoserver.opentelemetry.instrumentation.exporter.endpoint` | Exporter endpoint URL (required when enabled)                                                                                                                 | `""`                                   |
 
 ### Miscellaneous
 

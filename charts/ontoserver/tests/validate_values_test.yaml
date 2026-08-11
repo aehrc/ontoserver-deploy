@@ -294,3 +294,41 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "certmanager is not compatible with ALB ingress: ALB only supports TLS via ACM certificate ARNs, not Kubernetes TLS secrets. Use alb.ingress.kubernetes.io/certificate-arn instead, or switch to nginx ingress."
+
+  # Resource-name length. The obvious premise — that the release name appearing twice in a
+  # volumeClaimTemplate PVC name breaks the 63-character limit — is wrong, and was checked on a
+  # cluster: PVC names are DNS subdomains, and a 108-character one was created and Bound fine.
+  # What actually bites is Service names, which are DNS labels and hard-capped at 63. Helm's own
+  # 53-character release-name cap is not low enough to keep them legal.
+  - it: rejects a release name too long for the chart's Service names
+    release:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa   # 34
+    asserts:
+      - failedTemplate:
+          errorPattern: "is 34 characters; this chart allows at most 33"
+
+  # 33 produces a clustering Service name of exactly 63, so the boundary is inclusive.
+  - it: accepts a release name at the Service-name limit
+    release:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa    # 33
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # StatefulSets add their own, looser limit: "<release>-statefulset" must also fit in 63. It is
+  # looser than the Service limit, so it only ever fires if the Service names are shortened.
+  - it: accepts a StatefulSet release name within both limits
+    release:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa    # 33
+    values:
+      - fixtures/scaled-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: applies the length limit to Deployments too, not just StatefulSets
+    release:
+      name: verylongreleasename-for-testing-limits
+    asserts:
+      - failedTemplate:
+          errorPattern: "is 38 characters; this chart allows at most 33"

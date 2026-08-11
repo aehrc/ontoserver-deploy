@@ -1,6 +1,6 @@
 suite: PodDisruptionBudget tests
 templates:
-  - templates/poddistributionbudget.yaml
+  - templates/poddisruptionbudget.yaml
 tests:
   # A PDB only applies to scaled deployments. A single instance owns its Lucene index on a
   # ReadWriteOnce PVC and must be replaced, not kept available, so a PDB there would just

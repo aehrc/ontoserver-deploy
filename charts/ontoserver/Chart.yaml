@@ -24,10 +24,22 @@ dependencies:
 annotations:
   artifacthub.io/category: integration-delivery
   artifacthub.io/license: Apache-2.0
+  # Describes the version in `version:` above, i.e. the release this Chart.yaml will be tagged as.
+  # Keep in step with the changelog's [Unreleased] section.
   artifacthub.io/changes: |
     - kind: added
-      description: Initial public release
-    - kind: added
-      description: "existingSecretConfig: reference a pre-existing Secret as envFrom instead of having the chart create one"
-    - kind: added
       description: Opt-in pod and container securityContext values (unset by default, so upgrades roll no pods)
+    - kind: added
+      description: extraVolumes and extraVolumeMounts, which make readOnlyRootFilesystem usable
+    - kind: added
+      description: allowScaledReadWrite, to opt in to the unsupported scaled read-write topology
+    - kind: fixed
+      description: Deployments with a ReadWriteOnce volume now use the Recreate strategy, which RollingUpdate deadlocks against
+    - kind: fixed
+      description: podDisruptionBudget now accepts percentages, and rejects configurations that would produce an unevictable workload
+    - kind: fixed
+      description: secretConfig no longer fails to render on a numeric or boolean value
+    - kind: fixed
+      description: Configuration changes now roll the pods (checksum annotations on the pod template)
+    - kind: fixed
+      description: Registry credentials containing a quote or backslash no longer corrupt the image pull secret

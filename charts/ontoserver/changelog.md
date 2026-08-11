@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ontoserver.gateway.closureRequestTimeout` (default `300s`). The `$closure` HTTPRoute carried no
+  `timeouts` block at all, so the chart's longest-running operation inherited whatever the Gateway
+  implementation defaults to. Falls back to `requestTimeout` when empty.
+- `ontoserver.metrics.serviceMonitor.labels`, `.interval`, `.scrapeTimeout` and
+  `.namespaceSelector`. Most Prometheus installations set a non-empty `serviceMonitorSelector`, and
+  a ServiceMonitor carrying no matching label is silently never discovered — nothing errors, the
+  metrics just never appear.
+- Validation of the release-name length, with the limits checked against a live API server. The
+  binding constraint is Service names (DNS labels, capped at 63), which caps the release name at
+  **33** — Helm's own cap of 53 is not low enough. Without this an over-long name yields a
+  partially installed release: everything applies except one Service.
+
 - `ontoserver.deployment.allowScaledReadWrite` — opt in to the unsupported scaled read-write
   topology. Scaled deployments must otherwise be read-only: each replica keeps its own Lucene
   index on its own PVC, so content written through the round-robin Service is indexed only on
@@ -45,6 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a non-string is now rejected with a message naming the key.
 
 ### Fixed
+
+- Renamed `poddistributionbudget.yaml` to `poddisruptionbudget.yaml` (the resource is a
+  PodDisruptionBudget). Template filenames are not part of the API, so this changes nothing at
+  install time.
 
 - A `Deployment` with persistence on a `ReadWriteOnce` volume now renders `strategy.type: Recreate`
   instead of the requested `RollingUpdate`. `RollingUpdate` cannot work there: it starts the

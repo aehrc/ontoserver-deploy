@@ -551,6 +551,11 @@
               "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
               "description": "duration strings like '1h', '30m', '15s', '100ms', up to 4 segments"
             },
+            "closureRequestTimeout": {
+              "type": "string",
+              "pattern": "^(([0-9]{1,5}(h|m|s|ms)){1,4})?$",
+              "description": "Request timeout for the $closure HTTPRoute. Empty falls back to requestTimeout."
+            },
             "backendServiceNameOverride": {
               "type": "string"
             }
@@ -589,6 +594,30 @@
               "properties": {
                 "enabled": {
                   "type": "boolean"
+                },
+                "labels": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Extra labels so a Prometheus with a non-empty serviceMonitorSelector can discover this ServiceMonitor."
+                },
+                "interval": {
+                  "type": "string",
+                  "pattern": "^(([0-9]+(y|w|d|h|m|s|ms))+)?$",
+                  "description": "Scrape interval as a Prometheus duration. Empty uses the Prometheus global default."
+                },
+                "scrapeTimeout": {
+                  "type": "string",
+                  "pattern": "^(([0-9]+(y|w|d|h|m|s|ms))+)?$",
+                  "description": "Scrape timeout as a Prometheus duration; must be less than interval. Empty uses the Prometheus default."
+                },
+                "namespaceSelector": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Namespaces to search for the management Service. Empty means the release namespace only."
                 }
               }
             }
