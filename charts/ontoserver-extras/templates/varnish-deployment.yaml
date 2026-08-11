@@ -15,6 +15,17 @@ spec:
     metadata:
       labels:
         {{- include "ontoserver-extras.varnish.selectorLabels" . | nindent 8 }}
+      annotations:
+        {{- /* varnishd parses /etc/varnish/default.vcl once, at startup, and never re-reads it.
+             The VCL arrives as a mounted ConfigMap, so without this annotation a `helm upgrade`
+             that changes a cache TTL, graceSeconds or closureBackend updates the ConfigMap and
+             leaves this pod template byte-identical — no rollout, and Varnish goes on serving
+             the previous VCL indefinitely.
+
+             The hash is over the VCL text itself (see ontoserver-extras.varnish.vcl), so it
+             tracks both a values change and an edit to the VCL body, and is unaffected by
+             anything else in the chart — including the chart version. */}}
+        checksum/config: {{ include "ontoserver-extras.varnish.vcl" . | sha256sum }}
     spec:
       shareProcessNamespace: true
       {{- if .Values.varnish.tolerations }}

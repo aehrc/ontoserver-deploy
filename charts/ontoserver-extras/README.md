@@ -170,6 +170,18 @@ Everything from plain mode plus:
   - **varnish-trace-converter** — tails `varnishlog` for `VCL_Log` entries
   - **trace-forwarder** — parses OTEL_SPAN lines and POSTs Zipkin v2 spans to the collector
 
+### VCL changes and restarts
+
+`varnishd` parses `/etc/varnish/default.vcl` once, at startup, and never re-reads it. The VCL
+arrives as a mounted ConfigMap, so a `helm upgrade` that changes only a cache setting would
+otherwise update the ConfigMap and leave the pod template untouched — no rollout, and Varnish
+would keep serving the previous VCL.
+
+The Varnish Deployment therefore carries a `checksum/config` pod annotation holding a hash of
+the rendered VCL, so any change to a `varnish.*` value that appears in the VCL (or to the VCL
+template itself) rolls the Deployment. The hash covers the VCL text only, so releasing a new
+chart version does not restart Varnish and discard a warm cache.
+
 ### Scaled Ontoserver deployments
 
 When Varnish fronts a scaled StatefulSet Ontoserver cluster, two additional settings are relevant:

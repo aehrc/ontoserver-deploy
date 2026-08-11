@@ -194,3 +194,52 @@ tests:
       - notMatchRegex:
           path: spec.template.spec.containers[2].args[0]
           pattern: '\$\{span_id:0:16\}'
+
+  # varnishd parses the VCL once at startup and never re-reads the mounted ConfigMap, so without
+  # this annotation a `helm upgrade` that changes only a cache setting leaves the pod template
+  # byte-identical, no rollout happens, and Varnish serves the old VCL indefinitely.
+  - it: annotates the pod template with a checksum of the VCL
+    set:
+      varnish.enabled: true
+    asserts:
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/config"]
+          pattern: ^[0-9a-f]{64}$
+
+  # The two exact hashes below are what make this meaningful: a shape assertion alone would pass
+  # even if the checksum were a constant. These tests differ only in a cache TTL — a value that
+  # appears nowhere else in the pod template — so they prove the annotation tracks VCL content.
+  # Recompute both literals if the VCL body or the hash input is changed on purpose. Note the
+  # VCL embeds the release name (the default backend host is <release>-ontoserver-service), so
+  # these are the hashes for helm-unittest's RELEASE-NAME and cannot be reproduced with
+  # `helm template <other-name>`.
+  - it: derives the checksum from the VCL content (time200=60s)
+    set:
+      varnish.enabled: true
+      varnish.cache.time200: 60s
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/config"]
+          value: 554536abf5022be2c28fd4f1f0600f2d439e09c8c4e9dda9bd11de1345095c83
+
+  - it: derives the checksum from the VCL content (time200=3600s)
+    set:
+      varnish.enabled: true
+      varnish.cache.time200: 3600s
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/config"]
+          value: b3e12b05b7ba79a03e4d41b9d320ade20a0708fa732224f7fbc564be972b031f
+
+  # Deliberate: the checksum covers the VCL text only, so releasing a new chart version does not
+  # restart Varnish and throw away a warm cache. Same expected hash as the time200=60s test.
+  - it: does not change the checksum when only the chart version changes
+    chart:
+      version: 9.9.9
+    set:
+      varnish.enabled: true
+      varnish.cache.time200: 60s
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/config"]
+          value: 554536abf5022be2c28fd4f1f0600f2d439e09c8c4e9dda9bd11de1345095c83

@@ -39,8 +39,12 @@ spec:
         {{- with .Values.ontoserver.deployment.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- if or .Values.ontoserver.deployment.podAnnotations .Values.ontoserver.opentelemetry.instrumentation.enabled }}
+      {{- $checksums := include "ontoserver.configChecksums" . | trim }}
+      {{- if or .Values.ontoserver.deployment.podAnnotations .Values.ontoserver.opentelemetry.instrumentation.enabled $checksums }}
       annotations:
+        {{- with $checksums }}
+        {{- . | nindent 8 }}
+        {{- end }}
         {{- with .Values.ontoserver.deployment.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
