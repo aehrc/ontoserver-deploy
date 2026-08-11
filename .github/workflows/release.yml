@@ -25,8 +25,63 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # The test workflows trigger on `branches: ['**']`, which excludes tags — so without this gate a
+  # tag publishes whatever the tagged commit happens to be, tested or not. Rather than re-run the
+  # suites here (the integration matrix is expensive and would double every release), check that
+  # the runs for this exact commit already succeeded. They normally have: the tag points at a
+  # commit that was pushed to a branch first, which is what triggered them.
+  verify-tests:
+    name: Verify tests passed for this commit
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Require successful Unit and Integration test runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Status and conclusion are extracted inside a single `gh api --jq` call rather than by
+          # piping the run object into jq. The object embeds the commit message, and a multi-line
+          # message contains raw control characters that make a second jq parse fail.
+          query() {
+            gh api "repos/${REPO}/actions/runs?head_sha=${SHA}&per_page=100" \
+              --jq "[.workflow_runs[] | select(.name == \"$1\")] | sort_by(.created_at) | last
+                    | if . == null then \"none none\" else \"\(.status) \(.conclusion // \"pending\")\" end"
+          }
+          # A run triggered by the branch push may still be in flight when the tag lands moments
+          # later, so poll rather than failing on a race. 20 x 30s = 10 minutes, which comfortably
+          # covers the unit suite; a slower integration run is reported as still running and the
+          # release can be retried by re-running this workflow.
+          for wf in "Unit Tests" "Integration Tests"; do
+            status=""; conclusion=""
+            for attempt in $(seq 1 20); do
+              read -r status conclusion <<<"$(query "$wf")"
+              if [[ "$status" == "none" ]]; then
+                echo "::error::No '${wf}' run found for commit ${SHA}. The test workflows trigger on branch pushes only, so this commit was never tested. Push it to a branch before tagging."
+                exit 1
+              fi
+              [[ "$status" == "completed" ]] && break
+              echo "'${wf}' is ${status}; waiting (attempt ${attempt}/20)..."
+              sleep 30
+            done
+            if [[ "$status" != "completed" ]]; then
+              echo "::error::'${wf}' for commit ${SHA} did not finish in time (still ${status}). Re-run this release workflow once it completes."
+              exit 1
+            fi
+            if [[ "$conclusion" != "success" ]]; then
+              echo "::error::'${wf}' for commit ${SHA} concluded '${conclusion}', not success. Refusing to publish an untested chart."
+              exit 1
+            fi
+            echo "'${wf}': success"
+          done
+
   release-charts:
     name: Release Helm Charts
+    needs: verify-tests
     runs-on: ubuntu-latest
     permissions:
       contents: write

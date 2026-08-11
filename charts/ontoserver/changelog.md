@@ -58,6 +58,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Removed the unreachable `existingVolume` branch from the StatefulSet's `volumeClaimTemplates`.
+  `validate-values.yaml` rejects `persistence.files.existingVolume` for a StatefulSet outright, so
+  the branch could never render — and the spec it would have produced (`volumeName` with no
+  `accessModes` or `resources`) was not a valid PVC. Renders are byte-identical across all eight
+  test fixtures.
+
 - Renamed `poddistributionbudget.yaml` to `poddisruptionbudget.yaml` (the resource is a
   PodDisruptionBudget). Template filenames are not part of the API, so this changes nothing at
   install time.

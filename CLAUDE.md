@@ -23,6 +23,12 @@ Use `--allow-any-branch` to release from somewhere other than `master` (e.g. a p
 feature branch) — it warns rather than failing, but the upstream check still applies.
 
 The GitHub Actions workflow (`release.yml`) then:
+- **Gates on tests first** (`verify-tests` job). The test workflows trigger on `branches: ['**']`,
+  which excludes tags, so without this a tag would publish whatever the tagged commit is. The gate
+  looks up the Unit Tests and Integration Tests runs for that exact commit and refuses to publish
+  unless both succeeded — polling for up to 10 minutes if a run is still in flight, since the tag
+  usually lands moments after the branch push that triggered them. If it reports no run found, the
+  commit was never pushed to a branch; push it before tagging.
 - Packages all charts via `helm/chart-releaser-action` (`skip_existing: true` so only the new chart gets a release)
 - Creates a GitHub Release with the chart `.tgz` as an asset
 - Updates the `gh-pages` branch `index.yaml` (Helm repo index)
@@ -75,6 +81,13 @@ Remove the flag when ready to promote to stable:
 ```bash
 gh release edit <chart>-vX.Y.Z --repo aehrc/ontoserver-deploy --latest
 ```
+
+### Tag schemes
+
+Two tag forms exist for historical reasons: `<chart>-vX.Y.Z` and `<chart>-X.Y.Z`. Only the **`-v`
+form** triggers `release.yml` — that is what `release.sh` creates. The non-`v` form is created by
+`chart-releaser` as part of the release itself, so both end up in the repo for every release. Do
+not tag the non-`v` form by hand expecting a release.
 
 ### Chart versions
 

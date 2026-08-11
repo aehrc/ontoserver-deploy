@@ -264,9 +264,10 @@ spec:
     - metadata:
         name: {{ .Release.Name }}-ontoserver-files
       spec:
-        {{- if .Values.ontoserver.deployment.persistence.files.existingVolume.enabled }}
-        volumeName: {{ .Values.ontoserver.deployment.persistence.files.existingVolume.name }}
-        {{- else }}
+        {{- /* No existingVolume branch here on purpose. validate-values.yaml rejects
+             persistence.files.existingVolume for a StatefulSet outright — each replica needs its
+             own volume — so a branch for it would be unreachable, and the spec it used to render
+             (volumeName with no accessModes or resources) was not a valid PVC anyway. */}}
         resources:
           requests:
             storage: {{ required "ontoserver.deployment.persistence.files.storageSize is required for Scaled deployments" .Values.ontoserver.deployment.persistence.files.storageSize }}
@@ -277,14 +278,11 @@ spec:
         {{- else}}
         storageClassName: {{ .Values.ontoserver.deployment.persistence.files.storageClass.name }}
         {{- end }}
-        {{- end }}
     {{- if and (eq .Values.ontoserver.deployment.persistence.mode "split") .Values.ontoserver.deployment.db.enabled }}
     - metadata:
         name: {{ .Release.Name }}-ontoserver-db-files
       spec:
-        {{- if .Values.ontoserver.deployment.persistence.dbfiles.existingVolume.enabled }}
-        volumeName: {{ .Values.ontoserver.deployment.persistence.dbfiles.existingVolume.name }}
-        {{- else }}
+        {{- /* Same as above: dbfiles.existingVolume is rejected for StatefulSets. */}}
         resources:
           requests:
             storage: {{ required "ontoserver.deployment.persistence.dbfiles.storageSize is required for Scaled deployments" .Values.ontoserver.deployment.persistence.dbfiles.storageSize }}
@@ -294,7 +292,6 @@ spec:
         storageClassName: {{ .Release.Name }}-ontoserver-db-files
         {{- else}}
         storageClassName: {{ .Values.ontoserver.deployment.persistence.dbfiles.storageClass.name }}
-        {{- end }}
         {{- end }}
     {{- end }}
 {{- end }}
