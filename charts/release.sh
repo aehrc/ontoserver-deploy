@@ -16,6 +16,8 @@ BUMP_MODE=""        # patch | minor | major
 NEXT_VERSION=""     # explicit next version, overrides BUMP_MODE
 AUTO=false          # true = no prompt
 DRY_RUN=false
+ALLOW_ANY_BRANCH=false
+RELEASE_BRANCH="master"
 
 # Chart state variables
 CHART_DIR=""
@@ -56,6 +58,7 @@ Version bump options (choose at most one):
 
 Other:
   --dry-run                   Show what would happen without making changes
+  --allow-any-branch          Release from a branch other than ${RELEASE_BRANCH} (deliberate override)
   -h, --help                  Show this help message
 
 Examples:
@@ -98,6 +101,7 @@ parse_args() {
                 [[ "$2" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Invalid semver: '$2'. Expected X.Y.Z"
                 NEXT_VERSION="$2"; AUTO=true; bump_count=$((bump_count + 1)); shift 2 ;;
             --dry-run) DRY_RUN=true; shift ;;
+            --allow-any-branch) ALLOW_ANY_BRANCH=true; shift ;;
             -h|--help) usage; exit 0 ;;
             *) die "Unknown option: $1. Use --help for usage." ;;
         esac
@@ -127,6 +131,48 @@ check_git_clean() {
         echo "$dirty" >&2
         die "Commit or stash changes before releasing."
     fi
+}
+
+# A release tag is meant to point at a commit on the release branch. Tagging from a feature
+# branch produces a published chart built from code that was never merged, and nothing downstream
+# can tell the difference — the tag looks identical.
+check_branch() {
+    local branch
+    branch=$(git -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD)
+    if [[ "$branch" != "$RELEASE_BRANCH" ]]; then
+        if [[ "$ALLOW_ANY_BRANCH" == true ]]; then
+            log_warn "Releasing from '$branch', not '$RELEASE_BRANCH' (--allow-any-branch)."
+        else
+            die "On branch '$branch', expected '$RELEASE_BRANCH'. A tag created here would publish a chart from unmerged code. Use --allow-any-branch if that is genuinely intended."
+        fi
+    fi
+}
+
+# The tag is pushed before the version-bump commit, so if the branch cannot fast-forward the run
+# ends with a published release and an unpushed bump — the next release then re-tags the same
+# version. Fail before anything is pushed instead.
+check_branch_up_to_date() {
+    local branch upstream local_sha remote_sha
+    branch=$(git -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD)
+
+    if ! upstream=$(git -C "$SCRIPT_DIR" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null); then
+        die "Branch '$branch' has no upstream. Push it first ('git push -u origin $branch') so the bump commit has somewhere to go."
+    fi
+
+    git -C "$SCRIPT_DIR" fetch --quiet origin "$branch" 2>/dev/null || log_warn "Could not fetch origin/$branch; comparing against the last known state."
+
+    local_sha=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
+    remote_sha=$(git -C "$SCRIPT_DIR" rev-parse "$upstream")
+
+    if [[ "$local_sha" == "$remote_sha" ]]; then
+        return
+    fi
+    # Behind or diverged: the final push would be rejected. Ahead is fine — that is the normal
+    # case where the changelog stamp is committed locally and pushed at the end.
+    if git -C "$SCRIPT_DIR" merge-base --is-ancestor "$remote_sha" "$local_sha"; then
+        return
+    fi
+    die "Branch '$branch' is behind or has diverged from '$upstream'. The tag is pushed before the version bump, so the final push would be rejected and leave a published release with no bump commit. Reconcile with origin first."
 }
 
 read_current_version() {
@@ -211,6 +257,8 @@ check_tag_not_exists() {
 }
 
 create_and_push_tag() {
+    # compute_tag and check_tag_not_exists are called from main() before anything is written.
+    # Re-checked here because the check is cheap and this is the irreversible step.
     compute_tag
     check_tag_not_exists
 
@@ -293,7 +341,8 @@ add_unreleased_section() {
 
     local tmpfile
     tmpfile=$(mktemp)
-    awk -v ver="$CURRENT_VERSION" '
+    # No -v needed: the new heading goes above the first "## [" line, whatever its version.
+    awk '
         /^\#\# \[/ && !inserted {
             print "## [Unreleased]"
             print ""
@@ -332,12 +381,20 @@ main() {
     resolve_chart
     if [[ "$DRY_RUN" == false ]]; then
         check_git_clean
+        check_branch
+        check_branch_up_to_date
     fi
     read_current_version
     log_info "Chart:           $CHART"
     log_info "Chart.yaml:      $CHART_YAML"
     log_info "Current version: $CURRENT_VERSION"
     resolve_next_version
+    # Every precondition is checked before anything is written or pushed. The tag check in
+    # particular has to run first: it used to sit inside create_and_push_tag, which runs *after*
+    # the changelog stamp is committed, so re-running for an already-released version left a stray
+    # commit behind and then died.
+    compute_tag
+    check_tag_not_exists
     stamp_changelog_for_release   # [Unreleased] → [current] - date; commits changelog
     create_and_push_tag           # tag points to the stamped changelog commit
     update_chart_version          # bump Chart.yaml to next version

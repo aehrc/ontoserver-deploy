@@ -10,10 +10,17 @@ bash release.sh <chart> [--patch|--minor|--major]
 ```
 
 `release.sh` does the full release cycle in one command:
-1. Stamps `## [Unreleased]` → `## [X.Y.Z] - YYYY-MM-DD` in `changelog.md` and commits it (pre-release commit)
-2. Creates and pushes the annotated tag `<chart>-vX.Y.Z` — this triggers the GitHub Actions release workflow
-3. Bumps `Chart.yaml` to the next version and adds a fresh `## [Unreleased]` section to `changelog.md`
-4. Commits and pushes both
+1. Checks all preconditions **before writing anything**: clean tree, on `master`, branch not behind
+   or diverged from its upstream, and the tag does not already exist locally or on the remote
+2. Stamps `## [Unreleased]` → `## [X.Y.Z] - YYYY-MM-DD` in `changelog.md` and commits it (pre-release commit)
+3. Creates and pushes the annotated tag `<chart>-vX.Y.Z` — this triggers the GitHub Actions release workflow
+4. Bumps `Chart.yaml` to the next version and adds a fresh `## [Unreleased]` section to `changelog.md`
+5. Commits and pushes both
+
+Step 1 matters because steps 2–5 are not atomic: the tag is pushed before the bump commit, so a
+precondition that fails midway leaves either a stray commit or a published release with no bump.
+Use `--allow-any-branch` to release from somewhere other than `master` (e.g. a pre-release from a
+feature branch) — it warns rather than failing, but the upstream check still applies.
 
 The GitHub Actions workflow (`release.yml`) then:
 - Packages all charts via `helm/chart-releaser-action` (`skip_existing: true` so only the new chart gets a release)
