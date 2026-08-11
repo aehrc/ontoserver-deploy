@@ -2,6 +2,9 @@ kind: Service
 apiVersion: v1
 metadata:
   name: {{ .Release.Name }}-ontoserver-service
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+    {{- include "ontoserver.selectorLabels" . | nindent 4 }}
 spec:
   type: ClusterIP
   ports:
@@ -16,6 +19,10 @@ kind: Service
 apiVersion: v1
 metadata:
   name: {{ .Release.Name }}-ontoserver-clustering-service
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+    {{- include "ontoserver.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: clustering
 spec:
   type: ClusterIP
   clusterIP: None
@@ -34,6 +41,10 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ .Release.Name }}-ontoserver-headless
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+    {{- include "ontoserver.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: headless
 spec:
   clusterIP: None
   selector:
@@ -45,6 +56,10 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ .Release.Name }}-ontoserver-pod0-service
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+    {{- include "ontoserver.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: closure
 spec:
   type: ClusterIP
   ports:

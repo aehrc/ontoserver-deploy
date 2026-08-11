@@ -3,6 +3,8 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: {{ .Release.Name }}-gw
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
 {{- if or (gt (len .Values.ontoserver.gateway.annotations) 0) .Values.ontoserver.certmanager.enabled }}
   annotations:
     {{- with .Values.ontoserver.gateway.annotations }}
@@ -16,10 +18,10 @@ metadata:
 {{- end }}
 spec:
   gatewayClassName: {{ required "ontoserver.gateway.className is required" .Values.ontoserver.gateway.className }}
+  {{- if gt (len .Values.ontoserver.gateway.infrastructureAnnotations) 0 }}
   infrastructure:
-    {{- if gt (len .Values.ontoserver.gateway.infrastructureAnnotations) 0 }}
     annotations: {{ toJson .Values.ontoserver.gateway.infrastructureAnnotations }}
-    {{- end }}  
+  {{- end }}
   listeners:
   {{- if .Values.ontoserver.certmanager.enabled }}
   # Cert Manager Listener
@@ -33,20 +35,26 @@ spec:
   {{- if eq (len .Values.ontoserver.hostNames) 0 }}
     {{- fail "Minimum one entry is required in ontoserver.hostNames" }}
   {{- end }}
-  {{ $releaseName := .Release.Name }}
+  {{- /* Gateway API requires a tls block for protocol HTTPS and forbids one for HTTP, so the
+       protocol has to follow ontoserver.tls.enabled. Emitting HTTPS without certificateRefs
+       produces a listener the API server rejects. The listener name stays websecure-N in
+       both cases because the HTTPRoutes below bind to it by sectionName. */ -}}
   {{- range $i, $host := .Values.ontoserver.hostNames }}
     - name: websecure-{{ $i }}
       hostname: {{ $host | quote }}
-      port: {{ required "ontoserver.gateway.listenerPortSecure is required" $.Values.ontoserver.gateway.listenerPortSecure }}
-      protocol: HTTPS
       allowedRoutes:
         namespaces:
           from: Same
       {{- if $.Values.ontoserver.tls.enabled }}
+      port: {{ required "ontoserver.gateway.listenerPortSecure is required" $.Values.ontoserver.gateway.listenerPortSecure }}
+      protocol: HTTPS
       tls:
         mode: Terminate
         certificateRefs:
           - name: {{ $.Values.ontoserver.tls.certRef }}
+      {{- else }}
+      port: {{ required "ontoserver.gateway.listenerPortPlain is required" $.Values.ontoserver.gateway.listenerPortPlain }}
+      protocol: HTTP
       {{- end }}
   {{- end }}
 ---
@@ -54,6 +62,8 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: {{ .Release.Name }}-route
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
 spec:
   hostnames:
     {{- range .Values.ontoserver.hostNames }}
@@ -90,6 +100,8 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: {{ .Release.Name }}-closure-route
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
 spec:
   hostnames:
     {{- range .Values.ontoserver.hostNames }}
@@ -120,6 +132,8 @@ apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: {{ .Values.ontoserver.certmanager.clusterIssuerName }}-{{ .Release.Name }}
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "1"

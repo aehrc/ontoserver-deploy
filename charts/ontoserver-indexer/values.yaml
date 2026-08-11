@@ -20,8 +20,8 @@ image:
 ## @section Job parameters
 
 job:
-## @param job.name Override for the Kubernetes Job name; defaults to the Helm release name
-  name: ""                  # leave empty to use the Helm release name
+## @param job.name Override for the Kubernetes Job name; defaults to the release name suffixed with the release revision
+  name: ""                  # leave empty for <release name>-<release revision>, which changes on each upgrade
 ## @param job.activeDeadlineSeconds Maximum duration in seconds before the Job is forcibly terminated
   activeDeadlineSeconds: 7200
 ## @param job.ttlSecondsAfterFinished Seconds after Job completion before it is automatically deleted
@@ -31,8 +31,10 @@ job:
 ## @section Resources parameters
 
 resources:
-## @param resources.memoryGb Memory in gigabytes for the indexer pod; sets both the JVM -Xmx flag and the Kubernetes request/limit
-  memoryGb: 20              # gigabytes (integer) — sets both -Xmx JVM flag and Kubernetes memory request/limit
+## @param resources.memoryGb Memory in GiB for the indexer pod; sets the Kubernetes memory request and limit
+  memoryGb: 20              # GiB (integer) — Kubernetes memory request and limit
+## @param resources.heapGb JVM max heap in GiB (-Xmx); defaults to memoryGb minus 2 GiB, leaving headroom for non-heap JVM memory
+  heapGb: ~                 # leave unset to use memoryGb - 2; must be less than memoryGb
 ## @param resources.cpu CPU units for the indexer pod; sets both the Kubernetes request and limit
   cpu: 4                    # CPU request and limit
 

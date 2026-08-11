@@ -89,8 +89,14 @@ spec:
             {{- end }}
           {{- end }}
           env:
+            # The JVM max heap is deliberately smaller than the container memory limit.
+            # -Xmx bounds the Java heap only; metaspace, code cache, thread stacks, GC
+            # structures and direct buffers all live outside it and still count towards
+            # the cgroup limit. Setting -Xmx equal to the limit therefore guarantees an
+            # eventual OOMKill. Note the units differ on purpose: -Xmx...g and the limit's
+            # Gi suffix are both powers of two, so the reserve below is a true 2 GiB.
             - name: JAVA_OPTS
-              value: "-Xmx{{ .Values.resources.memoryGb }}g"
+              value: "-Xmx{{ .Values.resources.heapGb | default (sub .Values.resources.memoryGb 2) }}g"
             {{- $oauth2SecretName := include "ontoserver-indexer.oauth2SecretName" . }}
             {{- if $oauth2SecretName }}
             - name: authentication.oauth.endpoint.0
@@ -143,8 +149,8 @@ spec:
             {{- end }}
           resources:
             requests:
-              memory: {{ .Values.resources.memoryGb }}G
+              memory: {{ .Values.resources.memoryGb }}Gi
               cpu: {{ .Values.resources.cpu }}
             limits:
-              memory: {{ .Values.resources.memoryGb }}G
+              memory: {{ .Values.resources.memoryGb }}Gi
               cpu: {{ .Values.resources.cpu }}

@@ -1,10 +1,15 @@
 {{/*
-Job name — use job.name if set, otherwise Release.Name with a random suffix.
-The suffix changes on every render so that helm upgrade --install creates a new
+Job name — use job.name if set, otherwise Release.Name suffixed with the release revision.
+The revision increments on every helm upgrade, so `helm upgrade --install` creates a new
 Job rather than failing due to Job spec immutability.
+
+Do NOT use randAlphaNum here: this helper is called from job.yaml (metadata.name, two
+label fields) and NOTES.txt, and every `include` re-evaluates the template body. A random
+value would therefore differ between those call sites, and would also make `helm template`
+non-deterministic, which shows up as permanent drift in ArgoCD and friends.
 */}}
 {{- define "ontoserver-indexer.jobName" -}}
-{{- if .Values.job.name }}{{ .Values.job.name }}{{- else }}{{ .Release.Name }}-{{ randAlphaNum 6 | lower }}{{- end }}
+{{- if .Values.job.name }}{{ .Values.job.name }}{{- else }}{{ .Release.Name }}-{{ .Release.Revision }}{{- end }}
 {{- end }}
 
 {{/*

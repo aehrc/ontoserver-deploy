@@ -52,4 +52,20 @@ If you prefer to separate the steps or are using an older version of Kustomize, 
 
 ## Note on Label Selectors
 
-The Ontoserver chart generates labels in the format `app: {{ .Release.Name }}-ontoserver`. Ensure your `labelSelector` in `kustomization.yaml` matches the `releaseName` used during template generation.
+A patch `target.labelSelector` matches a resource's **own metadata labels** — not its pod template labels and not its `spec.selector`. This distinction matters: a selector that only exists on the pod template will match nothing, and Kustomize treats a patch that matches nothing as success rather than an error.
+
+The chart stamps the standard labels on every resource it creates, so prefer the release-independent one:
+
+| Label | Value | Notes |
+| --- | --- | --- |
+| `app.kubernetes.io/name` | `ontoserver` | Stable — use this in `labelSelector` |
+| `app.kubernetes.io/instance` | the release name | Changes with `releaseName` |
+| `app` | `<release>-ontoserver` | Release-scoped selector label; also changes with `releaseName` |
+
+Because a non-matching patch fails silently, always confirm the result rather than assuming it applied:
+
+```bash
+kubectl kustomize . --enable-helm --load-restrictor LoadRestrictionsNone | grep priorityClassName
+```
+
+Expect exactly one match — the chart renders either a `Deployment` or a `StatefulSet` depending on `ontoserver.deployment.kind`, so only one of the two patches in `kustomization.yaml` applies to any given render.

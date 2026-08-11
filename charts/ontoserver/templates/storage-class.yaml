@@ -3,6 +3,8 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: {{ .Release.Name }}-ontoserver-files
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
 provisioner: {{ required "ontoserver.deployment.persistence.files.storageClass.provided.storageProvisioner is required" .Values.ontoserver.deployment.persistence.files.storageClass.provided.storageProvisioner }}
 reclaimPolicy: {{ required "ontoserver.deployment.persistence.files.storageClass.provided.reclaimPolicy is required" .Values.ontoserver.deployment.persistence.files.storageClass.provided.reclaimPolicy }}
 volumeBindingMode: WaitForFirstConsumer
@@ -19,6 +21,8 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: {{ .Release.Name }}-ontoserver-db-files
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
 provisioner: {{ required "ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageProvisioner is required" .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageProvisioner }}
 reclaimPolicy: {{ required "ontoserver.deployment.persistence.dbfiles.storageClass.provided.reclaimPolicy is required" .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.reclaimPolicy }}
 volumeBindingMode: WaitForFirstConsumer

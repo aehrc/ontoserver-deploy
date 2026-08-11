@@ -46,6 +46,7 @@
   {{- fail "serviceMonitor requires managementService.enabled" }}
 {{- end }}
 
+
 {{- if and .Values.envoygateway.createGatewayClass (not .Values.ontoserver.gateway.enabled) }}
   {{- fail "envoygateway.createGatewayClass requires ontoserver.gateway.enabled" }}
 {{- end }}
@@ -84,6 +85,22 @@
      switch to nginx ingress which supports Kubernetes TLS secrets. */ -}}
 {{- if and .Values.ontoserver.certmanager.enabled .Values.ontoserver.ingress.enabled (eq .Values.ontoserver.ingress.className "alb") }}
   {{- fail "certmanager is not compatible with ALB ingress: ALB only supports TLS via ACM certificate ARNs, not Kubernetes TLS secrets. Use alb.ingress.kubernetes.io/certificate-arn instead, or switch to nginx ingress." }}
+{{- end }}
+
+{{- /* cert-manager's Gateway API integration populates the Secret named by an existing
+     listener certificateRef; it cannot add TLS to a listener that has none. The same applies
+     to the Ingress path, where the tls block is only rendered when tls.enabled. Checked after
+     the ALB rule above so that the more specific ALB diagnosis wins for that combination. */ -}}
+{{- if and .Values.ontoserver.certmanager.enabled (not .Values.ontoserver.tls.enabled) }}
+  {{- fail "ontoserver.certmanager.enabled requires ontoserver.tls.enabled: cert-manager fills the Secret referenced by ontoserver.tls.certRef and cannot attach TLS to a listener that does not request it." }}
+{{- end }}
+
+{{- /* A Gateway with TLS disabled serves plaintext HTTP. That is a valid choice for local
+     development or when TLS terminates upstream, but it must never happen by accident on a
+     public terminology server, so it has to be opted into explicitly. Checked last of the
+     TLS rules so the ALB and cert-manager diagnoses above win when they apply. */ -}}
+{{- if and .Values.ontoserver.gateway.enabled (not .Values.ontoserver.tls.enabled) (not .Values.ontoserver.gateway.allowPlaintext) }}
+  {{- fail "ontoserver.gateway.enabled with ontoserver.tls.enabled=false would expose Ontoserver over plaintext HTTP. Set ontoserver.tls.enabled=true and provide ontoserver.tls.certRef (optionally with certmanager.enabled), or set ontoserver.gateway.allowPlaintext=true to accept a plaintext listener." }}
 {{- end }}
 
 {{- /* Scaled deployments must use StatefulSet. A scaled Deployment with persistence enabled

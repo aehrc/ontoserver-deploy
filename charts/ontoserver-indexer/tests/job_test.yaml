@@ -2,33 +2,80 @@ suite: job template tests
 templates:
   - templates/job.yaml
 
-# Shared SNOMED values used across most tests
-x-snomed: &snomed
-  codeSystem.url: http://snomed.info/sct/32506021000036107
-  codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-  rf2.files[0]: https://example.com/snomed.zip
-  syndication.endpoint: https://synd.example.com
-  syndication.tokenEndpoint: https://auth.example.com/token
-  syndication.feed: my-feed
-  syndication.entryTitle: My Entry
-
 tests:
+  # The `set` block below is anchored as *snomed and reused by the tests that follow.
+  # It must stay on the first test: a YAML anchor has to be defined before it is aliased,
+  # and helm-unittest rejects unknown top-level keys, so it cannot live outside `tests`.
   - it: renders a Job
-    set:
-      <<: *snomed
+    set: &snomed
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
     asserts:
       - isKind:
           of: Job
       - hasDocuments:
           count: 1
 
-  - it: uses Release.Name with a random suffix as job name by default
+  # helm-unittest defaults Release.Revision to 0, whereas a real `helm install` starts at 1,
+  # so the revision is set explicitly here rather than relying on the plugin default.
+  - it: uses Release.Name suffixed with the release revision as job name by default
     set:
       <<: *snomed
+    release:
+      revision: 1
     asserts:
-      - matchRegex:
+      - equal:
           path: metadata.name
-          pattern: ^RELEASE-NAME-[a-z0-9]{6}$
+          value: RELEASE-NAME-1
+
+  - it: tracks the release revision in the job name across upgrades
+    set:
+      <<: *snomed
+    release:
+      revision: 7
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-7
+
+  # Regression guard: the job name helper must resolve to the same value at every call
+  # site. A randomised suffix re-evaluates per `include`, silently producing a different
+  # name for the Job, its labels and the pod labels in a single render.
+  - it: uses an identical job name for metadata.name and both app labels
+    set:
+      <<: *snomed
+    release:
+      revision: 1
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-1
+      - equal:
+          path: metadata.labels.app
+          value: RELEASE-NAME-1
+      - equal:
+          path: spec.template.metadata.labels.app
+          value: RELEASE-NAME-1
+
+  - it: uses job.name for metadata.name and both app labels when set
+    set:
+      <<: *snomed
+      job.name: my-custom-job
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-custom-job
+      - equal:
+          path: metadata.labels.app
+          value: my-custom-job
+      - equal:
+          path: spec.template.metadata.labels.app
+          value: my-custom-job
 
   - it: uses job.name when set
     set:
@@ -82,17 +129,19 @@ tests:
           path: spec.template.spec.containers[0].image
           value: quay.io/aehrc/ontoserver:ctsa-6
 
-  - it: sets memory request and limit from resources.memoryGb
+  # Gi, not G: the JVM's -Xmx...g is a power-of-two unit, so the container limit must use
+  # the matching binary suffix for the non-heap reserve to be the size it claims to be.
+  - it: sets memory request and limit from resources.memoryGb in Gi
     set:
       <<: *snomed
       resources.memoryGb: 24
     asserts:
       - equal:
           path: spec.template.spec.containers[0].resources.requests.memory
-          value: 24G
+          value: 24Gi
       - equal:
           path: spec.template.spec.containers[0].resources.limits.memory
-          value: 24G
+          value: 24Gi
 
   - it: sets imagePullSecrets from image.imagePullSecrets list
     set:
@@ -154,7 +203,10 @@ tests:
       - isNull:
           path: spec.template.spec.imagePullSecrets
 
-  - it: sets JAVA_OPTS env var from resources.memoryGb
+  # Regression guard: -Xmx must stay strictly below the container memory limit. Setting the
+  # heap equal to the limit leaves nothing for metaspace, thread stacks or direct buffers
+  # and reliably ends in an OOMKill partway through an index run.
+  - it: reserves 2Gi of non-heap headroom below the memory limit by default
     set:
       <<: *snomed
       resources.memoryGb: 16
@@ -163,7 +215,38 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: JAVA_OPTS
-            value: "-Xmx16g"
+            value: "-Xmx14g"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 16Gi
+
+  - it: uses resources.heapGb for -Xmx when set explicitly
+    set:
+      <<: *snomed
+      resources.memoryGb: 32
+      resources.heapGb: 26
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JAVA_OPTS
+            value: "-Xmx26g"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 32Gi
+
+  - it: keeps the documented default sizing at 20Gi
+    set:
+      <<: *snomed
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JAVA_OPTS
+            value: "-Xmx18g"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 20Gi
 
   - it: sets command to /run.sh and first arg to indexCodeSystemDebug
     set:

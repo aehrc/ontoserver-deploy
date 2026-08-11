@@ -3,10 +3,12 @@ kind: StatefulSet
 apiVersion: apps/v1
 metadata:
   name: {{ .Release.Name }}-statefulset
-  {{- with .Values.ontoserver.deployment.labels }}
   labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+    {{- include "ontoserver.selectorLabels" . | nindent 4 }}
+    {{- with .Values.ontoserver.deployment.labels }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
   {{- with .Values.ontoserver.deployment.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -28,11 +30,12 @@ spec:
   serviceName: {{ .Release.Name }}-ontoserver-headless
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-ontoserver
+      {{- include "ontoserver.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}-ontoserver
+        {{- include "ontoserver.selectorLabels" . | nindent 8 }}
+        {{- include "ontoserver.labels" . | nindent 8 }}
         {{- with .Values.ontoserver.deployment.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

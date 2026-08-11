@@ -39,6 +39,7 @@
       "type": "object",
       "properties": {
         "memoryGb": { "type": "integer", "minimum": 1 },
+        "heapGb":   { "type": ["integer", "null"], "minimum": 1 },
         "cpu":      { "type": ["string", "integer", "number"] }
       }
     },

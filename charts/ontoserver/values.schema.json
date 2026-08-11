@@ -506,6 +506,15 @@
                 "string"
               ]
             },
+            "listenerPortPlain": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            },
+            "allowPlaintext": {
+              "type": "boolean"
+            },
             "annotations": {
               "type": "object"
             },

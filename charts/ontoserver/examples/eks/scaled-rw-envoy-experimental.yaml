@@ -78,6 +78,18 @@ ontoserver:
     enabled: true
     className: envoy-gateway-class
 
+  # ── TLS ───────────────────────────────────────────────────────────────────
+  # Ontoserver must not be served over plaintext HTTP. Supply the certificate as a
+  # Kubernetes TLS Secret named by certRef, or uncomment certmanager below to have
+  # cert-manager issue and populate that Secret for you.
+  tls:
+    enabled: true
+    certRef: ontoserver-tls
+  # certmanager:
+  #   enabled: true
+  #   clusterIssuerName: letsencrypt-prod
+  #   email: your-email@example.com
+
   resources:
     ontoserver:
       requests:

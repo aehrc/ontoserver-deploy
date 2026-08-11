@@ -3,7 +3,9 @@ Job {{ include "ontoserver-indexer.jobName" . }} submitted to namespace {{ .Rele
 Follow logs while the Job is running:
   kubectl logs -f job/{{ include "ontoserver-indexer.jobName" . }} -n {{ .Release.Namespace }}
 
-The Job name above is the exact name to use. By default it includes a random suffix unless you set job.name explicitly.
+The Job name above is the exact name to use. By default it is the release name suffixed
+with the release revision, which increments on every upgrade, unless you set job.name
+explicitly.
 
 Check status:
   kubectl get job {{ include "ontoserver-indexer.jobName" . }} -n {{ .Release.Namespace }}

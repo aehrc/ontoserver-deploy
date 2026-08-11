@@ -4,6 +4,8 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
   name: {{ .Values.ontoserver.gateway.className }}
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
 spec:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
   parametersRef:
@@ -17,6 +19,8 @@ kind: EnvoyProxy
 metadata:
   name: {{ .Values.envoygateway.envoyProxy.name | default "default" }}
   namespace: {{ $controllerNs }}
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
 spec:
   provider:
     type: Kubernetes

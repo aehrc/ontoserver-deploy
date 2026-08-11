@@ -4,6 +4,8 @@ kind: Ingress
 apiVersion: networking.k8s.io/v1
 metadata:
   name: {{ .Release.Name }}-ontoserver-ingress
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
 {{- if or (gt (len .Values.ontoserver.ingress.annotations) 0) .Values.ontoserver.certmanager.enabled }}
   annotations:
     {{- range $k, $v := .Values.ontoserver.ingress.annotations }}

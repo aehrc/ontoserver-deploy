@@ -1,12 +1,20 @@
 name: Unit Tests
 
 on:
+  # branches: ['**'] rather than a bare `push:` so release tag pushes do not run this
+  # workflow a second time on top of the branch push that produced them.
   push:
+    branches: ['**']
   pull_request:
-    branches: [main]
+    branches: [master]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Pinned so a new plugin release cannot change test-suite parsing behaviour underneath CI.
+  HELM_UNITTEST_VERSION: 0.8.0
+  # Must match the version the helm-readme-generator skill uses, or the drift check below
+  # will disagree with locally generated tables.
+  README_GENERATOR_VERSION: 2.7.2
 
 jobs:
   unit-tests:
@@ -21,7 +29,9 @@ jobs:
           version: v3.18.4
 
       - name: Install helm-unittest plugin
-        run: helm plugin install https://github.com/helm-unittest/helm-unittest
+        run: |
+          helm plugin install https://github.com/helm-unittest/helm-unittest \
+            --version "${HELM_UNITTEST_VERSION}"
 
       - name: Build chart dependencies
         run: helm dependency build ./charts/ontoserver
@@ -34,6 +44,43 @@ jobs:
 
       - name: Run unit tests
         run: |
-          helm unittest ./charts/ontoserver
-          helm unittest ./charts/ontoserver-extras
-          helm unittest ./charts/ontoserver-indexer
+          helm unittest --strict ./charts/ontoserver
+          helm unittest --strict ./charts/ontoserver-extras
+          helm unittest --strict ./charts/ontoserver-indexer
+
+      # Every shipped example must render. Chart-level validation (validate-values.yaml) can
+      # otherwise reject the examples the README tells people to copy, with nothing catching it.
+      - name: Render all examples
+        run: |
+          # git ls-files, not find: only tracked examples are checked, so running this same
+          # loop locally behaves identically to CI even with untracked scratch files present.
+          rc=0
+          render() {
+            for f in $(git ls-files -- "charts/$1/examples" | grep '\.yaml$'); do
+              if ! out=$(helm template "$2" "./charts/$1" -f "$f" 2>&1); then
+                echo "::error file=$f::example failed to render"
+                echo "$out" | tail -3
+                rc=1
+              fi
+            done
+          }
+          render ontoserver rel
+          render ontoserver-indexer idx
+          exit $rc
+
+      # The `## Parameters` tables are generated from the ## @param annotations in values.yaml.
+      # They previously went stale for an entire release, so regenerate and fail on any diff.
+      - name: Check README parameter tables are up to date
+        run: |
+          for c in ontoserver ontoserver-extras ontoserver-indexer; do
+            ( cd "charts/$c" && npx --yes \
+                "@bitnami/readme-generator-for-helm@${README_GENERATOR_VERSION}" \
+                -v values.yaml -r README.md )
+          done
+          if ! git diff --exit-code -- 'charts/*/README.md'; then
+            echo "::error::README parameter tables are out of date with values.yaml."
+            echo "Regenerate them and commit the result:"
+            echo '  SKILL_DIR="$HOME/.claude/skills/helm-readme-generator"'
+            echo '  TABLE_ONLY=1 bash "$SKILL_DIR/scripts/bitnami-helm-readme.sh" charts/<chart>'
+            exit 1
+          fi

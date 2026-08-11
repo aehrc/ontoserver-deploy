@@ -3,6 +3,9 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ .Release.Name }}-service-monitor
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics
 spec:
   selector:
     matchLabels:
@@ -18,8 +21,8 @@ kind: ServiceMonitor
 metadata:
   name: {{ .Release.Name }}-ontoserver-gateway-servicemonitor
   labels:
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "ontoserver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway-metrics
 spec:
   namespaceSelector:
     matchNames:

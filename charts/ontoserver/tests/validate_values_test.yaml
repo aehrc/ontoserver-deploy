@@ -211,3 +211,47 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "ontoserver.externalSecret.imagePullSecret: both data.username.key and data.password.key must be set together"
+
+  # ── Plaintext Gateway guard ────────────────────────────────────────────────
+  # Gateway API rejects an HTTPS listener that carries no certificateRefs, so with TLS off
+  # the chart must render an HTTP listener. Serving a terminology server over plaintext has
+  # to be a deliberate choice, hence the explicit opt-in.
+  - it: fails when gateway is enabled without TLS and without allowPlaintext
+    set:
+      ontoserver.gateway.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.gateway.enabled with ontoserver.tls.enabled=false would expose Ontoserver over plaintext HTTP. Set ontoserver.tls.enabled=true and provide ontoserver.tls.certRef (optionally with certmanager.enabled), or set ontoserver.gateway.allowPlaintext=true to accept a plaintext listener."
+
+  - it: passes when gateway is enabled with TLS
+    set:
+      ontoserver.gateway.enabled: true
+      ontoserver.tls.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: passes when gateway is enabled without TLS but plaintext is opted into
+    set:
+      ontoserver.gateway.enabled: true
+      ontoserver.gateway.allowPlaintext: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when certmanager is enabled without TLS
+    set:
+      ontoserver.gateway.enabled: true
+      ontoserver.certmanager.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.certmanager.enabled requires ontoserver.tls.enabled: cert-manager fills the Secret referenced by ontoserver.tls.certRef and cannot attach TLS to a listener that does not request it."
+
+  - it: reports the ALB incompatibility ahead of the certmanager TLS requirement
+    set:
+      ontoserver.ingress.enabled: true
+      ontoserver.ingress.className: alb
+      ontoserver.certmanager.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "certmanager is not compatible with ALB ingress: ALB only supports TLS via ACM certificate ARNs, not Kubernetes TLS secrets. Use alb.ingress.kubernetes.io/certificate-arn instead, or switch to nginx ingress."

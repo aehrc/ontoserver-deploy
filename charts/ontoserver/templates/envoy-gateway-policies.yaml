@@ -4,6 +4,8 @@ apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: ClientTrafficPolicy
 metadata:
   name: {{ .Release.Name }}-client-settings
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
 spec:
   targetRef:
     group: gateway.networking.k8s.io
@@ -27,6 +29,8 @@ apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: BackendTrafficPolicy
 metadata:
   name: {{ .Release.Name }}-backend-settings
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
 spec:
   targetRef:
     group: gateway.networking.k8s.io
@@ -58,6 +62,8 @@ apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
   name: {{ .Release.Name }}-ip-filter
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io

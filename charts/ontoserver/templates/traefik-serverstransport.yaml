@@ -10,6 +10,8 @@ apiVersion: traefik.io/v1alpha1
 kind: ServersTransport
 metadata:
   name: {{ .Release.Name }}-ontoserver-serverstransport
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
 spec:
   # insecureSkipVerify skips backend TLS certificate validation.
   # Use true for self-signed certificates, false when rootCAsSecrets are provided.

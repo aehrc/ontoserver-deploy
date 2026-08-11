@@ -97,3 +97,40 @@ tests:
           path: spec.template.spec.imagePullSecrets
           content:
             name: RELEASE-NAME-ontoserver-pull-secret-external
+
+  # ── Labels ─────────────────────────────────────────────────────────────────
+  - it: stamps the standard labels on the StatefulSet
+    set:
+      ontoserver.deployment.kind: StatefulSet
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: ontoserver
+      - equal:
+          path: metadata.labels["app.kubernetes.io/version"]
+          value: ctsa-6
+
+  # Both spec.selector and spec.volumeClaimTemplates are immutable on a StatefulSet.
+  # Adding labels to either would break helm upgrade on an existing release, so the
+  # selector stays release-scoped and the volumeClaimTemplates carry no labels at all.
+  - it: keeps the selector and volumeClaimTemplates free of the standard labels
+    set:
+      ontoserver.deployment.kind: StatefulSet
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app: RELEASE-NAME-ontoserver
+      - isNull:
+          path: spec.volumeClaimTemplates[0].metadata.labels
+
+  - it: carries both selector and standard labels on the StatefulSet pod template
+    set:
+      ontoserver.deployment.kind: StatefulSet
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["app"]
+          value: RELEASE-NAME-ontoserver
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/name"]
+          value: ontoserver

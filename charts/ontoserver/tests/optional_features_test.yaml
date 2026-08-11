@@ -77,6 +77,7 @@ tests:
       - templates/envoy-gateway-policies.yaml
     set:
       ontoserver.gateway.enabled: true
+      ontoserver.tls.enabled: true
       envoygateway.clientTrafficPolicy.enabled: true
     asserts:
       - isKind:
@@ -92,6 +93,7 @@ tests:
       - templates/envoy-gateway-policies.yaml
     set:
       ontoserver.gateway.enabled: true
+      ontoserver.tls.enabled: true
       envoygateway.backendTrafficPolicy.enabled: true
     asserts:
       - isKind:
@@ -110,6 +112,7 @@ tests:
       - templates/envoy-gateway-policies.yaml
     set:
       ontoserver.gateway.enabled: true
+      ontoserver.tls.enabled: true
       envoygateway.backendTrafficPolicy.enabled: true
       envoygateway.backendTrafficPolicy.rateLimitUserAgents[0]: SemrushBot
     asserts:
@@ -309,6 +312,7 @@ tests:
       - templates/servicemonitor.yaml
     set:
       ontoserver.gateway.enabled: true
+      ontoserver.tls.enabled: true
       envoygateway.gatewayServiceMonitor.enabled: true
     asserts:
       - isKind:

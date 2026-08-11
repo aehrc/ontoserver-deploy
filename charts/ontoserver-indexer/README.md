@@ -11,7 +11,7 @@ Supported code systems:
 
 This chart wraps the Ontoserver `indexCodeSystemDebug` CLI tool. It retrieves one or more source files (via HTTPS or from a mounted volume), builds a Lucene index, and either pushes the packaged index as a syndication feed entry so that Ontoserver instances can pull it on startup or via the syndication API, or writes it directly to a PersistentVolumeClaim, or both.
 
-The Job terminates after a single run. Helm's `ttlSecondsAfterFinished` removes it automatically. The Job name includes a random suffix that changes on every render, so `helm upgrade --install` on the same release name creates a new Job rather than failing due to Job spec immutability. Set `job.name` to a fixed value if you need a predictable name (e.g. for scripted log tailing), but you must then uninstall the release before re-running.
+The Job terminates after a single run. Helm's `ttlSecondsAfterFinished` removes it automatically. The Job name is the release name suffixed with the Helm release revision (`<release>-<revision>`). The revision increments on every upgrade, so `helm upgrade --install` on the same release name creates a new Job rather than failing due to Job spec immutability. Note that Helm removes the Job from the previous revision as part of the upgrade — if an index run is still in progress, upgrading will terminate it. Set `job.name` to a fixed value if you need a predictable name (e.g. for scripted log tailing), but you must then uninstall the release before re-running.
 
 ## Registry Credentials
 
@@ -56,7 +56,7 @@ helm upgrade --install snomed-au-index ./charts/ontoserver-indexer \
   --namespace indexing --create-namespace
 ```
 
-Each invocation creates a new Job with a unique random suffix, so re-running the same command will not fail due to an existing Job.
+Each invocation bumps the Helm release revision, giving the Job a new name, so re-running the same command will not fail due to an existing Job.
 
 See the [`examples/`](examples/) directory for example value files for SNOMED CT AU and LOINC.
 
@@ -196,7 +196,7 @@ tolerations:
 
 After installing, the NOTES output prints the namespace-qualified commands to follow the submitted Job.
 
-By default the chart gives each Job a random suffix, so the actual Job name is not just the Helm release name. Use the exact name printed in `helm install` / `helm upgrade --install` output, or set `job.name` if you need a predictable Job name for scripting.
+By default the chart suffixes the Job name with the Helm release revision, so the actual Job name is not just the Helm release name. Use the exact name printed in `helm install` / `helm upgrade --install` output, or set `job.name` if you need a predictable Job name for scripting.
 
 Example with an explicit fixed Job name:
 
@@ -227,18 +227,19 @@ kubectl get job snomed-au-index -n <namespace>
 
 ### Job parameters
 
-| Name                          | Description                                                             | Value  |
-| ----------------------------- | ----------------------------------------------------------------------- | ------ |
-| `job.name`                    | Override for the Kubernetes Job name; defaults to the Helm release name | `""`   |
-| `job.activeDeadlineSeconds`   | Maximum duration in seconds before the Job is forcibly terminated       | `7200` |
-| `job.ttlSecondsAfterFinished` | Seconds after Job completion before it is automatically deleted         | `3600` |
+| Name                          | Description                                                                                           | Value  |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------- | ------ |
+| `job.name`                    | Override for the Kubernetes Job name; defaults to the release name suffixed with the release revision | `""`   |
+| `job.activeDeadlineSeconds`   | Maximum duration in seconds before the Job is forcibly terminated                                     | `7200` |
+| `job.ttlSecondsAfterFinished` | Seconds after Job completion before it is automatically deleted                                       | `3600` |
 
 ### Resources parameters
 
-| Name                 | Description                                                                                           | Value |
-| -------------------- | ----------------------------------------------------------------------------------------------------- | ----- |
-| `resources.memoryGb` | Memory in gigabytes for the indexer pod; sets both the JVM -Xmx flag and the Kubernetes request/limit | `20`  |
-| `resources.cpu`      | CPU units for the indexer pod; sets both the Kubernetes request and limit                             | `4`   |
+| Name                 | Description                                                                                            | Value |
+| -------------------- | ------------------------------------------------------------------------------------------------------ | ----- |
+| `resources.memoryGb` | Memory in GiB for the indexer pod; sets the Kubernetes memory request and limit                        | `20`  |
+| `resources.heapGb`   | JVM max heap in GiB (-Xmx); defaults to memoryGb minus 2 GiB, leaving headroom for non-heap JVM memory | `nil` |
+| `resources.cpu`      | CPU units for the indexer pod; sets both the Kubernetes request and limit                              | `4`   |
 
 ### Code system parameters
 

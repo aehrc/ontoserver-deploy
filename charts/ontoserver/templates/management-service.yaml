@@ -4,6 +4,9 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}-ontoserver-management-service
   labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: management
+    # Selected by the ServiceMonitor in servicemonitor.yaml — do not rename.
     service: {{ .Release.Name }}-ontoserver-management
 spec:
   type: ClusterIP

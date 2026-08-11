@@ -6,6 +6,8 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: {{ .Release.Name }}-pdb
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
 spec:
   {{- if .Values.ontoserver.deployment.podDisruptionBudget.minAvailable }}
   minAvailable: {{ .Values.ontoserver.deployment.podDisruptionBudget.minAvailable }}

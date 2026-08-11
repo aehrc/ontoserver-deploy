@@ -3,6 +3,9 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-ontoserver-test-closure-scaled-script
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: test
 data:
   test.sh: |
     #!/bin/sh
@@ -80,6 +83,9 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ .Release.Name }}-ontoserver-test-closure-scaled
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: test
   annotations:
     "helm.sh/hook": test
     "helm.sh/hook-delete-policy": before-hook-creation

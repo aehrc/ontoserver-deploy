@@ -60,3 +60,14 @@
 {{- if and .Values.auth.basic.username (empty .Values.auth.basic.password) }}
   {{- fail "auth.basic.password is required when auth.basic.username is set" }}
 {{- end }}
+
+{{- /* The JVM heap must stay below the container memory limit so that non-heap JVM
+     memory (metaspace, code cache, thread stacks, GC structures, direct buffers) has
+     somewhere to live. Without this, the pod is OOMKilled rather than failing fast. */ -}}
+{{- $heap := .Values.resources.heapGb | default (sub .Values.resources.memoryGb 2) }}
+{{- if le (int $heap) 0 }}
+  {{- fail (printf "resources.memoryGb must be at least 3 to leave a 2Gi non-heap reserve (got %v). Set resources.heapGb explicitly to override the default heap sizing." .Values.resources.memoryGb) }}
+{{- end }}
+{{- if ge (int $heap) (int .Values.resources.memoryGb) }}
+  {{- fail (printf "resources.heapGb (%v) must be less than resources.memoryGb (%v): the JVM heap cannot fill the entire container memory limit" $heap .Values.resources.memoryGb) }}
+{{- end }}

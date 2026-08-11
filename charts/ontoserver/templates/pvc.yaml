@@ -3,6 +3,8 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-ontoserver-files
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
   annotations:
     helm.sh/resource-policy: keep
 spec:
@@ -25,6 +27,8 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-ontoserver-db-files
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
   annotations:
     helm.sh/resource-policy: keep
 spec:

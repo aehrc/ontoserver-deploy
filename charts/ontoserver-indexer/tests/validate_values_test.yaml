@@ -2,21 +2,20 @@ suite: validate-values tests
 templates:
   - templates/validate-values.yaml
 
-# Shared SNOMED values used across most tests
-x-snomed: &snomed
-  codeSystem.url: http://snomed.info/sct/32506021000036107
-  codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
-  rf2.files[0]: https://example.com/snomed.zip
-  rf2.kind: FULL
-  syndication.endpoint: https://synd.example.com
-  syndication.tokenEndpoint: https://auth.example.com/token
-  syndication.feed: my-feed
-  syndication.entryTitle: My Entry
-
 tests:
+  # The `set` block below is anchored as *snomed and reused by the tests that follow.
+  # It must stay on the first test: a YAML anchor has to be defined before it is aliased,
+  # and helm-unittest rejects unknown top-level keys, so it cannot live outside `tests`.
   - it: passes with all required SNOMED values set
-    set:
-      <<: *snomed
+    set: &snomed
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      rf2.kind: FULL
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
     asserts:
       - hasDocuments:
           count: 0
@@ -220,3 +219,46 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "auth.basic.password is required when auth.basic.username is set"
+
+  - it: fails when memoryGb is too small to leave a non-heap reserve
+    set:
+      <<: *snomed
+      resources.memoryGb: 2
+    asserts:
+      - failedTemplate:
+          errorMessage: "resources.memoryGb must be at least 3 to leave a 2Gi non-heap reserve (got 2). Set resources.heapGb explicitly to override the default heap sizing."
+
+  - it: fails when heapGb equals memoryGb
+    set:
+      <<: *snomed
+      resources.memoryGb: 20
+      resources.heapGb: 20
+    asserts:
+      - failedTemplate:
+          errorMessage: "resources.heapGb (20) must be less than resources.memoryGb (20): the JVM heap cannot fill the entire container memory limit"
+
+  - it: fails when heapGb exceeds memoryGb
+    set:
+      <<: *snomed
+      resources.memoryGb: 8
+      resources.heapGb: 12
+    asserts:
+      - failedTemplate:
+          errorMessage: "resources.heapGb (12) must be less than resources.memoryGb (8): the JVM heap cannot fill the entire container memory limit"
+
+  - it: passes when heapGb leaves headroom below memoryGb
+    set:
+      <<: *snomed
+      resources.memoryGb: 32
+      resources.heapGb: 26
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: passes at the minimum viable memoryGb
+    set:
+      <<: *snomed
+      resources.memoryGb: 3
+    asserts:
+      - hasDocuments:
+          count: 0

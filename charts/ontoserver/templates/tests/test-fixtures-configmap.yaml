@@ -3,6 +3,9 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-ontoserver-test-fixtures
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: test
 data:
   codesystem.json: |
     {

@@ -78,6 +78,11 @@ ontoserver:
   gateway:
     enabled: true
     className: envoy-gateway-class   # default — matches Envoy Gateway install
+    # Local development only: serve plaintext HTTP instead of HTTPS. The chart refuses to
+    # render a plaintext Gateway unless this is set, so a public deployment cannot end up
+    # unencrypted by accident. Never set this on an internet-facing instance.
+    allowPlaintext: true
+    listenerPortPlain: 80            # k3d maps host 8080 → 80 (see serverPort above)
 
   tls:
     enabled: false

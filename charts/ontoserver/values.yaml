@@ -225,6 +225,10 @@ ontoserver:
     enabled: false
     ## @param ontoserver.gateway.listenerPortSecure        Secure listener port -  Depends on the gateway class - Traefik is 8443
     listenerPortSecure: 443
+    ## @param ontoserver.gateway.listenerPortPlain         Plaintext listener port, used only when tls.enabled is false and allowPlaintext is true
+    listenerPortPlain: 80
+    ## @param ontoserver.gateway.allowPlaintext            Permit a plaintext HTTP listener when tls.enabled is false. Off by default so a public Gateway cannot be left unencrypted by accident; enable for local development or when TLS terminates upstream
+    allowPlaintext: false
     ## @param ontoserver.gateway.annotations               Gateway annotations
     annotations: {}
     ## @param ontoserver.gateway.infrastructureAnnotations Infrastructure annotations
