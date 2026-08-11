@@ -118,3 +118,148 @@ tests:
           path: spec.ttlSecondsAfterFinished
           value: 600
         documentIndex: 1
+
+  # The $closure routing hook is gated on BOTH deployment.kind and deployment.type, and
+  # exists because only a StatefulSet gives pod-0 a stable identity to pin $closure to.
+  # Each half of that condition gets its own negative case below.
+  - it: does not render closure-scaled test hook by default
+    templates:
+      - templates/tests/test-closure-scaled-job.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render closure-scaled test hook for an unscaled StatefulSet
+    templates:
+      - templates/tests/test-closure-scaled-job.yaml
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: single
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render closure-scaled test hook for a scaled Deployment
+    templates:
+      - templates/tests/test-closure-scaled-job.yaml
+    # Reuses the scaled fixture (2 replicas, external DB) and flips only the kind, so the
+    # kind is the sole difference from the positive case below. helm-unittest renders the
+    # whole chart before filtering to `templates:`, so the other scaled prerequisites must
+    # be satisfied or their `fail` would error this test instead of letting it assert.
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.kind: Deployment
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders closure-scaled test hook for a scaled StatefulSet
+    templates:
+      - templates/tests/test-closure-scaled-job.yaml
+    values:
+      - fixtures/scaled-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-test-closure-scaled-script
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-test-closure-scaled
+        documentIndex: 1
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: test
+        documentIndex: 1
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+        documentIndex: 1
+      - equal:
+          path: spec.ttlSecondsAfterFinished
+          value: 1800
+        documentIndex: 1
+      # backoffLimit must stay 0: a retried $closure test would hit an already-initialised
+      # closure table and report a false pass on the second attempt.
+      - equal:
+          path: spec.backoffLimit
+          value: 0
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.volumes[0].configMap.name
+          value: RELEASE-NAME-ontoserver-test-closure-scaled-script
+        documentIndex: 1
+      # The script is mounted, not exec'd inline, so it needs the executable bit.
+      - equal:
+          path: spec.template.spec.volumes[0].configMap.defaultMode
+          value: 0755
+        documentIndex: 1
+
+  - it: labels closure-scaled test hook resources as test components
+    templates:
+      - templates/tests/test-closure-scaled-job.yaml
+    values:
+      - fixtures/scaled-values.yaml
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: test
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: ontoserver
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: RELEASE-NAME
+      - equal:
+          path: metadata.labels["app.kubernetes.io/part-of"]
+          value: ontoserver
+      # Asserted by shape rather than exact value so a chart version bump does not
+      # break this test.
+      - matchRegex:
+          path: metadata.labels["helm.sh/chart"]
+          pattern: '^ontoserver-[0-9]+\.[0-9]+\.[0-9]+'
+
+  - it: targets pod-0 by dedicated service and both pods by headless DNS
+    templates:
+      - templates/tests/test-closure-scaled-job.yaml
+    values:
+      - fixtures/scaled-values.yaml
+    asserts:
+      # The point of this hook: $closure must be pinned to pod-0 via the dedicated
+      # service, and both pods must be individually addressable over headless DNS.
+      - matchRegex:
+          path: data["test.sh"]
+          pattern: 'POD0_SVC="http://RELEASE-NAME-ontoserver-pod0-service"'
+        documentIndex: 0
+      - matchRegex:
+          path: data["test.sh"]
+          pattern: 'POD0_DNS="http://RELEASE-NAME-statefulset-0\.RELEASE-NAME-ontoserver-headless:8080"'
+        documentIndex: 0
+      - matchRegex:
+          path: data["test.sh"]
+          pattern: 'POD1_DNS="http://RELEASE-NAME-statefulset-1\.RELEASE-NAME-ontoserver-headless:8080"'
+        documentIndex: 0
+      - matchRegex:
+          path: data["test.sh"]
+          pattern: '\$POD0_SVC/fhir/\\\$closure'
+        documentIndex: 0
+
+  - it: uses the configured container port in closure-scaled headless DNS URLs
+    templates:
+      - templates/tests/test-closure-scaled-job.yaml
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.containerPort: 8443
+    asserts:
+      - matchRegex:
+          path: data["test.sh"]
+          pattern: 'RELEASE-NAME-ontoserver-headless:8443'
+        documentIndex: 0
+      - notMatchRegex:
+          path: data["test.sh"]
+          pattern: 'RELEASE-NAME-ontoserver-headless:8080'
+        documentIndex: 0

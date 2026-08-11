@@ -23,6 +23,10 @@ jobs:
             unexpectedHook: ontoserver-ro-ontoserver-test-fhir-rw
             runHelmTest: true
             verifyTraefikRoute: false
+            valuesFile: ""
+            needsPostgres: false
+            needsTraefikCrds: false
+            installTimeout: 10m
           - name: read-write
             release: ontoserver-rw
             isReadOnly: "false"
@@ -30,6 +34,10 @@ jobs:
             unexpectedHook: ontoserver-rw-ontoserver-test-fhir-ro
             runHelmTest: true
             verifyTraefikRoute: false
+            valuesFile: ""
+            needsPostgres: false
+            needsTraefikCrds: false
+            installTimeout: 10m
           - name: traefik-https-backend
             release: ontoserver-traefik
             isReadOnly: "true"
@@ -37,6 +45,26 @@ jobs:
             unexpectedHook: ""
             runHelmTest: false
             verifyTraefikRoute: true
+            valuesFile: traefik-https-backend-values.yaml
+            needsPostgres: false
+            needsTraefikCrds: true
+            installTimeout: 10m
+          # Scaled StatefulSet: the only mode that exercises test-closure-scaled-job.yaml,
+          # i.e. that $closure is pinned to pod-0 and both pods are individually addressable.
+          # Needs an external PostgreSQL (a scaled deployment cannot use the sidecar DB) and
+          # its fixture enables a Traefik IngressRoute, hence needsTraefikCrds.
+          - name: scaled
+            release: ontoserver-scaled
+            isReadOnly: "false"
+            expectedHook: ontoserver-scaled-ontoserver-test-closure-scaled
+            unexpectedHook: ontoserver-scaled-ontoserver-test-fhir-ro
+            runHelmTest: true
+            verifyTraefikRoute: false
+            valuesFile: scaled-values.yaml
+            needsPostgres: true
+            needsTraefikCrds: true
+            # Two Ontoserver pods start in parallel but share one runner's CPU.
+            installTimeout: 20m
     steps:
       - uses: actions/checkout@v5
 
@@ -56,10 +84,63 @@ jobs:
             --image rancher/k3s:v1.32.10-k3s1
 
       - name: Wait for Traefik CRDs
-        if: matrix.mode.verifyTraefikRoute
+        if: matrix.mode.needsTraefikCrds
         run: |
           until kubectl get crd ingressroutes.traefik.io >/dev/null 2>&1; do sleep 2; done
           until kubectl wait --for=condition=established crd/ingressroutes.traefik.io --timeout=10s 2>/dev/null; do sleep 2; done
+
+      # A scaled deployment must share one database across replicas, so the sidecar DB is
+      # disabled in scaled-values.yaml and this stands in for the external PostgreSQL that
+      # ontoserver.config.spring.datasource.url points at.
+      - name: Deploy PostgreSQL
+        if: matrix.mode.needsPostgres
+        run: |
+          kubectl apply -f - <<'EOF'
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: postgres
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: postgres
+            template:
+              metadata:
+                labels:
+                  app: postgres
+              spec:
+                containers:
+                  - name: postgres
+                    image: postgres:16
+                    env:
+                      - name: POSTGRES_DB
+                        value: ontoserver
+                      - name: POSTGRES_USER
+                        value: ontoserver
+                      - name: POSTGRES_PASSWORD
+                        value: ontoserver
+                    ports:
+                      - containerPort: 5432
+                    resources:
+                      requests:
+                        cpu: 250m
+                        memory: 512Mi
+                      limits:
+                        memory: 1G
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: postgres
+          spec:
+            selector:
+              app: postgres
+            ports:
+              - port: 5432
+                targetPort: 5432
+          EOF
+          kubectl rollout status deployment/postgres --timeout=3m
 
       - name: Build chart dependencies
         run: helm dependency build ./charts/ontoserver
@@ -69,11 +150,22 @@ jobs:
           QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
           QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
         run: |
-          EXTRA_VALUES=""
-          if [[ "${{ matrix.mode.verifyTraefikRoute }}" == "true" ]]; then
-            EXTRA_VALUES="--values ./charts/ontoserver/tests/fixtures/traefik-https-backend-values.yaml"
+          # An array rather than a string: the scaled mode's --set values contain escaped dots
+          # that word-splitting an unquoted variable would mangle.
+          EXTRA=()
+          if [[ -n "${{ matrix.mode.valuesFile }}" ]]; then
+            EXTRA+=(--values "./charts/ontoserver/tests/fixtures/${{ matrix.mode.valuesFile }}")
+          fi
+          if [[ "${{ matrix.mode.needsPostgres }}" == "true" ]]; then
+            # Password is supplied here rather than in the fixture so the fixture stays
+            # credential-free; matches the local k3d recipe documented in scaled-values.yaml.
+            EXTRA+=(--set 'ontoserver.secretConfig.spring\.datasource\.password=ontoserver')
+            # StatefulSet volumeClaimTemplates need a real storage class; k3s ships local-path.
+            EXTRA+=(--set ontoserver.deployment.persistence.files.storageClass.provided.enabled=false)
+            EXTRA+=(--set ontoserver.deployment.persistence.files.storageClass.name=local-path)
           fi
           helm install ${{ matrix.mode.release }} ./charts/ontoserver \
+            "${EXTRA[@]}" \
             --set ontoserver.deployment.isReadOnly=${{ matrix.mode.isReadOnly }} \
             --set ontoserver.managementService.enabled=true \
             --set ontoserver.imageCredentials.username="$QUAY_USERNAME" \
@@ -88,9 +180,8 @@ jobs:
             --set ontoserver.resources.db.limits.cpu=1 \
             --set ontoserver.resources.db.requests.memory=512Mi \
             --set ontoserver.resources.db.limits.memory=1G \
-            $EXTRA_VALUES \
             --wait \
-            --timeout 10m
+            --timeout ${{ matrix.mode.installTimeout }}
 
       - name: Diagnose failed install
         if: failure()
