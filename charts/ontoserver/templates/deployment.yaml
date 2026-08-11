@@ -240,7 +240,7 @@ spec:
                 name: {{ .Values.ontoserver.existingSecretConfig }}
             {{- end }}
           {{- end }}
-          {{- if or .Values.ontoserver.customization .Values.ontoserver.deployment.persistence.enabledForDeployment }}
+          {{- if or .Values.ontoserver.customization .Values.ontoserver.deployment.persistence.enabledForDeployment .Values.ontoserver.deployment.extraVolumeMounts }}
           volumeMounts:
             {{- if not (empty .Values.ontoserver.customization) }}
             - name: customization
@@ -250,8 +250,12 @@ spec:
             - name: ontoserver-files
               mountPath: /var/onto
             {{- end }}
+            {{- /* Appended last so a caller cannot shadow a chart-managed mount path. */}}
+            {{- with .Values.ontoserver.deployment.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
-      {{- if or .Values.ontoserver.customization .Values.ontoserver.deployment.persistence.enabledForDeployment }}
+      {{- if or .Values.ontoserver.customization .Values.ontoserver.deployment.persistence.enabledForDeployment .Values.ontoserver.deployment.extraVolumes }}
       volumes:
         {{- if .Values.ontoserver.customization }}
         - name: customization
@@ -267,6 +271,10 @@ spec:
           persistentVolumeClaim:
             claimName: {{ .Release.Name }}-ontoserver-db-files
         {{- end }}
+        {{- end }}
+        {{- /* Appended last so a caller cannot shadow a chart-managed volume name. */}}
+        {{- with .Values.ontoserver.deployment.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}
       {{- end }}
 {{- end }}

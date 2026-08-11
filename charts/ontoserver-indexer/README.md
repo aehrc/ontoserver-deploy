@@ -194,7 +194,7 @@ tolerations:
 
 ## Security context
 
-By default the Job sets no `securityContext`, so the indexer runs as root — the image default. Hardening is opt-in via `job.podSecurityContext`, `job.containerSecurityContext` and `job.automountServiceAccountToken`, all unset by default.
+By default the Job sets no `securityContext`, so the indexer runs as root — the image default. Hardening is opt-in via `job.podSecurityContext`, `job.containerSecurityContext`, `job.automountServiceAccountToken` and `job.extraVolumes`/`job.extraVolumeMounts`, all empty or unset by default.
 
 The indexer uses the same image as the server (`quay.io/aehrc/ontoserver`), which contains a dedicated **`ontoserver` user, uid 7531**. Running as that user works, but note the Job writes its output ZIP to the mounted output PVC, so `fsGroup` must make that volume writable — a Job that cannot write its output fails outright after doing all the indexing work, which is expensive to discover late:
 
@@ -209,12 +209,22 @@ job:
       type: RuntimeDefault
   containerSecurityContext:
     allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
     capabilities:
       drop: [ALL]
   automountServiceAccountToken: false
+  # Required by readOnlyRootFilesystem — see below.
+  extraVolumes:
+    - name: tmp
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: tmp
+      mountPath: /tmp
 ```
 
-`readOnlyRootFilesystem` is not supported: the JVM writes to `/tmp` (Spring Boot opens `/tmp/spring.log`), and the chart has no way to mount a writable `/tmp`.
+`readOnlyRootFilesystem` and the `/tmp` `emptyDir` are a **pair**. The indexer runs the same Spring Boot image as the server, which writes `/tmp/spring.log` unconditionally and dies at startup on `openFile(/tmp/spring.log) … Read-only file system` without a writable `/tmp`. Size the `emptyDir` if your cluster constrains node ephemeral storage — indexing is I/O heavy and `/tmp` also holds JVM and Tomcat scratch files.
+
+`job.extraVolumes`/`job.extraVolumeMounts` are rendered verbatim and appended after the chart's own `output-volume` and `input-volume` entries, so those always win a name collision. They apply to the indexer container.
 
 Validate on a non-production run before adopting this — in particular that an existing output PVC's contents are writable under the new `fsGroup`, and that the input PVC (mounted read-only) is still readable.
 
@@ -261,6 +271,8 @@ kubectl get job snomed-au-index -n <namespace>
 | `job.podSecurityContext`           | Pod-level securityContext for the indexer Job pod, passed through as-is (e.g. runAsNonRoot, runAsUser, fsGroup, seccompProfile)                              | `{}`   |
 | `job.containerSecurityContext`     | Container-level securityContext for the indexer container, passed through as-is (e.g. allowPrivilegeEscalation, capabilities, readOnlyRootFilesystem)        | `{}`   |
 | `job.automountServiceAccountToken` | Mount the ServiceAccount token into the Job pod. The indexer does not call the Kubernetes API, so false is safe. Leave unset (null) for the cluster default. | `nil`  |
+| `job.extraVolumes`                 | Extra pod volumes, e.g. `[{name: tmp, emptyDir: {}}]`                                                                                                        | `[]`   |
+| `job.extraVolumeMounts`            | Extra mounts for the indexer container, e.g. `[{name: tmp, mountPath: /tmp}]`                                                                                | `[]`   |
 
 ### Resources parameters
 

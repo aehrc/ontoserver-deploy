@@ -15,8 +15,10 @@
 #   3. ONTOSERVER_INSECURE must stay "true". In HTTPS mode /run.sh generates a keystore at
 #      /keystore.p12, in the root-owned /, and keytool fails with "Permission denied".
 #
-# readOnlyRootFilesystem is deliberately absent: Spring Boot opens /tmp/spring.log for writing,
-# so it needs a writable /tmp, and this chart has no way to mount an emptyDir there yet.
+# readOnlyRootFilesystem is included, and requires the emptyDir at /tmp below. /tmp is
+# load-bearing, not incidental: a running server was observed writing spring.log, hsperfdata,
+# Tomcat's docbase/work directories and 16 `downlaod-*` scratch files there. Without a writable
+# /tmp the JVM dies at startup on "openFile(/tmp/spring.log) ... Read-only file system".
 ontoserver:
   serverName: onto.example.com
   deployment:
@@ -29,10 +31,18 @@ ontoserver:
         type: RuntimeDefault
     containerSecurityContext:
       allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
       capabilities:
         drop:
           - ALL
     automountServiceAccountToken: false
+    # Required by readOnlyRootFilesystem above — see the header note on /tmp.
+    extraVolumes:
+      - name: tmp
+        emptyDir: {}
+    extraVolumeMounts:
+      - name: tmp
+        mountPath: /tmp
     db:
       enabled: false
       # Retained to show the sidecar can still be hardened where it is used — but note it

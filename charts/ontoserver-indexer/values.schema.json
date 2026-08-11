@@ -35,7 +35,9 @@
         "ttlSecondsAfterFinished": { "type": "integer", "minimum": 0 },
         "podSecurityContext":       { "type": "object", "description": "Pod-level securityContext for the Job pod, passed through as-is. Empty means unset." },
         "containerSecurityContext": { "type": "object", "description": "Container-level securityContext for the indexer container, passed through as-is. Empty means unset." },
-        "automountServiceAccountToken": { "type": ["boolean", "null"], "description": "Mount the ServiceAccount token into the Job pod. Null leaves it to the cluster default." }
+        "automountServiceAccountToken": { "type": ["boolean", "null"], "description": "Mount the ServiceAccount token into the Job pod. Null leaves it to the cluster default." },
+        "extraVolumes": { "type": "array", "items": { "type": "object" }, "description": "Extra pod volumes, rendered verbatim and appended after the chart's own volumes." },
+        "extraVolumeMounts": { "type": "array", "items": { "type": "object" }, "description": "Extra volumeMounts for the indexer container, rendered verbatim and appended after the chart's own mounts." }
       }
     },
     "resources": {

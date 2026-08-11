@@ -47,6 +47,16 @@ ontoserver:
     containerSecurityContext: {}
     ## @param ontoserver.deployment.automountServiceAccountToken Mount the ServiceAccount token into the pod. Ontoserver does not call the Kubernetes API — scaled clustering uses DNS, not the API — so false is safe. Leave unset (null) for the cluster default.
     automountServiceAccountToken: ~
+    ## Arbitrary extra volumes and mounts for the Ontoserver container. Both default to empty, so
+    ## upgrading an existing release changes nothing. Rendered verbatim and appended after the
+    ## chart's own entries, so chart-managed volumes always win a name collision.
+    ## The primary use is `readOnlyRootFilesystem: true`, which needs a writable /tmp — Spring Boot
+    ## writes /tmp/spring.log unconditionally. See the README ("Security context").
+    ## Note these apply to the Ontoserver container only, not to the Postgres sidecar.
+    ## @param ontoserver.deployment.extraVolumes         Extra pod volumes, e.g. `[{name: tmp, emptyDir: {}}]`
+    extraVolumes: []
+    ## @param ontoserver.deployment.extraVolumeMounts    Extra mounts for the Ontoserver container, e.g. `[{name: tmp, mountPath: /tmp}]`
+    extraVolumeMounts: []
     ## @param ontoserver.deployment.deploymentStrategy  K8s update strategy when using Deployment Kind
     deploymentStrategy: RollingUpdate
     startupProbe:

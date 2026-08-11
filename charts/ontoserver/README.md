@@ -741,6 +741,7 @@ By default the chart sets **no** `securityContext` at all, so pods run with what
 | `ontoserver.deployment.containerSecurityContext` | the Ontoserver container |
 | `ontoserver.deployment.db.containerSecurityContext` | the Postgres sidecar |
 | `ontoserver.deployment.automountServiceAccountToken` | the pod — safe to set `false`; Ontoserver never calls the Kubernetes API (scaled clustering uses DNS) |
+| `ontoserver.deployment.extraVolumes` / `extraVolumeMounts` | the pod and the Ontoserver container — needed to supply the writable `/tmp` that `readOnlyRootFilesystem` requires |
 
 All default to unset, so **upgrading an existing release changes nothing** and rolls no pods. That is deliberate rather than timid: these charts have always run as root, and a default securityContext would break existing releases in ways the chart cannot detect — see the failures below, each of which is a hard crash at startup, not a warning.
 
@@ -763,6 +764,7 @@ Useful facts that follow from this:
 
 - The image contains a dedicated **`ontoserver` user, uid 7531** — it is clearly intended to be runnable as non-root, but the image does not default to it.
 - `/var/onto` in the image is `root:root 0755`, so a non-root pod **must** get a writable `/var/onto` from somewhere. Enabling persistence plus `fsGroup` is the supported way.
+- `/tmp` is **load-bearing**, not just a log destination. A running server was observed writing `spring.log`, `hsperfdata`, Tomcat's `docbase`/work directories and 16 `downlaod-*` scratch files there (the typo is upstream's). Any read-only-root configuration has to give it a real writable `/tmp`.
 
 ### Hardened configuration
 
@@ -780,9 +782,17 @@ ontoserver:
         type: RuntimeDefault
     containerSecurityContext:
       allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
       capabilities:
         drop: [ALL]
     automountServiceAccountToken: false
+    # Required by readOnlyRootFilesystem — see "What was verified" on why /tmp is load-bearing.
+    extraVolumes:
+      - name: tmp
+        emptyDir: {}
+    extraVolumeMounts:
+      - name: tmp
+        mountPath: /tmp
     db:
       enabled: false         # required — see below
     persistence:
@@ -791,24 +801,25 @@ ontoserver:
     ONTOSERVER_INSECURE: "true"    # required — see below
 ```
 
+`readOnlyRootFilesystem` and the `/tmp` `emptyDir` are a **pair** — enabling the first without the second crashes the pod at startup. The test asserts both together so the recipe cannot ship half-applied.
+
 ### What is not supported non-root
 
-Three combinations cannot be made to work with the chart as it stands. Each fails closed — the pod crashes at startup rather than running degraded — so you will find out immediately, but it is cheaper to read it here.
+Two combinations cannot be made to work with the chart as it stands. Each fails closed — the pod crashes at startup rather than running degraded — so you will find out immediately, but it is cheaper to read it here.
 
 1. **The Postgres sidecar** (`ontoserver.deployment.db.enabled: true`) together with a non-root Ontoserver. The postgres entrypoint refuses to start unless it **owns** its data directory, and `fsGroup` only sets *group* ownership. Ontoserver needs uid 7531 to write `/var/onto` while Postgres needs uid 999 to own its data dir — and in the default `shared` persistence mode both live on the same volume. Use an [external database](#configuring-an-external-database), which production deployments need anyway.
 
    The sidecar's own `containerSecurityContext` is still useful for `allowPrivilegeEscalation: false` and dropping capabilities; it is just the non-root part that conflicts.
 
-2. **`readOnlyRootFilesystem: true`.** Spring Boot opens `/tmp/spring.log` for writing, and this chart has no way to mount an `emptyDir` at `/tmp`. Leave it unset until the chart grows `extraVolumes`/`extraVolumeMounts`.
-
-3. **Ontoserver's own HTTPS mode** (`ONTOSERVER_INSECURE: "false"`, see [Healthcheck and HTTPS mode](#healthcheck-and-https-mode-ontoserver_insecure-false)). `/run.sh` generates a self-signed keystore at `/keystore.p12` — in the root-owned `/` — so `keytool` fails with `Permission denied`. Terminate TLS at the ingress or gateway instead, which is the chart's default posture.
+2. **Ontoserver's own HTTPS mode** (`ONTOSERVER_INSECURE: "false"`, see [Healthcheck and HTTPS mode](#healthcheck-and-https-mode-ontoserver_insecure-false)). `/run.sh` generates a self-signed keystore at `/keystore.p12` — in the root-owned `/` — so `keytool` fails with `Permission denied`. Terminate TLS at the ingress or gateway instead, which is the chart's default posture.
 
 This configuration has been run on a cluster (AKS, Azure Disk `managed-csi` PVC, external PostgreSQL, Gatekeeper auditing), not only rendered. Confirmed there: the pod runs as `uid=7531`, `fsGroup` makes the volume group-writable (`/var/onto` becomes `root:7531 drwxrwsr-x`) and `/var/onto/lucene` is created owned by `ontoserver`; both `helm test` suites pass including the read-write one; and a full NCTS preload of SNOMED CT AU and LOINC installs and serves `$lookup`, ECL `$expand` and `$validate-code` normally.
 
-Against the AKS built-in policy set, the hardened release reports **no** violations of `allowedUsersGroups` or `noPrivilegeEscalation`. It does still violate `readOnlyRootFilesystem`, for the reason given above — that one cannot be satisfied until the chart can mount a writable `/tmp`.
+Against the AKS built-in policy set, the cluster run reported **no** violations of `allowedUsersGroups` or `noPrivilegeEscalation`.
 
-> **Still validate before rolling this out.** Two things remain unverified and are worth checking against your own deployment:
+> **Still validate before rolling this out.** Three things remain unverified and are worth checking against your own deployment:
 >
+> - **`readOnlyRootFilesystem` on a cluster.** It was verified by running the image directly — read-only root, all capabilities dropped, `no-new-privileges`, uid 7531, a `tmpfs` at `/tmp` and a writable `/var/onto`, serving `/fhir/metadata` and a `CodeSystem` search with HTTP 200 — but the cluster run predates it, and its Gatekeeper audit therefore still shows the two `readOnlyRootFilesystem` violations.
 > - **An existing PVC with data on it.** Kubernetes relabels the volume it mounts, and a large pre-existing Lucene index can take a long time to `chown` — the validation above used a freshly provisioned, empty volume, so it says nothing about that delay.
 > - **A mounted `ontoserver.customization` ConfigMap**, which was not part of the tested configuration.
 >
@@ -1061,6 +1072,8 @@ Requires the [External Secrets Operator](https://external-secrets.io/) installed
 | `ontoserver.deployment.podSecurityContext`                                                  | Pod-level securityContext, passed through as-is (e.g. runAsNonRoot, runAsUser, fsGroup, seccompProfile)                                                                                                                                                                                                                                                      | `{}`                              |
 | `ontoserver.deployment.containerSecurityContext`                                            | Container-level securityContext for the Ontoserver container, passed through as-is (e.g. allowPrivilegeEscalation, capabilities, readOnlyRootFilesystem)                                                                                                                                                                                                     | `{}`                              |
 | `ontoserver.deployment.automountServiceAccountToken`                                        | Mount the ServiceAccount token into the pod. Ontoserver does not call the Kubernetes API — scaled clustering uses DNS, not the API — so false is safe. Leave unset (null) for the cluster default.                                                                                                                                                           | `nil`                             |
+| `ontoserver.deployment.extraVolumes`                                                        | Extra pod volumes, e.g. `[{name: tmp, emptyDir: {}}]`                                                                                                                                                                                                                                                                                                        | `[]`                              |
+| `ontoserver.deployment.extraVolumeMounts`                                                   | Extra mounts for the Ontoserver container, e.g. `[{name: tmp, mountPath: /tmp}]`                                                                                                                                                                                                                                                                             | `[]`                              |
 | `ontoserver.deployment.deploymentStrategy`                                                  | K8s update strategy when using Deployment Kind                                                                                                                                                                                                                                                                                                               | `RollingUpdate`                   |
 | `ontoserver.deployment.startupProbe.initialDelaySeconds`                                    | Startup probe initial delay                                                                                                                                                                                                                                                                                                                                  | `5`                               |
 | `ontoserver.deployment.startupProbe.periodSeconds`                                          | Startup probe period                                                                                                                                                                                                                                                                                                                                         | `2`                               |

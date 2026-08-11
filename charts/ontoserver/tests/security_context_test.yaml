@@ -186,10 +186,23 @@ tests:
           path: spec.template.spec.containers[0].securityContext.capabilities.drop
           value:
             - ALL
-      # readOnlyRootFilesystem must NOT appear: Spring Boot opens /tmp/spring.log for writing and
-      # the chart cannot yet mount a writable /tmp, so enabling it crashes the pod at startup.
-      - isNull:
+      # readOnlyRootFilesystem is only safe together with a writable /tmp — the server writes
+      # spring.log, hsperfdata, Tomcat's work dirs and `downlaod-*` scratch files there, and dies
+      # at startup on "openFile(/tmp/spring.log) ... Read-only file system" without it. The two
+      # are asserted as a pair so the recipe cannot ship one without the other.
+      - equal:
           path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir: {}
       # The Postgres sidecar must be off. It refuses to start unless it owns its data directory,
       # and fsGroup only sets group ownership — so one pod cannot satisfy both uids on one volume.
       - isNull:

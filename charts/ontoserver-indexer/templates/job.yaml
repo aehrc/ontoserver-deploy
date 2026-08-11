@@ -32,7 +32,7 @@ spec:
       {{- if $pullSecrets }}
       imagePullSecrets: {{ toJson $pullSecrets }}
       {{- end }}
-      {{- if or .Values.output.pvcName .Values.input.pvcName }}
+      {{- if or .Values.output.pvcName .Values.input.pvcName .Values.job.extraVolumes }}
       volumes:
         {{- if .Values.output.pvcName }}
         - name: output-volume
@@ -44,6 +44,10 @@ spec:
           persistentVolumeClaim:
             claimName: {{ .Values.input.pvcName }}
             readOnly: true
+        {{- end }}
+        {{- /* Appended last so a caller cannot shadow a chart-managed volume name. */}}
+        {{- with .Values.job.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}
       {{- end }}
       containers:
@@ -88,7 +92,7 @@ spec:
             - -o
             - {{ .Values.output.path | quote }}
             {{- end }}
-          {{- if or .Values.output.pvcName .Values.input.pvcName }}
+          {{- if or .Values.output.pvcName .Values.input.pvcName .Values.job.extraVolumeMounts }}
           volumeMounts:
             {{- if .Values.output.pvcName }}
             - name: output-volume
@@ -98,6 +102,10 @@ spec:
             - name: input-volume
               mountPath: {{ .Values.input.mountPath }}
               readOnly: true
+            {{- end }}
+            {{- /* Appended last so a caller cannot shadow a chart-managed mount path. */}}
+            {{- with .Values.job.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
           env:

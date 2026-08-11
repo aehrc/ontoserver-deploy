@@ -1,0 +1,128 @@
+suite: Indexer Job extra volumes tests
+templates:
+  - templates/job.yaml
+
+tests:
+  # The `set` block is anchored as *required and reused below — same convention as job_test.yaml:
+  # a YAML anchor must be defined before it is aliased, and helm-unittest rejects unknown top-level
+  # keys, so it cannot live outside `tests`.
+  #
+  # Both keys default to empty, so nothing changes for an existing user. `volumes` must be absent
+  # entirely rather than an empty list, since this configuration mounts no PVC at all.
+  - it: adds nothing by default
+    set: &required
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      output.path: /output/snomed.zip
+    asserts:
+      - isNull:
+          path: spec.template.spec.volumes
+      - isNull:
+          path: spec.template.spec.containers[0].volumeMounts
+
+  # Needs the guard conditions widened, not just an append: without a PVC the chart previously
+  # emitted no `volumes` key at all.
+  - it: renders extra volumes with no PVC configured
+    set:
+      <<: *required
+      job.extraVolumes:
+        - name: tmp
+          emptyDir: {}
+      job.extraVolumeMounts:
+        - name: tmp
+          mountPath: /tmp
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.volumes
+          count: 1
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: tmp
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /tmp
+
+  # Ordering matters: Kubernetes rejects duplicate volume names and resolves a mount path to its
+  # first match, so the chart's own output/input entries must come first and win a collision.
+  - it: appends after the chart's own output and input volumes
+    set:
+      <<: *required
+      output.pvcName: index-output
+      input.pvcName: index-input
+      job.extraVolumes:
+        - name: tmp
+          emptyDir: {}
+      job.extraVolumeMounts:
+        - name: tmp
+          mountPath: /tmp
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: output-volume
+      - equal:
+          path: spec.template.spec.volumes[1].name
+          value: input-volume
+      - equal:
+          path: spec.template.spec.volumes[2].name
+          value: tmp
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /output
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[2].mountPath
+          value: /tmp
+
+  # Passed through verbatim, not reshaped — a source type the chart knows nothing about.
+  - it: passes a projected volume through verbatim
+    set:
+      <<: *required
+      job.extraVolumes:
+        - name: extra-certs
+          secret:
+            secretName: my-certs
+            defaultMode: 420
+      job.extraVolumeMounts:
+        - name: extra-certs
+          mountPath: /certs
+          readOnly: true
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].secret.secretName
+          value: my-certs
+      - equal:
+          path: spec.template.spec.volumes[0].secret.defaultMode
+          value: 420
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].readOnly
+          value: true
+
+  # The indexer runs the same Spring Boot image as the server, which writes /tmp/spring.log
+  # unconditionally, so readOnlyRootFilesystem is only usable with a writable /tmp. Asserted as a
+  # pair so the documented combination cannot ship half-applied.
+  - it: renders readOnlyRootFilesystem together with a writable /tmp
+    set:
+      <<: *required
+      job.containerSecurityContext:
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+      job.extraVolumes:
+        - name: tmp
+          emptyDir: {}
+      job.extraVolumeMounts:
+        - name: tmp
+          mountPath: /tmp
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir: {}

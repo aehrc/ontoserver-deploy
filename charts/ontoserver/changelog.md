@@ -25,10 +25,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hardening has to be requested. The Postgres sidecar has its own value because it cannot share
   the Ontoserver container's: the postgres entrypoint requires uid 999.
 
-  A verified hardened configuration is documented in the README, along with the three
-  combinations that cannot be made to work non-root (the Postgres sidecar, `readOnlyRootFilesystem`,
-  and Ontoserver's own HTTPS mode). Those constraints were established by running the shipped
-  images under each setting, not inferred — each failure is a crash at startup.
+  A verified hardened configuration is documented in the README, along with the two
+  combinations that cannot be made to work non-root (the Postgres sidecar and Ontoserver's own
+  HTTPS mode). Those constraints were established by running the shipped images under each
+  setting, not inferred — each failure is a crash at startup.
+- `ontoserver.deployment.extraVolumes` and `.extraVolumeMounts` — arbitrary volumes and mounts for
+  the Ontoserver container, rendered verbatim and appended after the chart's own entries so
+  chart-managed names always win a collision. Both default to empty, so an existing release
+  renders a byte-identical pod spec.
+
+  This makes `readOnlyRootFilesystem: true` reachable, which it previously was not: the server
+  needs a writable `/tmp` and the chart had no way to supply one. `/tmp` turned out to be
+  load-bearing rather than just a log destination — a running server writes `spring.log`,
+  `hsperfdata`, Tomcat's work directories and `downlaod-*` scratch files there. The hardened
+  README recipe now includes both, asserted together by a test so it cannot ship half-applied.
 
 ### Fixed
 

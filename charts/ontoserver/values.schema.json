@@ -83,6 +83,20 @@
               ],
               "description": "Mount the ServiceAccount token into the pod. Null leaves it to the cluster default."
             },
+            "extraVolumes": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              },
+              "description": "Extra pod volumes, rendered verbatim and appended after the chart's own volumes."
+            },
+            "extraVolumeMounts": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              },
+              "description": "Extra volumeMounts for the Ontoserver container, rendered verbatim and appended after the chart's own mounts."
+            },
             "deploymentStrategy": {
               "type": "string",
               "enum": [

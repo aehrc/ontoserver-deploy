@@ -18,8 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Opt-in security context: `job.podSecurityContext`, `job.containerSecurityContext` and
   `job.automountServiceAccountToken`, all unset by default so existing users see no change. The
   README documents a hardened configuration; note a non-root Job needs an `fsGroup` that can
-  write the output PVC, and `readOnlyRootFilesystem` is not supported because the JVM writes to
-  `/tmp`.
+  write the output PVC.
+- `job.extraVolumes` and `job.extraVolumeMounts` — arbitrary volumes and mounts for the indexer
+  container, rendered verbatim and appended after the chart's own `output-volume`/`input-volume`
+  entries so those win a name collision. Both default to empty, so nothing changes for existing
+  users. This makes `readOnlyRootFilesystem: true` reachable: the indexer runs the same Spring Boot
+  image as the server and needs a writable `/tmp`, which the chart previously could not supply.
 
 ### Fixed
 

@@ -36,6 +36,15 @@ job:
   containerSecurityContext: {}
 ## @param job.automountServiceAccountToken Mount the ServiceAccount token into the Job pod. The indexer does not call the Kubernetes API, so false is safe. Leave unset (null) for the cluster default.
   automountServiceAccountToken: ~
+  ## Arbitrary extra volumes and mounts for the indexer container. Both default to empty, so
+  ## nothing changes for existing users. Rendered verbatim and appended after the chart's own
+  ## output-volume / input-volume entries, so those always win a name collision.
+  ## The primary use is `readOnlyRootFilesystem: true`, which needs a writable /tmp — the indexer
+  ## runs the same Spring Boot image as the server and writes /tmp/spring.log unconditionally.
+## @param job.extraVolumes Extra pod volumes, e.g. `[{name: tmp, emptyDir: {}}]`
+  extraVolumes: []
+## @param job.extraVolumeMounts Extra mounts for the indexer container, e.g. `[{name: tmp, mountPath: /tmp}]`
+  extraVolumeMounts: []
 
 
 ## @section Resources parameters
