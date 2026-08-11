@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> Note: this section covers the fixes made during the pre-merge review of the `update-charts`
+> branch. Earlier changes on the branch are not yet back-filled here.
+
+### Added
+
+- `ontoserver.deployment.allowScaledReadWrite` — opt in to the unsupported scaled read-write
+  topology. Scaled deployments must otherwise be read-only: each replica keeps its own Lucene
+  index on its own PVC, so content written through the round-robin Service is indexed only on
+  the replica that served the write, and `$expand`/`$validate-code` then fail on the others.
+- `ontoserver.deployment.podDisruptionBudget.maxUnavailable` and `.unhealthyPodEvictionPolicy`
+  as real values rather than commented-out suggestions.
+
+### Fixed
+
+- `podDisruptionBudget.minAvailable`/`.maxUnavailable` now accept percentages. The previous guard
+  compared `int` against 1, and `int "25%"` is 0, so every percentage — including the `25%` form
+  the values file suggested — was rejected. Percentages are emitted quoted and counts unquoted,
+  as the Kubernetes `IntOrString` type requires. Setting both, setting neither, `maxUnavailable: 0`,
+  and a `minAvailable` at or above the replica count are now all rejected with an actionable
+  message instead of silently producing an unevictable workload.
+- Configuration changes now roll the pods. `checksum/secret-config` and
+  `checksum/external-secret` annotations were added to the pod template, because Ontoserver
+  resolves its configuration as environment variables at container start, so a `helm upgrade`
+  that changed only a Secret left the running pods on the old value indefinitely. See
+  "Configuration changes and pod restarts" in the README for what is and is not covered.
+- The `<release>-ontoserver-db-files` StorageClass is no longer created when
+  `persistence.dbfiles.storageClass.provided.enabled` is `false`. The condition tested the
+  enclosing map, which is always truthy, leaving an orphaned cluster-scoped object while the PVC
+  correctly referenced `storageClass.name`.
+- Registry credentials containing a `"` or `\` no longer corrupt the image pull secret, in both
+  the chart-managed Secret and the External Secrets variant. The `.dockerconfigjson` was built by
+  interpolating credentials into a JSON string literal, so either character produced invalid
+  JSON — which the kubelet reports only as an opaque `ImagePullBackOff`.
+
 ## [0.3.0] - 2026-04-01
 
 ### Added

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `resources.heapGb` — sets the JVM `-Xmx` independently of the container memory limit. The
+  default is `memoryGb - 2`, leaving 2 GiB for non-heap JVM memory (metaspace, code cache,
+  thread stacks, GC structures, direct buffers). Previously `-Xmx` was set equal to the memory
+  limit, which guarantees an eventual OOMKill.
+- Validation rejecting a heap that meets or exceeds `resources.memoryGb`, so the misconfiguration
+  fails at install time rather than as an OOMKill mid-index.
+
+### Fixed
+
+- Registry credentials containing a `"` or `\` no longer corrupt the image pull secret. The
+  `.dockerconfigjson` was built by interpolating the username and password into a JSON string
+  literal with `printf`, so either character produced invalid JSON — which the kubelet reports
+  only as an opaque `ImagePullBackOff`. It is now built with `dict` and `toJson`.
+
+### Changed
+
+- The default Job name is now `<release name>-<release revision>` rather than the release name,
+  so an upgrade creates a new Job instead of failing on the immutable pod template of the
+  existing one.
+
 ## [0.1.0]
 
 ### Added

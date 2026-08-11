@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Varnish now restarts when its VCL changes. `varnishd` parses `/etc/varnish/default.vcl` once
+  at startup and never re-reads the mounted ConfigMap, so a `helm upgrade` that changed only a
+  cache setting updated the ConfigMap, left the pod template untouched, and Varnish went on
+  serving the previous VCL indefinitely. The Deployment pod template now carries a
+  `checksum/config` annotation over the rendered VCL. Note this means upgrading to this version
+  restarts Varnish once, discarding the warm cache.
+
+### Changed
+
+- The VCL body moved from `varnish-configmap.yaml` into a named template
+  (`ontoserver-extras.varnish.vcl`) so the Deployment can hash exactly the VCL text. The
+  rendered ConfigMap content is unchanged. The hash is deliberately independent of the chart
+  version, so future releases do not restart Varnish without a VCL change.
+- Chart icon URL now points at the `master` branch rather than the non-existent `main`.
+
 ## [0.1.0]
 
 ### Added

@@ -2,7 +2,7 @@ apiVersion: v2
 name: ontoserver-extras
 description: Optional infrastructure components for Ontoserver (Varnish cache, OTel Collector, PV)
 type: application
-version: 0.1.0
+version: 0.1.1
 appVersion: "ctsa-6"
 home: https://ontoserver.csiro.au
 icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/master/icons/ontoserver-extras.png
@@ -21,5 +21,5 @@ annotations:
   artifacthub.io/category: integration-delivery
   artifacthub.io/license: Apache-2.0
   artifacthub.io/changes: |
-    - kind: added
-      description: Initial public release
+    - kind: fixed
+      description: Varnish now restarts when the VCL changes (checksum/config pod annotation)

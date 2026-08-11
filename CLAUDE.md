@@ -74,5 +74,10 @@ gh release edit <chart>-vX.Y.Z --repo aehrc/ontoserver-deploy --latest
 | Chart | Published | In development |
 |---|---|---|
 | `ontoserver` | 0.3.0 (pre-release) | 0.3.1 |
-| `ontoserver-extras` | 0.1.0 | — |
-| `ontoserver-indexer` | 0.1.0 | — |
+| `ontoserver-extras` | 0.1.0 | 0.1.1 |
+| `ontoserver-indexer` | 0.1.0 | 0.2.0 |
+
+`Chart.yaml` always holds the *in-development* version — the one `release.sh` will tag next —
+and the changelog's `## [Unreleased]` section holds its notes. Both extras and indexer were left
+at their published version after the 0.1.0 release (which predates `release.sh`), so their
+Chart.yaml lagged behind the template changes on this branch.
