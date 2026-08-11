@@ -954,6 +954,21 @@ The `$closure` route backend follows `backendServiceNameOverride` — defaulting
 
 The routing is validated by the `$closure` routing integration test (`helm test`) which is automatically included for scaled StatefulSet deployments. See [Scaled StatefulSet integration test](#scaled-statefulset-integration-test) for local test instructions.
 
+#### The literal `$` in the path, and percent-encoding
+
+`$` is a legal URI path character, and the API server accepts it in an Ingress `path` under all three `pathType` values. Controllers differ in how they *match* it, though — tested against the two controllers this chart can drive, routing `/fhir/$closure` to a dedicated backend and everything else to a catchall:
+
+| Client sends | F5 NGINX Ingress 2.1.0 (bundled subchart) | Traefik IngressRoute |
+| --- | --- | --- |
+| `/fhir/$closure` | dedicated backend ✅ | dedicated backend ✅ |
+| `/fhir/%24closure` (percent-encoded) | dedicated backend ✅ | **catchall ❌** |
+
+> **Traefik caveat.** Traefik matches `PathPrefix` against the *encoded* path, so `%24closure` does not match `` PathPrefix(`/fhir/$closure`) `` and falls through to the catchall rule — which load-balances across every pod and therefore breaks the stateful closure table. NGINX decodes before matching, so both forms work there.
+>
+> Percent-encoding `$` is unusual but legal, and some HTTP client libraries do it when building URLs. If your clients might, either have them send the literal `$`, or add a second Traefik rule matching `` PathPrefix(`/fhir/%24closure`) `` to the same backend. The failure is silent — requests succeed, and only the closure results are wrong.
+
+**Not verified:** AWS ALB and Azure AGIC. Both translate Ingress paths into their own matching engines, and neither was available to test. If you use either, confirm `/fhir/$closure` reaches `RELEASE-ontoserver-pod0-service` before relying on `$closure` in a scaled deployment — the `helm test` closure suite exercises the Services directly and so passes even when the ingress path does not match.
+
 ## Envoy Gateway
 
 ### Infrastructure (GatewayClass and EnvoyProxy)

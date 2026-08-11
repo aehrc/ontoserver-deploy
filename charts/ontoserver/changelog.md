@@ -63,6 +63,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Documented a silent `$closure` routing failure on Traefik. Traefik matches `PathPrefix` against
+  the percent-encoded path, so a client sending `/fhir/%24closure` misses the dedicated pod-0 route
+  and is load-balanced across all pods, corrupting the stateful closure table. NGINX decodes before
+  matching and is unaffected. Both were tested; AWS ALB and Azure AGIC remain unverified and the
+  README says so.
+
 - Removed the unreachable `existingVolume` branch from the StatefulSet's `volumeClaimTemplates`.
   `validate-values.yaml` rejects `persistence.files.existingVolume` for a StatefulSet outright, so
   the branch could never render — and the spec it would have produced (`volumeName` with no
