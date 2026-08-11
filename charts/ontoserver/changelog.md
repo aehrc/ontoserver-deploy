@@ -46,6 +46,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `Deployment` with persistence on a `ReadWriteOnce` volume now renders `strategy.type: Recreate`
+  instead of the requested `RollingUpdate`. `RollingUpdate` cannot work there: it starts the
+  replacement pod before removing the old one, and a RWO disk attaches to one node at a time, so a
+  replacement scheduled elsewhere waits indefinitely on `Multi-Attach error` while the old pod is
+  never torn down. Reproduced on a live cluster; it also blocks PVC expansion until the volume
+  detaches. Scoped to `ReadWriteOnce`/`ReadWriteOncePod`, so `ReadWriteMany` users keep
+  zero-downtime rolling upgrades, and the sidecar's `dbfiles` access mode is only consulted when
+  the sidecar is enabled.
+
+  **Upgrading an existing release**: Kubernetes defaults `spec.strategy.rollingUpdate` and refuses
+  to hold it alongside `type: Recreate`. `helm upgrade` and client-side `kubectl apply` handle the
+  removal; **server-side apply fails** with `spec.strategy.rollingUpdate: Forbidden`. Each row of
+  that was verified on a cluster, and the README gives the one-line patch that clears it.
+
 - `ontoserver.secretConfig` no longer fails to render on a non-string value. `b64enc` rejects
   anything but a string, so a numeric port or a boolean flag aborted the whole release with
   `wrong type for value; expected string; got int64` — and the error named only `<b64enc>`, not the

@@ -156,3 +156,35 @@ fragile. So quote if and only if the value is a percentage.
 {{- define "ontoserver.pdbValue" -}}
 {{- if hasSuffix "%" (toString .) }}{{ toString . | quote }}{{ else }}{{ . }}{{ end }}
 {{- end }}
+
+{{/*
+The effective Deployment update strategy.
+
+`RollingUpdate` cannot work for a Deployment that mounts a ReadWriteOnce volume. The strategy
+brings up the replacement pod before tearing the old one down, but a RWO disk can only be
+attached to one node at a time, so if the replacement lands on a different node it waits forever:
+
+    Warning  FailedAttachVolume  Multi-Attach error for volume "pvc-..."
+             Volume is already used by pod(s) <old pod>
+
+The old pod is never torn down, so the rollout never completes without manual intervention. This
+was reproduced on a live cluster, and it also blocks PVC expansion — a resize sits in `Resizing`
+until the volume detaches. So `Recreate` is substituted rather than merely recommended: the
+requested strategy is not slower or riskier here, it is unachievable.
+
+Deliberately scoped to RWO/ReadWriteOncePod. `ReadWriteMany` (Azure Files, NFS) can be attached
+to several nodes at once and rolls without incident, so those users keep zero-downtime upgrades.
+StatefulSets are unaffected — each pod gets its own PVC via volumeClaimTemplates and the ordered
+strategy never overlaps two pods on one volume.
+*/}}
+{{- define "ontoserver.deploymentStrategy" -}}
+{{- $p := .Values.ontoserver.deployment.persistence -}}
+{{- $exclusive := list "ReadWriteOnce" "ReadWriteOncePod" -}}
+{{- $filesExclusive := and $p.enabledForDeployment (has $p.files.accessMode $exclusive) -}}
+{{- $dbExclusive := and $p.enabledForDeployment (eq $p.mode "split") .Values.ontoserver.deployment.db.enabled (has $p.dbfiles.accessMode $exclusive) -}}
+{{- if or $filesExclusive $dbExclusive -}}
+Recreate
+{{- else -}}
+{{ required "ontoserver.deployment.deploymentStrategy is required" .Values.ontoserver.deployment.deploymentStrategy }}
+{{- end -}}
+{{- end }}

@@ -27,7 +27,9 @@ spec:
   {{- end }}
   replicas: {{ .Values.ontoserver.deployment.replicas }}
   strategy:
-    type: {{ required "ontoserver.deployment.deploymentStrategy is required" .Values.ontoserver.deployment.deploymentStrategy }}
+    {{- /* Substituted to Recreate when a ReadWriteOnce volume is mounted, because RollingUpdate
+         deadlocks on Multi-Attach there. See the helper for the reproduction. */}}
+    type: {{ include "ontoserver.deploymentStrategy" . }}
   selector:
     matchLabels:
       {{- include "ontoserver.selectorLabels" . | nindent 6 }}

@@ -28,6 +28,7 @@ This chart provides flexible deployment options for [Ontoserver](https://ontoser
     - [CI matrix](#ci-matrix)
 - [Persistence](#persistence)
   - [Pre-provisioned PersistentVolumes](#pre-provisioned-persistentvolumes)
+- [Update strategy](#update-strategy)
 - [Health Checking](#health-checking)
   - [Healthcheck and HTTPS mode](#healthcheck-and-https-mode-ontoserver_insecure-false)
 - [Amazon EKS](#amazon-eks)
@@ -411,6 +412,50 @@ The PV name is taken from `existingVolume.name` so the PVC and PV stay in sync. 
 > **StatefulSet limitation:** Do not set `files.existingVolume.*` or `dbfiles.existingVolume.*` with `deployment.kind: StatefulSet`. The chart rejects this configuration. Use a StorageClass-backed StatefulSet instead.
 
 > **Upgrade note:** Chart-managed PVCs are annotated with `helm.sh/resource-policy: keep`. This prevents Helm from patching the immutable `spec` fields (such as `storageClassName`) on upgrade and ensures PVCs are retained on `helm uninstall`. Delete PVCs manually if a full teardown is required.
+
+## Update strategy
+
+For a `Deployment`, `ontoserver.deployment.deploymentStrategy` defaults to `RollingUpdate` — but the chart **substitutes `Recreate`** when persistence is enabled on a volume whose access mode is `ReadWriteOnce` or `ReadWriteOncePod`.
+
+This is not a preference. `RollingUpdate` brings the replacement pod up *before* tearing the old one down, and a `ReadWriteOnce` disk can only be attached to one node at a time. If the replacement is scheduled onto a different node it waits indefinitely:
+
+```
+Warning  FailedAttachVolume  Multi-Attach error for volume "pvc-..."
+         Volume is already used by pod(s) <old pod>
+```
+
+The old pod is never torn down, so the rollout never completes without manual intervention. This was reproduced on a live cluster, not inferred. It also **blocks PVC expansion** — a resize sits in `Resizing` until the volume detaches, then completes.
+
+| Configuration | Effective strategy |
+| --- | --- |
+| No persistence | as requested (`RollingUpdate` by default) |
+| Persistence, `ReadWriteOnce` / `ReadWriteOncePod` | **`Recreate`** |
+| Persistence, `ReadWriteMany` (Azure Files, NFS) | as requested |
+| `split` mode where *either* volume is exclusive | **`Recreate`** |
+| `deployment.kind: StatefulSet` | unaffected — not a Deployment |
+
+`ReadWriteMany` is excluded deliberately: it can be attached to several nodes at once, so it rolls without incident and those users keep zero-downtime upgrades. The sidecar's `dbfiles` access mode is only consulted when the sidecar is actually enabled, so an external-database deployment is not penalised for a value that has no effect.
+
+The practical consequence of `Recreate` is a **brief outage on every upgrade** — the old pod is fully terminated before the new one starts. With a warm Lucene index, expect the startup probe's usual delay. Run a scaled `StatefulSet` if you need upgrades without downtime, since each replica then owns its own volume.
+
+### Upgrading an existing release onto this behaviour
+
+Kubernetes defaults `spec.strategy.rollingUpdate` on any Deployment created with `RollingUpdate`, and it refuses to hold that block alongside `type: Recreate`. Switching an existing release therefore has to remove the defaulted block in the same operation. How that goes depends on how you apply manifests — verified on a live cluster, per row:
+
+| How you deploy | Switching to `Recreate` |
+| --- | --- |
+| `helm upgrade` | **works** — Helm's three-way merge removes the defaulted block |
+| `kubectl apply` (client-side) | **works** |
+| `kubectl apply --server-side` (some ArgoCD configurations) | **fails**: `spec.strategy.rollingUpdate: Forbidden: may not be specified when strategy 'type' is 'Recreate'` |
+
+If you hit the server-side apply failure, none of the obvious workarounds help: `--force-conflicts` still fails because this is validation rather than a field conflict, an explicit `rollingUpdate: null` in the manifest is dropped before it reaches the server, and removing the block on its own is immediately re-defaulted while the type is still `RollingUpdate`. What works is one atomic patch, after which server-side apply is clean:
+
+```bash
+kubectl patch deployment <release>-ontoserver-deployment -n <namespace> \
+  --type=merge -p '{"spec":{"strategy":{"type":"Recreate","rollingUpdate":null}}}'
+```
+
+Deleting the Deployment and letting it be recreated also works. The PVC is annotated `helm.sh/resource-policy: keep`, so the index survives either way.
 
 ## Health Checking
 
@@ -823,7 +868,7 @@ Against the AKS built-in policy set, the cluster run reported **no** violations 
 > - **An existing PVC with data on it.** Kubernetes relabels the volume it mounts, and a large pre-existing Lucene index can take a long time to `chown` — the validation above used a freshly provisioned, empty volume, so it says nothing about that delay.
 > - **A mounted `ontoserver.customization` ConfigMap**, which was not part of the tested configuration.
 >
-> Also note that if you enable persistence on a `Deployment` you should set `ontoserver.deployment.deploymentStrategy: Recreate`. The default `RollingUpdate` deadlocks against a `ReadWriteOnce` volume — the replacement pod cannot attach the disk while the outgoing pod holds it (`Multi-Attach error`), and it also blocks PVC expansion until the volume detaches. This is unrelated to the security context but you will meet it on the same upgrade.
+> Also note that enabling persistence changes the Deployment update strategy — see [Update strategy](#update-strategy). That is unrelated to the security context, but you will meet it on the same upgrade.
 
 ## Outbound HTTP proxy
 
@@ -1074,7 +1119,7 @@ Requires the [External Secrets Operator](https://external-secrets.io/) installed
 | `ontoserver.deployment.automountServiceAccountToken`                                        | Mount the ServiceAccount token into the pod. Ontoserver does not call the Kubernetes API — scaled clustering uses DNS, not the API — so false is safe. Leave unset (null) for the cluster default.                                                                                                                                                           | `nil`                             |
 | `ontoserver.deployment.extraVolumes`                                                        | Extra pod volumes, e.g. `[{name: tmp, emptyDir: {}}]`                                                                                                                                                                                                                                                                                                        | `[]`                              |
 | `ontoserver.deployment.extraVolumeMounts`                                                   | Extra mounts for the Ontoserver container, e.g. `[{name: tmp, mountPath: /tmp}]`                                                                                                                                                                                                                                                                             | `[]`                              |
-| `ontoserver.deployment.deploymentStrategy`                                                  | K8s update strategy when using Deployment Kind                                                                                                                                                                                                                                                                                                               | `RollingUpdate`                   |
+| `ontoserver.deployment.deploymentStrategy`                                                  | K8s update strategy when using Deployment Kind. Forced to Recreate when a ReadWriteOnce volume is mounted.                                                                                                                                                                                                                                                   | `RollingUpdate`                   |
 | `ontoserver.deployment.startupProbe.initialDelaySeconds`                                    | Startup probe initial delay                                                                                                                                                                                                                                                                                                                                  | `5`                               |
 | `ontoserver.deployment.startupProbe.periodSeconds`                                          | Startup probe period                                                                                                                                                                                                                                                                                                                                         | `2`                               |
 | `ontoserver.deployment.startupProbe.failureThreshold`                                       | Startup probe failure threshold                                                                                                                                                                                                                                                                                                                              | `150`                             |

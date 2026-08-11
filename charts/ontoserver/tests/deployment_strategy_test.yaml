@@ -1,0 +1,94 @@
+suite: Deployment update strategy tests
+templates:
+  - templates/deployment.yaml
+tests:
+  # Unchanged for the common case: no volume means no attach conflict, so a stateless Deployment
+  # keeps zero-downtime rolling upgrades.
+  - it: keeps RollingUpdate when persistence is disabled
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: RollingUpdate
+
+  # Regression test for a deadlock reproduced on a live cluster. RollingUpdate starts the
+  # replacement pod before removing the old one, but a ReadWriteOnce disk attaches to one node at
+  # a time, so a replacement scheduled elsewhere waits forever on `Multi-Attach error` and the old
+  # pod is never torn down. It also blocks PVC expansion until the volume detaches.
+  - it: substitutes Recreate when persistence uses ReadWriteOnce
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+
+  - it: substitutes Recreate even when RollingUpdate is requested explicitly
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.deploymentStrategy: RollingUpdate
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+
+  - it: substitutes Recreate for ReadWriteOncePod
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.persistence.files.accessMode: ReadWriteOncePod
+      ontoserver.deployment.persistence.dbfiles.accessMode: ReadWriteOncePod
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+
+  # ReadWriteMany can be attached to several nodes at once, so there is no conflict and no reason
+  # to take the downtime. Scoping the substitution to exclusive access modes is the point of the
+  # helper — forcing Recreate for every persistent Deployment would cost these users uptime for
+  # nothing.
+  - it: keeps RollingUpdate when both volumes are ReadWriteMany
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.persistence.files.accessMode: ReadWriteMany
+      ontoserver.deployment.persistence.dbfiles.accessMode: ReadWriteMany
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: RollingUpdate
+
+  # In split mode the sidecar's data volume is a second PVC, and one exclusive volume is enough to
+  # deadlock the rollout — so the files volume being ReadWriteMany is not sufficient on its own.
+  - it: substitutes Recreate when only the db volume is exclusive
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.persistence.files.accessMode: ReadWriteMany
+      ontoserver.deployment.persistence.dbfiles.accessMode: ReadWriteOnce
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+
+  # With the sidecar off there is no dbfiles PVC, so its access mode must not be consulted —
+  # otherwise an external-database deployment on ReadWriteMany would take needless downtime
+  # because of a value that has no effect.
+  - it: ignores the db access mode when the sidecar is disabled
+    values:
+      - fixtures/external-db-values.yaml
+    set:
+      ontoserver.deployment.db.enabled: false
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.persistence.files.accessMode: ReadWriteMany
+      ontoserver.deployment.persistence.dbfiles.accessMode: ReadWriteOnce
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: RollingUpdate
+
+  - it: honours an explicit Recreate with no persistence
+    set:
+      ontoserver.deployment.deploymentStrategy: Recreate
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate

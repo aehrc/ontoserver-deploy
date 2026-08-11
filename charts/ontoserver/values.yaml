@@ -57,7 +57,10 @@ ontoserver:
     extraVolumes: []
     ## @param ontoserver.deployment.extraVolumeMounts    Extra mounts for the Ontoserver container, e.g. `[{name: tmp, mountPath: /tmp}]`
     extraVolumeMounts: []
-    ## @param ontoserver.deployment.deploymentStrategy  K8s update strategy when using Deployment Kind
+    ## Ignored — and replaced with Recreate — when persistence is enabled on a ReadWriteOnce
+    ## volume, because RollingUpdate deadlocks on Multi-Attach there and the rollout never
+    ## completes. ReadWriteMany keeps the requested strategy. See the README ("Update strategy").
+    ## @param ontoserver.deployment.deploymentStrategy  K8s update strategy when using Deployment Kind. Forced to Recreate when a ReadWriteOnce volume is mounted.
     deploymentStrategy: RollingUpdate
     startupProbe:
       ## @param ontoserver.deployment.startupProbe.initialDelaySeconds   Startup probe initial delay
