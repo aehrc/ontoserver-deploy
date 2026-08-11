@@ -1,9 +1,22 @@
 name: Integration Tests
 
 on:
+  # Every branch, not just master: this was master-only from 2026-03 to 2026-08, during which
+  # the branch accumulated 50 commits of chart changes with no integration run behind them.
+  # branches: ['**'] rather than a bare `push:` so release tag pushes do not run this workflow
+  # a second time on top of the branch push that produced them.
+  #
+  # No `pull_request:` trigger — every PR branch lives in this repo, so the push event already
+  # covers it and adding one would double the k3d clusters per commit.
   push:
-    branches: [master]
+    branches: ['**']
   workflow_dispatch:
+
+# Integration runs are far more expensive than the unit suite, so superseded runs on the same
+# branch are cancelled rather than left to finish.
+concurrency:
+  group: integration-tests-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
