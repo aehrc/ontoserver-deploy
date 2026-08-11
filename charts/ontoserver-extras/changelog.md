@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `collector.podSecurityContext` and `collector.containerSecurityContext`. The collector pod is
+  built by the OpenTelemetry Operator from the `OpenTelemetryCollector` CR, so these render as CR
+  fields rather than pod-spec fields: `spec.podSecurityContext` and `spec.securityContext` — the
+  latter being the *container* context despite the name. Both verified against the `v1beta1` CRD
+  shipped with operator 0.156.0. `spec.containerSecurityContext`, the plausible spelling, is not a
+  field on the CRD, and since the CRD does not reject unknown fields it would have applied cleanly
+  and been ignored; a test asserts the chart does not emit it. Rendering is validated, but this has
+  not been run against a live Operator.
+
 - Readiness and liveness probes on the `varnish` container (`varnish.probes.*`, on by default).
   Only the metrics exporter sidecar had one before, so the Service began routing to a pod whose
   `varnishd` was not yet accepting connections and every rolling update dropped requests.

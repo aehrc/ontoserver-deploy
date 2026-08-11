@@ -74,15 +74,17 @@ All features are disabled by default — installing the chart with no overrides 
 
 ### OpenTelemetry Collector
 
-| Name                            | Description                                                                                                                                                                                     | Value   |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `collector.enabled`             | Enable OpenTelemetryCollector CRD (Instrumentation CRD is in the ontoserver chart)                                                                                                              | `false` |
-| `collector.otlpEndpoint`        | OTLP gRPC exporter endpoint (required when enabled)                                                                                                                                             | `""`    |
-| `collector.zipkinEndpoint`      | Zipkin exporter endpoint (required when enabled)                                                                                                                                                | `""`    |
-| `collector.tolerations`         | Pod tolerations for the OpenTelemetryCollector                                                                                                                                                  | `[]`    |
-| `collector.debug`               | Enable debug exporter with detailed verbosity (not suitable for production)                                                                                                                     | `false` |
-| `collector.batch.sendBatchSize` | Spans per batch before the batch processor flushes                                                                                                                                              | `1000`  |
-| `collector.batch.timeout`       | Maximum time a span waits before being flushed regardless of batch size. Must not be 0s — that disables the timer entirely, so on a quiet server spans wait indefinitely for the batch to fill. | `5s`    |
+| Name                                 | Description                                                                                                                                                                                     | Value   |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `collector.enabled`                  | Enable OpenTelemetryCollector CRD (Instrumentation CRD is in the ontoserver chart)                                                                                                              | `false` |
+| `collector.otlpEndpoint`             | OTLP gRPC exporter endpoint (required when enabled)                                                                                                                                             | `""`    |
+| `collector.zipkinEndpoint`           | Zipkin exporter endpoint (required when enabled)                                                                                                                                                | `""`    |
+| `collector.tolerations`              | Pod tolerations for the OpenTelemetryCollector                                                                                                                                                  | `[]`    |
+| `collector.debug`                    | Enable debug exporter with detailed verbosity (not suitable for production)                                                                                                                     | `false` |
+| `collector.podSecurityContext`       | Pod-level securityContext for the collector pod, passed to the CR's spec.podSecurityContext (e.g. runAsNonRoot, runAsUser, fsGroup, seccompProfile)                                             | `{}`    |
+| `collector.containerSecurityContext` | Container-level securityContext for the collector container, passed to the CR's spec.securityContext (e.g. allowPrivilegeEscalation, capabilities, readOnlyRootFilesystem)                      | `{}`    |
+| `collector.batch.sendBatchSize`      | Spans per batch before the batch processor flushes                                                                                                                                              | `1000`  |
+| `collector.batch.timeout`            | Maximum time a span waits before being flushed regardless of batch size. Must not be 0s — that disables the timer entirely, so on a quiet server spans wait indefinitely for the batch to fill. | `5s`    |
 
 ## Deploying alongside the ontoserver chart
 
@@ -250,8 +252,9 @@ By default the chart sets no `securityContext`, so containers run as whatever th
 | `varnish.podSecurityContext` | the Varnish pod |
 | `varnish.containerSecurityContext` | **every** container in the pod — `varnish`, `varnish-exporter`, `varnish-trace-converter`, `trace-forwarder` and the `init-trace-pipe` init container |
 | `varnish.automountServiceAccountToken` | the pod — safe to set `false`; Varnish never calls the Kubernetes API |
+| `collector.podSecurityContext` / `collector.containerSecurityContext` | the OpenTelemetry Collector pod — see [below](#opentelemetry-collector-1), these are CR fields rather than pod-spec fields |
 
-Both default to unset, so upgrading an existing release leaves the pod spec byte-identical and does not discard a warm cache.
+All default to unset, so upgrading an existing release leaves the pod spec byte-identical and does not discard a warm cache.
 
 There is one container-level value rather than one per container because these containers are a single unit: they share a process namespace (`shareProcessNamespace: true`, which is what lets the exporter and `varnishlog` see the `varnishd` process), so per-container isolation settings would be misleading.
 
@@ -272,6 +275,32 @@ varnish:
 ```
 
 `readOnlyRootFilesystem` is left out deliberately: `varnishd` compiles the VCL into a shared object at startup and needs a writable working directory, and the exporter and trace sidecars have not been verified under it. The `ghcr.io/aehrc/varnish-exporter` image was not reachable for inspection when this was written, so treat the exporter sidecar in particular as unverified and test before relying on it.
+
+### OpenTelemetry Collector
+
+The collector pod is not created by this chart — the OpenTelemetry Operator builds it from the `OpenTelemetryCollector` CR. Hardening it therefore means setting **CR fields**, not pod-spec fields, and the chart passes two values through:
+
+| Value | Rendered as |
+| --- | --- |
+| `collector.podSecurityContext` | `spec.podSecurityContext` on the CR |
+| `collector.containerSecurityContext` | `spec.securityContext` on the CR |
+
+Note the asymmetry: the CR's `spec.securityContext` is the **container** context, despite the name. There is no `spec.containerSecurityContext` field — that plausible-looking spelling is not defined on the CRD, and because the CRD does not reject unknown fields, using it would produce a CR that applies cleanly and is silently ignored. Both names here were checked against the `v1beta1` CRD shipped with operator **0.156.0**, where each carries the full corresponding Kubernetes type.
+
+```yaml
+collector:
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: [ALL]
+```
+
+This has been validated as rendering the fields the CRD declares; it has **not** been run against a live Operator, so confirm the collector still starts before adopting it — in particular `readOnlyRootFilesystem`, which is included above only as an example.
 
 ## Resource Naming
 

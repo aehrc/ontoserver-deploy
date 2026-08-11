@@ -180,3 +180,64 @@ tests:
       - notContains:
           path: spec.config.processors["filter/health_checks"].traces.span
           content: 'name == "cache_lookup" and IsMatch(attributes["http.url"], "/fhir/metadata")'
+
+  # The collector pod is built by the OpenTelemetry Operator from this CR, so hardening it means
+  # setting CR fields, not pod-spec fields. Both names were verified against the v1beta1 CRD
+  # shipped with operator 0.156.0: `spec.podSecurityContext` and `spec.securityContext` — the
+  # latter being the *container* context despite the name. `spec.containerSecurityContext`, the
+  # obvious guess, is not a field on the CRD at all.
+  - it: sets no security context by default
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - isNull:
+          path: spec.podSecurityContext
+      - isNull:
+          path: spec.securityContext
+
+  - it: passes the pod security context to the CR
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+      collector.podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+    asserts:
+      - equal:
+          path: spec.podSecurityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.podSecurityContext.runAsUser
+          value: 10001
+      - equal:
+          path: spec.podSecurityContext.seccompProfile.type
+          value: RuntimeDefault
+
+  - it: passes the container security context to the CR's spec.securityContext
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+      collector.containerSecurityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+    asserts:
+      - equal:
+          path: spec.securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.securityContext.capabilities.drop
+          value:
+            - ALL
+      # The name the CRD does NOT define. Asserted so a future rename to the "obvious" spelling
+      # fails here rather than silently producing a CR the Operator ignores.
+      - isNull:
+          path: spec.containerSecurityContext

@@ -11,6 +11,18 @@ spec:
   {{- if .Values.collector.tolerations }}
   tolerations: {{ toJson .Values.collector.tolerations }}
   {{- end }}
+  {{- /* The Operator builds the collector Deployment from this CR, so these are CR fields rather
+       than pod-spec fields: spec.podSecurityContext and spec.securityContext (the latter is the
+       *container* context, despite the name). Both verified present on the v1beta1 CRD shipped
+       with operator 0.156.0, each carrying the full Kubernetes type. */}}
+  {{- with .Values.collector.podSecurityContext }}
+  podSecurityContext:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.collector.containerSecurityContext }}
+  securityContext:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   config:
     receivers:
       zipkin:

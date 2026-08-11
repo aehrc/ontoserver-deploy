@@ -247,6 +247,14 @@
           "default": false,
           "description": "Enable debug exporter with detailed verbosity. Not suitable for production."
         },
+        "podSecurityContext": {
+          "type": "object",
+          "description": "Pod-level securityContext, passed to the OpenTelemetryCollector CR's spec.podSecurityContext. Empty means unset."
+        },
+        "containerSecurityContext": {
+          "type": "object",
+          "description": "Container-level securityContext, passed to the OpenTelemetryCollector CR's spec.securityContext. Empty means unset."
+        },
         "batch": {
           "type": "object",
           "description": "Batch processor settings for the traces pipeline",

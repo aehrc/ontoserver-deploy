@@ -136,6 +136,15 @@ collector:
   tolerations: []
   ## @param collector.debug  Enable debug exporter with detailed verbosity (not suitable for production)
   debug: false
+  ## Security context for the collector pod. These are NOT ordinary pod-spec fields — the pod is
+  ## created by the OpenTelemetry Operator from this CR, so they are passed through as
+  ## spec.podSecurityContext and spec.securityContext on the OpenTelemetryCollector resource.
+  ## Both field names verified against the v1beta1 CRD shipped with operator 0.156.0, where each
+  ## is the full Kubernetes type. Both default to unset, so existing releases are unchanged.
+  ## @param collector.podSecurityContext                         Pod-level securityContext for the collector pod, passed to the CR's spec.podSecurityContext (e.g. runAsNonRoot, runAsUser, fsGroup, seccompProfile)
+  podSecurityContext: {}
+  ## @param collector.containerSecurityContext                   Container-level securityContext for the collector container, passed to the CR's spec.securityContext (e.g. allowPrivilegeEscalation, capabilities, readOnlyRootFilesystem)
+  containerSecurityContext: {}
   batch:
     ## @param collector.batch.sendBatchSize                       Spans per batch before the batch processor flushes
     sendBatchSize: 1000
