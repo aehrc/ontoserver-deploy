@@ -99,6 +99,42 @@ automountServiceAccountToken: {{ .Values.ontoserver.deployment.automountServiceA
 {{- end }}
 
 {{/*
+Security context for the chart's `helm test` hook pods.
+
+Unlike the workload pods, these are hardened unconditionally rather than opt-in. They are
+chart-owned, ephemeral (they exist only for the duration of a `helm test`) and run nothing but
+curl against a mounted script, so there is no existing release whose behaviour could change and
+nothing deployment-specific to get wrong.
+
+Doing this is not cosmetic. Cluster policy that audits pod security counts these pods too: on a
+cluster with the AKS "allowed users and groups" policy, a release with a fully hardened workload
+still reported violations from the test hooks alone, because the policy inspects the manifest and
+does not care that curlimages/curl happens to default to a non-root uid.
+
+uid 100 / gid 101 are curl_user / curl_group in curlimages/curl. readOnlyRootFilesystem is safe
+only because every test script writes its response bodies to /tmp and each Job mounts an emptyDir
+there — keep those together if either is changed.
+*/}}
+{{- define "ontoserver.testPodSecurity" -}}
+automountServiceAccountToken: false
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 100
+  runAsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+{{- end }}
+
+{{- define "ontoserver.testContainerSecurity" -}}
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+{{- end }}
+
+{{/*
 Is a PodDisruptionBudget field set?
 
 `empty` cannot be used here: empty 0 is true, so it conflates a deliberate 0 with an unset

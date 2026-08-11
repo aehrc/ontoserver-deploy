@@ -91,16 +91,24 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      {{- include "ontoserver.testPodSecurity" . | nindent 6 }}
       volumes:
         - name: script
           configMap:
             name: {{ .Release.Name }}-ontoserver-test-ro-script
             defaultMode: 0755
+        {{- /* readOnlyRootFilesystem is set on the container; every test script writes
+             its response bodies to /tmp, so /tmp must be writable. */}}
+        - name: tmp
+          emptyDir: {}
       containers:
         - name: test
           image: curlimages/curl:8.11.1
+          {{- include "ontoserver.testContainerSecurity" . | nindent 10 }}
           command: ["/bin/sh", "/scripts/test.sh"]
           volumeMounts:
             - name: script
               mountPath: /scripts
+            - name: tmp
+              mountPath: /tmp
 {{- end }}

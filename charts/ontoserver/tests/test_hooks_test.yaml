@@ -263,3 +263,132 @@ tests:
           path: data["test.sh"]
           pattern: 'RELEASE-NAME-ontoserver-headless:8080'
         documentIndex: 0
+
+  # The test hook pods are hardened unconditionally, unlike the workload pods. This is not
+  # cosmetic: cluster policy that audits pod security counts these pods too, and a release with a
+  # fully hardened workload still reported violations from the test hooks alone, because the
+  # policy inspects the manifest and does not care that curlimages/curl defaults to a non-root
+  # uid. Verified against curlimages/curl:8.11.1 — uid 100 is curl_user, gid 101 curl_group.
+  - it: hardens the metadata test hook pod
+    templates:
+      - templates/tests/test-metadata-job.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 100
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.securityContext.runAsGroup
+          value: 101
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value:
+            - ALL
+        documentIndex: 1
+
+  # readOnlyRootFilesystem and the /tmp emptyDir are a pair: every test script writes its
+  # response body to /tmp/response.json, so enabling one without the other breaks every hook.
+  # Asserted together so they cannot be separated by a later edit.
+  - it: pairs readOnlyRootFilesystem with a writable /tmp on the metadata hook
+    templates:
+      - templates/tests/test-metadata-job.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+        documentIndex: 1
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+        documentIndex: 1
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir: {}
+        documentIndex: 1
+
+  - it: hardens the read-only fhir test hook
+    templates:
+      - templates/tests/test-fhir-ro-job.yaml
+    set:
+      ontoserver.deployment.isReadOnly: true
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 100
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+        documentIndex: 1
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+        documentIndex: 1
+
+  - it: hardens the read-write fhir test hook
+    templates:
+      - templates/tests/test-fhir-rw-job.yaml
+    set:
+      ontoserver.deployment.isReadOnly: false
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 100
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+        documentIndex: 1
+      # This hook mounts fixtures as well, so the /tmp mount must not have displaced them.
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: fixtures
+            mountPath: /fixtures
+        documentIndex: 1
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+        documentIndex: 1
+
+  - it: hardens the closure-scaled test hook
+    templates:
+      - templates/tests/test-closure-scaled-job.yaml
+    values:
+      - fixtures/scaled-values.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 100
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+        documentIndex: 1
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+        documentIndex: 1
