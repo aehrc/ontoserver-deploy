@@ -42,6 +42,10 @@ ontoserver:
     image: quay.io/aehrc/ontoserver:ctsa-6
     replicas: 2    # keep small given experimental status
     isReadOnly: false   # ← read-write across multiple instances (experimental)
+    # The chart blocks scaled read-write by default. CI has since demonstrated the failure
+    # concretely on a scaled install: $expand and $validate-code return HTTP 500 on the
+    # replica that did not serve the write. This flag opts in anyway.
+    allowScaledReadWrite: true
 
     clusterName: "ontoserver-rw"
 

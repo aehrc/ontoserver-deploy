@@ -93,7 +93,10 @@ ontoserver:
     kind: StatefulSet
     type: scaled
     replicas: 2
-    isReadOnly: false   # $closure is a POST — disabled in read-only mode
+    # Scaled deployments are always read-only — validate-values.yaml enforces it. $closure is
+    # still available: it is a stateful operation, which is why it must always be routed to
+    # one specific pod (pod-0, via <release>-ontoserver-pod0-service).
+    isReadOnly: true
     db:
       enabled: false
   config:

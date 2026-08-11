@@ -22,8 +22,10 @@ ontoserver:
     lifecycle: {}
     ## @param ontoserver.deployment.imagePullSecrets    Additional pre-created image pull secrets to attach to the pod (merged with the chart-managed pull secret when imageCredentials are set)
     imagePullSecrets: []
-    ## @param ontoserver.deployment.isReadOnly          Ontoserver in read‑only mode - keep it true for scaled
+    ## @param ontoserver.deployment.isReadOnly          Ontoserver in read‑only mode. Required to be true when type is scaled; see allowScaledReadWrite.
     isReadOnly: true
+    ## @param ontoserver.deployment.allowScaledReadWrite Opt in to the unsupported scaled read-write topology. Each replica has its own Lucene index, so content written through the round-robin Service is only indexed on the replica that served the write and $expand / $validate-code fail on the others. Load content with a single-instance read-write deployment instead, then serve it scaled and read-only.
+    allowScaledReadWrite: false
     ## @param ontoserver.deployment.replicas            Number of replicas - min 2 for scaled deployment - can be set to 0
     replicas: 1
     ## @param ontoserver.deployment.clusterName         Cluster name for auto-discovery in scaled deployments (overrides the default "ontoserver" set in application.properties); ignored for single deployments

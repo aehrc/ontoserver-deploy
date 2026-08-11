@@ -66,11 +66,15 @@ jobs:
           # i.e. that $closure is pinned to pod-0 and both pods are individually addressable.
           # Needs an external PostgreSQL (a scaled deployment cannot use the sidecar DB) and
           # its fixture enables a Traefik IngressRoute, hence needsTraefikCrds.
+          #
+          # Read-only is mandatory when scaled (enforced by validate-values.yaml): each replica
+          # has its own Lucene index, so a write served by one replica is missing from the
+          # others. $closure stays available because it is pinned to pod-0.
           - name: scaled
             release: ontoserver-scaled
-            isReadOnly: "false"
+            isReadOnly: "true"
             expectedHook: ontoserver-scaled-ontoserver-test-closure-scaled
-            unexpectedHook: ontoserver-scaled-ontoserver-test-fhir-ro
+            unexpectedHook: ontoserver-scaled-ontoserver-test-fhir-rw
             runHelmTest: true
             verifyTraefikRoute: false
             valuesFile: scaled-values.yaml

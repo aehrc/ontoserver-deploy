@@ -46,6 +46,9 @@
             "isReadOnly": {
               "type": "boolean"
             },
+            "allowScaledReadWrite": {
+              "type": "boolean"
+            },
             "replicas": {
               "type": "integer",
               "minimum": 0
