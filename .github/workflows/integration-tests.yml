@@ -82,7 +82,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Install Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@v5.0.1
         with:
           version: v3.18.4
 
@@ -254,13 +254,18 @@ jobs:
           echo "=== test-metadata logs ==="
           kubectl logs -l job-name=${{ matrix.mode.release }}-ontoserver-test-metadata --tail=200 || true
 
+      # Every test hook, not just the mode-specific one: `helm test` fails on ANY hook, so
+      # collecting only expectedHook leaves the actual failure invisible in the log.
       - name: Collect helm test hook logs
         if: always() && matrix.mode.runHelmTest
         run: |
-          echo "=== mode-specific test job ==="
-          kubectl describe job ${{ matrix.mode.expectedHook }} || true
-          echo "=== mode-specific test logs ==="
-          kubectl logs -l job-name=${{ matrix.mode.expectedHook }} --tail=200 || true
+          for job in $(kubectl get jobs -o name | sed 's|job.batch/||' | grep -- '-test-'); do
+            echo "=== job/$job ==="
+            kubectl get job "$job" -o jsonpath='{.status}' || true
+            echo ""
+            echo "--- logs ---"
+            kubectl logs -l job-name="$job" --tail=200 || true
+          done
 
       - name: Collect Traefik logs
         if: always() && matrix.mode.verifyTraefikRoute
