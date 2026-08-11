@@ -294,28 +294,14 @@
                   "type": "boolean"
                 },
                 "minAvailable": {
-                  "oneOf": [
-                    {
-                      "type": "integer"
-                    },
-                    {
-                      "type": "string"
-                    }
-                  ]
+                  "type": ["integer", "string", "null"]
                 },
                 "maxUnavailable": {
-                  "oneOf": [
-                    {
-                      "type": "integer"
-                    },
-                    {
-                      "type": "string"
-                    }
-                  ]
+                  "type": ["integer", "string", "null"]
                 },
                 "unhealthyPodEvictionPolicy": {
-                  "type": "string",
-                  "default": null
+                  "type": ["string", "null"],
+                  "enum": [null, "", "IfHealthyBudget", "AlwaysAllow"]
                 }
               }
             },

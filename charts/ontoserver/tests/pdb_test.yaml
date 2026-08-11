@@ -1,0 +1,187 @@
+suite: PodDisruptionBudget tests
+templates:
+  - templates/poddistributionbudget.yaml
+tests:
+  # A PDB only applies to scaled deployments. A single instance owns its Lucene index on a
+  # ReadWriteOnce PVC and must be replaced, not kept available, so a PDB there would just
+  # block node drains.
+  - it: does not render for a single deployment
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render when disabled
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.podDisruptionBudget.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders minAvailable as an integer for a scaled deployment
+    values:
+      - fixtures/scaled-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-pdb
+      - equal:
+          path: spec.minAvailable
+          value: 1
+      # Must match .spec.selector on the StatefulSet, which is immutable.
+      - equal:
+          path: spec.selector.matchLabels.app
+          value: RELEASE-NAME-ontoserver
+      - isNull:
+          path: spec.maxUnavailable
+      - isNull:
+          path: spec.unhealthyPodEvictionPolicy
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: ontoserver
+
+  # int "25%" is 0, so the old numeric guard rejected every percentage — including this exact
+  # form, which values.yaml suggests. Percentages must render as quoted strings: an unquoted
+  # minAvailable: "1" would be parsed as a percentage by the API server and rejected.
+  - it: renders a percentage minAvailable as a quoted string
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.podDisruptionBudget.minAvailable: 50%
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: "50%"
+      - matchRegex:
+          path: spec.minAvailable
+          pattern: '^50%$'
+
+  - it: renders maxUnavailable when minAvailable is cleared
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.podDisruptionBudget.minAvailable: null
+      ontoserver.deployment.podDisruptionBudget.maxUnavailable: 1
+    asserts:
+      - equal:
+          path: spec.maxUnavailable
+          value: 1
+      - isNull:
+          path: spec.minAvailable
+
+  - it: renders a percentage maxUnavailable as a quoted string
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.podDisruptionBudget.minAvailable: null
+      ontoserver.deployment.podDisruptionBudget.maxUnavailable: 25%
+    asserts:
+      - equal:
+          path: spec.maxUnavailable
+          value: "25%"
+
+  - it: renders unhealthyPodEvictionPolicy when set
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.podDisruptionBudget.unhealthyPodEvictionPolicy: AlwaysAllow
+    asserts:
+      - equal:
+          path: spec.unhealthyPodEvictionPolicy
+          value: AlwaysAllow
+
+  # Previously minAvailable silently won, so uncommenting maxUnavailable without clearing the
+  # default minAvailable: 1 had no effect and gave no warning.
+  - it: fails when both minAvailable and maxUnavailable are set
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.podDisruptionBudget.maxUnavailable: 1
+    asserts:
+      - failedTemplate:
+          errorMessage: "Set only one of ontoserver.deployment.podDisruptionBudget.minAvailable or .maxUnavailable — the Kubernetes API rejects a PodDisruptionBudget that specifies both. minAvailable defaults to 1, so clear it (minAvailable: null) when setting maxUnavailable."
+
+  - it: fails when neither minAvailable nor maxUnavailable is set
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.podDisruptionBudget.minAvailable: null
+    asserts:
+      - failedTemplate:
+          errorMessage: "Set one of ontoserver.deployment.podDisruptionBudget.minAvailable or .maxUnavailable, or disable the PodDisruptionBudget with ontoserver.deployment.podDisruptionBudget.enabled: false."
+
+  # 0 must be distinguishable from unset — `empty 0` is true, which is why the chart tests
+  # presence rather than truthiness.
+  - it: fails when maxUnavailable is 0
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.podDisruptionBudget.minAvailable: null
+      ontoserver.deployment.podDisruptionBudget.maxUnavailable: 0
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.deployment.podDisruptionBudget.maxUnavailable: 0 blocks all voluntary evictions, so node drains and cluster upgrades will hang indefinitely. Use minAvailable to express how many pods must stay up."
+
+  - it: fails when minAvailable is 0
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.podDisruptionBudget.minAvailable: 0
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.deployment.podDisruptionBudget.minAvailable: 0 provides no protection at all. Use a value of 1 or more, or disable the PodDisruptionBudget with ontoserver.deployment.podDisruptionBudget.enabled: false."
+
+  # Easy to reach by accident: minAvailable: 2 on a 2-replica cluster is exactly as blocking as
+  # maxUnavailable: 0. The scaled-ro-envoy examples deliberately stay one below their replica
+  # counts (3/2 and 2/1).
+  - it: fails when minAvailable equals the replica count
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.podDisruptionBudget.minAvailable: 2
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.deployment.podDisruptionBudget.minAvailable (2) must be less than ontoserver.deployment.replicas (2), otherwise no pod can ever be evicted voluntarily and node drains will hang. Use 1 or fewer, or raise the replica count."
+
+  - it: allows minAvailable one below the replica count
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.replicas: 3
+      ontoserver.deployment.podDisruptionBudget.minAvailable: 2
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: 2
+
+  # A percentage is always satisfiable, so the replica-count rule must not apply to it.
+  - it: allows a 100% minAvailable percentage regardless of replicas
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.podDisruptionBudget.minAvailable: 100%
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: "100%"
+
+  - it: fails on a non-numeric minAvailable
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.podDisruptionBudget.minAvailable: half
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.deployment.podDisruptionBudget.minAvailable must be a whole number (2) or a percentage string (\"25%\"). Got: \"half\""
+
+  - it: fails on an out-of-range percentage
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.podDisruptionBudget.minAvailable: 150%
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.deployment.podDisruptionBudget.minAvailable percentage must be between 0% and 100%. Got: \"150%\""

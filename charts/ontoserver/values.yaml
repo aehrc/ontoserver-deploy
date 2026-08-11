@@ -146,14 +146,18 @@ ontoserver:
               kind: Managed
             ## @param ontoserver.deployment.persistence.dbfiles.storageClass.provided.allowVolumeExpansion  Allow volume expansion
             allowVolumeExpansion: true
+    # Only rendered for scaled deployments. A single instance owns its Lucene index on a
+    # ReadWriteOnce PVC and must be replaced rather than kept available, so a PDB there would
+    # only block node drains.
     podDisruptionBudget:
       ## @param ontoserver.deployment.podDisruptionBudget.enabled                     Enable PDB for scaled deployments
       enabled: true
-      # Pick one of minAvailable or maxUnavailable if you enable PDB.
-      ## @param ontoserver.deployment.podDisruptionBudget.minAvailable                Minimum pods available - If you set this, maxUnavailable will be ignored
+      ## @param ontoserver.deployment.podDisruptionBudget.minAvailable                Minimum pods that must stay available. Whole number (1) or percentage string ("50%"). Mutually exclusive with maxUnavailable — clear this one (minAvailable: null) to use that instead.
       minAvailable: 1
-      # maxUnavailable: 25%
-      # unhealthyPodEvictionPolicy: AlwaysAllow
+      ## @param ontoserver.deployment.podDisruptionBudget.maxUnavailable              Maximum pods that may be unavailable. Whole number (1) or percentage string ("25%"). Mutually exclusive with minAvailable, which is set by default.
+      maxUnavailable: ""
+      ## @param ontoserver.deployment.podDisruptionBudget.unhealthyPodEvictionPolicy  IfHealthyBudget or AlwaysAllow. Empty uses the cluster default (IfHealthyBudget).
+      unhealthyPodEvictionPolicy: ""
     db:
       ## @param ontoserver.deployment.db.enabled            Enable Postgres sidecar
       enabled: true
