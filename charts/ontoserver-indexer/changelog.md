@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> Note: checked against the `ontoserver-indexer-0.1.0` tag by diffing the values keys, not assembled from commit
+> messages, so nothing user-facing since that release is missing.
+
 ### Added
 
 - `resources.heapGb` — sets the JVM `-Xmx` independently of the container memory limit. The

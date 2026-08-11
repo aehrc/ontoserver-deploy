@@ -7,10 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-> Note: this section covers the fixes made during the pre-merge review of the `update-charts`
-> branch. Earlier changes on the branch are not yet back-filled here.
+> Note: verified against the `ontoserver-v0.3.0` tag rather than assembled from commit messages —
+> 18 commits touch this chart since that release, and the values-key diff was used to confirm
+> nothing user-facing is missing. Changes predating 0.3.0 are covered by the sections below.
 
 ### Added
+
+- `ontoserver.gateway.allowPlaintext` and `ontoserver.gateway.listenerPortPlain`. A plaintext HTTP
+  listener now has to be requested explicitly: it is off by default so a public Gateway cannot be
+  left unencrypted by accident. Enable it for local development, or when TLS terminates upstream.
 
 - `ontoserver.gateway.closureRequestTimeout` (default `300s`). The `$closure` HTTPRoute carried no
   `timeouts` block at all, so the chart's longest-running operation inherited whatever the Gateway

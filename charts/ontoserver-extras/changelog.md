@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> Note: checked against the `ontoserver-extras-0.1.0` tag by diffing the values keys, not assembled from commit
+> messages, so nothing user-facing since that release is missing.
+
 ### Added
 
 - Chart description corrected — it still advertised a PV template, which now lives in the
