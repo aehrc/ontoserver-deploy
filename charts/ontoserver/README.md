@@ -803,7 +803,16 @@ Three combinations cannot be made to work with the chart as it stands. Each fail
 
 3. **Ontoserver's own HTTPS mode** (`ONTOSERVER_INSECURE: "false"`, see [Healthcheck and HTTPS mode](#healthcheck-and-https-mode-ontoserver_insecure-false)). `/run.sh` generates a self-signed keystore at `/keystore.p12` — in the root-owned `/` — so `keytool` fails with `Permission denied`. Terminate TLS at the ingress or gateway instead, which is the chart's default posture.
 
-> **Validate before rolling this out.** The table above was produced from the container images, which settles the image's own requirements. It does not cover your cluster's specifics: whether an existing PVC's files are readable under a new `fsGroup` (Kubernetes only relabels the volume it mounts, and a large pre-existing Lucene index can take a long time to chown), whether a mounted `ontoserver.customization` ConfigMap is still readable, or how your admission policy (Pod Security Standards, Gatekeeper, Kyverno) reacts. Test on a non-production release first.
+This configuration has been run on a cluster (AKS, Azure Disk `managed-csi` PVC, external PostgreSQL, Gatekeeper auditing), not only rendered. Confirmed there: the pod runs as `uid=7531`, `fsGroup` makes the volume group-writable (`/var/onto` becomes `root:7531 drwxrwsr-x`) and `/var/onto/lucene` is created owned by `ontoserver`; both `helm test` suites pass including the read-write one; and a full NCTS preload of SNOMED CT AU and LOINC installs and serves `$lookup`, ECL `$expand` and `$validate-code` normally.
+
+Against the AKS built-in policy set, the hardened release reports **no** violations of `allowedUsersGroups` or `noPrivilegeEscalation`. It does still violate `readOnlyRootFilesystem`, for the reason given above — that one cannot be satisfied until the chart can mount a writable `/tmp`.
+
+> **Still validate before rolling this out.** Two things remain unverified and are worth checking against your own deployment:
+>
+> - **An existing PVC with data on it.** Kubernetes relabels the volume it mounts, and a large pre-existing Lucene index can take a long time to `chown` — the validation above used a freshly provisioned, empty volume, so it says nothing about that delay.
+> - **A mounted `ontoserver.customization` ConfigMap**, which was not part of the tested configuration.
+>
+> Also note that if you enable persistence on a `Deployment` you should set `ontoserver.deployment.deploymentStrategy: Recreate`. The default `RollingUpdate` deadlocks against a `ReadWriteOnce` volume — the replacement pod cannot attach the disk while the outgoing pod holds it (`Multi-Attach error`), and it also blocks PVC expansion until the volume detaches. This is unrelated to the security context but you will meet it on the same upgrade.
 
 ## Outbound HTTP proxy
 
