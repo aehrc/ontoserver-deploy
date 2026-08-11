@@ -20,10 +20,12 @@ This chart provides flexible deployment options for [Ontoserver](https://ontoser
   - [Option A — chart-managed secret (recommended)](#option-a--chart-managed-secret-recommended)
   - [Option B — External Secrets](#option-b--external-secrets)
   - [Option C — pre-created secret](#option-c--pre-created-secret)
+- [Configuration changes and pod restarts](#configuration-changes-and-pod-restarts)
 - [Testing](#testing)
   - [Unit Tests](#unit-tests)
   - [Integration Tests](#integration-tests)
     - [Scaled StatefulSet integration test](#scaled-statefulset-integration-test)
+    - [CI matrix](#ci-matrix)
 - [Persistence](#persistence)
   - [Pre-provisioned PersistentVolumes](#pre-provisioned-persistentvolumes)
 - [Health Checking](#health-checking)
@@ -212,6 +214,37 @@ ontoserver:
       - name: my-pull-secret
 ```
 
+## Configuration changes and pod restarts
+
+Ontoserver reads its configuration as environment variables, and a container resolves those
+once at start. A `helm upgrade` that changes only a Secret therefore updates the Secret object
+and leaves the pod template untouched — Kubernetes sees nothing to roll out, and the running
+pods keep the old value indefinitely.
+
+The chart closes that gap with checksum annotations on the pod template, so a configuration
+change forces a rollout:
+
+| Setting | Rolls pods on change | How |
+|---|---|---|
+| `ontoserver.config` | Yes | Rendered directly as env values in the pod template |
+| `ontoserver.secretConfig` | Yes | `checksum/secret-config` annotation |
+| `ontoserver.externalSecret.data` / `.dataFrom` / `.secretStoreRef` | Yes | `checksum/external-secret` annotation |
+| `ontoserver.existingSecretConfig` (the Secret's contents) | **No** | Not owned or readable by this chart |
+| Value rotated in the external store behind an ExternalSecret | **No** | External Secrets rewrites the target Secret; the chart sees no change |
+| `ontoserver.imageCredentials` / `imagePullSecrets` | No, by design | Used only by the kubelet at image-pull time |
+| `ontoserver.customization` (the ConfigMap's contents) | No | User-supplied ConfigMap, mounted as a volume |
+
+For the cases marked **No**, restart explicitly after the change:
+
+```bash
+kubectl rollout restart statefulset/<release>-ontoserver   # or deployment/<release>-ontoserver
+```
+
+The checksums hash the *values*, not the rendered Secret manifest. Hashing the manifest — the
+pattern shown in the Helm documentation — would fold in the `helm.sh/chart` label and so
+restart every pod on any chart version bump, which is expensive here because Ontoserver
+re-opens its Lucene index on start.
+
 ## Testing
 
 ### Unit Tests
@@ -271,6 +304,52 @@ helm test my-ontoserver
 The `$closure` routing test requires a scaled StatefulSet deployment with an external PostgreSQL database and ≥8 GB RAM (2 Ontoserver pods + PostgreSQL). Run it locally using a [k3d](https://k3d.io/) cluster.
 
 A complete local test procedure is documented in [`charts/ontoserver/tests/fixtures/scaled-values.yaml`](tests/fixtures/scaled-values.yaml).
+
+#### CI matrix
+
+`.github/workflows/integration-tests.yml` runs the chart against a throwaway k3d cluster on
+every push, in five modes:
+
+| Mode | Covers |
+|---|---|
+| `read-only` | Metadata + FHIR read-only test hooks; write rejection |
+| `read-write` | Metadata + FHIR read-write hooks; `$lookup`, `$expand`, `$validate-code`, `$translate`, `$closure` |
+| `traefik-https-backend` | Traefik IngressRoute + ServersTransport to Ontoserver's own TLS listener |
+| `gateway` | Gateway API: `Gateway`, `HTTPRoute` and all three Envoy Gateway traffic policies, end-to-end through Envoy |
+| `scaled` | Scaled StatefulSet, external PostgreSQL, `$closure` pinned to pod-0 |
+
+The `gateway` mode installs [Envoy Gateway](https://gateway.envoyproxy.io/) (pinned) — whose
+release manifest also carries the upstream Gateway API CRDs — and asserts that the `Gateway`
+reaches `Programmed=True`, that the `HTTPRoute` reaches both `Accepted=True` and
+`ResolvedRefs=True`, and that the `ClientTrafficPolicy`, `BackendTrafficPolicy` and
+`SecurityPolicy` are each accepted by the controller. Those conditions are the part unit tests
+cannot reach: helm-unittest checks the rendered YAML, but only a real controller rejects a
+listener whose protocol and `tls` block disagree, a `sectionName` that matches no listener, or a
+`backendRefs` naming a Service that does not exist.
+
+To reproduce it locally:
+
+```bash
+kubectl apply --server-side -f https://github.com/envoyproxy/gateway/releases/download/v1.8.3/install.yaml
+kubectl wait --for=condition=Available --timeout=5m -n envoy-gateway-system deployment/envoy-gateway
+
+helm install ontoserver-gw ./charts/ontoserver \
+  -f charts/ontoserver/tests/fixtures/gateway-values.yaml \
+  --set ontoserver.imageCredentials.username=<quay-username> \
+  --set ontoserver.imageCredentials.password=<quay-password> \
+  --wait
+
+kubectl wait --for=condition=Programmed gateway/ontoserver-gw-gw --timeout=5m
+ENVOY_SVC=$(kubectl get svc -n envoy-gateway-system \
+  -l gateway.envoyproxy.io/owning-gateway-name=ontoserver-gw-gw \
+  -o jsonpath='{.items[0].metadata.name}')
+kubectl port-forward -n envoy-gateway-system "svc/$ENVOY_SVC" 18081:80 &
+curl -s -H 'Host: ontoserver.gateway-test.local' http://localhost:18081/fhir/metadata
+```
+
+The fixture sets `ontoserver.gateway.allowPlaintext: true` because it uses an HTTP listener to
+avoid needing cert-manager or a pre-created TLS Secret. Do not copy that into a real deployment
+— see [Gateway API vs Ingress](#gateway-api-vs-ingress).
 
 ## Persistence
 

@@ -1,0 +1,91 @@
+# charts/ontoserver/tests/fixtures/gateway-values.yaml
+#
+# Integration test fixture for the Gateway API / Envoy Gateway scenario.
+#
+# Everything in gateway.yaml and envoy-gateway-policies.yaml was unit-tested only: helm-unittest
+# checks the rendered YAML, but never that a real API server accepts it. The Envoy Gateway CRDs
+# reject plenty of things a template renders happily — a listener whose protocol and tls block
+# disagree, an HTTPRoute whose sectionName matches no listener, an unknown policy field.
+#
+# Single-instance on purpose: this mode covers the main HTTPRoute and all three traffic
+# policies. The $closure HTTPRoute is deliberately NOT exercised here — it only renders for a
+# scaled StatefulSet, so this fixture doubles as the negative case proving it stays absent.
+#
+# Used by: .github/workflows/integration-tests.yml (gateway matrix entry)
+ontoserver:
+  hostNames:
+    - ontoserver.gateway-test.local
+  serverName: ontoserver.gateway-test.local
+
+  gateway:
+    enabled: true
+    className: envoy-gateway-class
+    # tls.enabled stays false below, so the chart emits an HTTP listener on this port. That
+    # avoids needing cert-manager (not installed in the k3d cluster) or a pre-created TLS
+    # Secret, while still exercising the listener/HTTPRoute/sectionName wiring.
+    listenerPortPlain: 80
+    # Required: validate-values.yaml refuses a plaintext Gateway listener unless this is set,
+    # so that a production deployment cannot end up serving HTTP by omission. Acceptable in a
+    # throwaway k3d cluster reached only through kubectl port-forward.
+    allowPlaintext: true
+    requestTimeout: 120s
+
+  tls:
+    enabled: false
+
+  certmanager:
+    # Would add an ACME Issuer and a port-80 solver listener; there is no cert-manager and no
+    # public DNS in CI, so the Issuer would never resolve.
+    enabled: false
+
+envoygateway:
+  # The chart owns the GatewayClass and the EnvoyProxy that parameterises it. Off by default
+  # because a shared cluster usually has one already; on here so the whole chain is under test.
+  createGatewayClass: true
+  controlPlaneNamespace: envoy-gateway-system
+
+  envoyProxy:
+    name: default
+    # One proxy pod rather than the default 2: it shares a single GitHub runner with Ontoserver
+    # and the Envoy Gateway control plane. pdbMinAvailable is left at 1 — the template does
+    # `| default 1`, so 0 would be silently coerced back to 1 anyway (see tracker item 24).
+    replicas: 1
+    pdbMinAvailable: 1
+    accessLog:
+      enabled: true
+
+  gatewayServiceMonitor:
+    # Needs the Prometheus Operator CRDs, which this cluster does not have.
+    enabled: false
+
+  # All three policies on, so the real CRDs validate them. These are the templates most likely
+  # to drift from the Envoy Gateway API, since they use gateway.envoyproxy.io/v1alpha1.
+  clientTrafficPolicy:
+    enabled: true
+    idleTimeout: 300s
+    proxyProtocol:
+      # Would make Envoy expect a PROXY protocol header on every connection; curl does not send
+      # one, so enabling this breaks the end-to-end check rather than testing anything.
+      enabled: false
+    clientIPDetection:
+      xForwardedFor:
+        numTrustedHops: 1
+
+  backendTrafficPolicy:
+    enabled: true
+    requestBufferLimit: 1Gi
+    rateLimit:
+      # High enough that the handful of requests this test makes never trips it.
+      requests: 1000
+      unit: Second
+    # Exercises the per-User-Agent rule loop, not just the fallback rule.
+    rateLimitUserAgents:
+      - ".*[Bb]ot.*"
+
+  securityPolicy:
+    enabled: true
+    defaultAction: Allow
+    # A CIDR that cannot match the in-cluster client, so the deny rule is validated by the API
+    # server without blocking the end-to-end request.
+    deniedCIDRs:
+      - 192.0.2.0/24

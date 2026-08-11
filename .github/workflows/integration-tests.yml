@@ -39,6 +39,8 @@ jobs:
             valuesFile: ""
             needsPostgres: false
             needsTraefikCrds: false
+            needsEnvoyGateway: false
+            verifyGatewayRoute: false
             installTimeout: 10m
           - name: read-write
             release: ontoserver-rw
@@ -50,6 +52,8 @@ jobs:
             valuesFile: ""
             needsPostgres: false
             needsTraefikCrds: false
+            needsEnvoyGateway: false
+            verifyGatewayRoute: false
             installTimeout: 10m
           - name: traefik-https-backend
             release: ontoserver-traefik
@@ -61,6 +65,30 @@ jobs:
             valuesFile: traefik-https-backend-values.yaml
             needsPostgres: false
             needsTraefikCrds: true
+            needsEnvoyGateway: false
+            verifyGatewayRoute: false
+            installTimeout: 10m
+          # Gateway API: gateway.yaml and envoy-gateway-policies.yaml were unit-tested only, so
+          # nothing had ever checked that a real API server accepts them. The Envoy Gateway CRDs
+          # reject a listener whose protocol and tls block disagree, an HTTPRoute whose
+          # sectionName matches no listener, or an unknown policy field — none of which
+          # helm-unittest can see.
+          #
+          # Single-instance: this covers the main HTTPRoute plus all three traffic policies, and
+          # doubles as the negative case for the $closure HTTPRoute, which must render only for
+          # a scaled StatefulSet.
+          - name: gateway
+            release: ontoserver-gw
+            isReadOnly: "true"
+            expectedHook: ""
+            unexpectedHook: ""
+            runHelmTest: false
+            verifyTraefikRoute: false
+            valuesFile: gateway-values.yaml
+            needsPostgres: false
+            needsTraefikCrds: false
+            needsEnvoyGateway: true
+            verifyGatewayRoute: true
             installTimeout: 10m
           # Scaled StatefulSet: the only mode that exercises test-closure-scaled-job.yaml,
           # i.e. that $closure is pinned to pod-0 and both pods are individually addressable.
@@ -80,6 +108,8 @@ jobs:
             valuesFile: scaled-values.yaml
             needsPostgres: true
             needsTraefikCrds: true
+            needsEnvoyGateway: false
+            verifyGatewayRoute: false
             # Two Ontoserver pods start in parallel but share one runner's CPU.
             installTimeout: 20m
     steps:
@@ -158,6 +188,30 @@ jobs:
                 targetPort: 5432
           EOF
           kubectl rollout status deployment/postgres --timeout=3m
+
+      # Envoy Gateway's install.yaml bundles the upstream Gateway API CRDs, so this single apply
+      # provides both the Gateway/HTTPRoute/GatewayClass schemas and the gateway.envoyproxy.io
+      # policy CRDs plus the controller that programs them. Server-side apply is required: the
+      # CRDs exceed the 256 KiB annotation limit that client-side apply would need for
+      # last-applied-configuration.
+      #
+      # Pinned rather than tracking latest, like the k3s, k3d and Helm versions above — an
+      # upstream release should never be able to fail a run that contains no chart change.
+      - name: Install Envoy Gateway
+        if: matrix.mode.needsEnvoyGateway
+        run: |
+          kubectl apply --server-side -f https://github.com/envoyproxy/gateway/releases/download/v1.8.3/install.yaml
+          kubectl wait --for=condition=Available --timeout=5m \
+            -n envoy-gateway-system deployment/envoy-gateway
+          # The GatewayClass the chart creates references gateway.envoyproxy.io CRDs; wait for
+          # them to be established so the install below cannot lose a race with the CRD rollout.
+          for crd in gateways.gateway.networking.k8s.io httproutes.gateway.networking.k8s.io \
+                     clienttrafficpolicies.gateway.envoyproxy.io \
+                     backendtrafficpolicies.gateway.envoyproxy.io \
+                     securitypolicies.gateway.envoyproxy.io \
+                     envoyproxies.gateway.envoyproxy.io; do
+            kubectl wait --for=condition=established --timeout=2m "crd/$crd"
+          done
 
       - name: Build chart dependencies
         run: helm dependency build ./charts/ontoserver
@@ -246,6 +300,82 @@ jobs:
             http://localhost:18080/fhir/metadata \
           | grep '"resourceType":"CapabilityStatement"'
 
+      - name: Verify Gateway API route (Envoy Gateway)
+        if: matrix.mode.verifyGatewayRoute
+        run: |
+          set -o pipefail
+          GW=${{ matrix.mode.release }}-gw
+
+          # Programmed=True is the assertion a CRDs-only install cannot make: it means the
+          # controller accepted every listener and actually provisioned an Envoy fleet for it.
+          # A protocol/tls mismatch or a bad certificateRef fails here, not at apply time.
+          kubectl wait --for=condition=Programmed --timeout=5m gateway/"$GW"
+
+          # HTTPRoute conditions live under status.parents[], per parent Gateway — there is no
+          # top-level status.conditions, so `kubectl wait --for=condition=Accepted` would hang
+          # on a route that is already fine. Poll the nested condition instead.
+          for route in ${{ matrix.mode.release }}-route; do
+            for i in $(seq 30); do
+              accepted=$(kubectl get httproute "$route" \
+                -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}' 2>/dev/null || true)
+              resolved=$(kubectl get httproute "$route" \
+                -o jsonpath='{.status.parents[0].conditions[?(@.type=="ResolvedRefs")].status}' 2>/dev/null || true)
+              [[ "$accepted" == "True" && "$resolved" == "True" ]] && break
+              sleep 4
+            done
+            echo "$route: Accepted=$accepted ResolvedRefs=$resolved"
+            # ResolvedRefs matters as much as Accepted: it is what fails when backendRefs names
+            # a Service that does not exist, which is exactly what backendServiceNameOverride
+            # and the pod0-service default get wrong.
+            [[ "$accepted" == "True" && "$resolved" == "True" ]] || { kubectl get httproute "$route" -o yaml; exit 1; }
+          done
+
+          # This mode is single-instance, so the $closure route must NOT exist — it renders only
+          # for a scaled StatefulSet. Guards against the condition being widened by accident.
+          if kubectl get httproute ${{ matrix.mode.release }}-closure-route >/dev/null 2>&1; then
+            echo "Unexpected \$closure HTTPRoute on a single-instance deployment"
+            exit 1
+          fi
+
+          # All three policies must be accepted by the controller, not merely admitted by the
+          # API server. These use gateway.envoyproxy.io/v1alpha1 and had no coverage at all.
+          for kind in clienttrafficpolicy/${{ matrix.mode.release }}-client-settings \
+                      backendtrafficpolicy/${{ matrix.mode.release }}-backend-settings \
+                      securitypolicy/${{ matrix.mode.release }}-ip-filter; do
+            for i in $(seq 30); do
+              status=$(kubectl get "$kind" \
+                -o jsonpath='{.status.ancestors[0].conditions[?(@.type=="Accepted")].status}' 2>/dev/null || true)
+              [[ "$status" == "True" ]] && break
+              sleep 4
+            done
+            echo "$kind: Accepted=$status"
+            [[ "$status" == "True" ]] || { kubectl get "$kind" -o yaml; exit 1; }
+          done
+
+          # End-to-end, mirroring the Traefik mode: the Envoy fleet is a separate Deployment the
+          # controller creates in its own namespace, discovered by owning-gateway label rather
+          # than by a generated name (which carries a hash).
+          ENVOY_SVC=$(kubectl get svc -n envoy-gateway-system \
+            -l gateway.envoyproxy.io/owning-gateway-name="$GW" \
+            -o jsonpath='{.items[0].metadata.name}')
+          echo "Envoy service: $ENVOY_SVC"
+          kubectl wait --for=condition=Available --timeout=3m -n envoy-gateway-system \
+            deployment -l gateway.envoyproxy.io/owning-gateway-name="$GW"
+
+          kubectl port-forward -n envoy-gateway-system svc/"$ENVOY_SVC" 18081:80 &
+          for i in $(seq 30); do
+            curl -s -o /dev/null -H "Host: ontoserver.gateway-test.local" \
+              http://localhost:18081/fhir/metadata && break
+            sleep 2
+          done
+
+          # Full path: curl → Envoy (HTTP listener :80, hostname-matched) → HTTPRoute
+          #            → gw-ontoserver-service → Ontoserver
+          curl -sf \
+            -H "Host: ontoserver.gateway-test.local" \
+            http://localhost:18081/fhir/metadata \
+          | grep '"resourceType":"CapabilityStatement"'
+
       - name: Collect test logs
         if: always()
         run: |
@@ -276,3 +406,22 @@ jobs:
         run: |
           echo "=== Traefik logs ==="
           kubectl logs -n kube-system -l app.kubernetes.io/name=traefik --tail=50 || true
+
+      - name: Collect Gateway API diagnostics
+        if: always() && matrix.mode.verifyGatewayRoute
+        run: |
+          echo "=== GatewayClass / Gateway / HTTPRoute ==="
+          kubectl get gatewayclass,gateway,httproute -o wide || true
+          echo "=== Gateway status ==="
+          kubectl get gateway ${{ matrix.mode.release }}-gw -o yaml || true
+          echo "=== HTTPRoute status ==="
+          kubectl get httproute -o yaml || true
+          echo "=== Envoy Gateway policies ==="
+          kubectl get clienttrafficpolicy,backendtrafficpolicy,securitypolicy -o yaml || true
+          echo "=== Envoy Gateway control plane logs ==="
+          kubectl logs -n envoy-gateway-system deployment/envoy-gateway --tail=100 || true
+          echo "=== Envoy proxy fleet ==="
+          kubectl get pods,svc -n envoy-gateway-system -o wide || true
+          kubectl logs -n envoy-gateway-system \
+            -l gateway.envoyproxy.io/owning-gateway-name=${{ matrix.mode.release }}-gw \
+            --tail=100 || true
