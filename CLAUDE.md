@@ -37,13 +37,13 @@ silent half-release. Both workflows share the `release-charts` concurrency group
 Both paths gate on tests: publishing refuses unless the Unit Tests and Integration Tests runs for
 that exact commit succeeded.
 
-### Adopting it — one-time step
+### Adoption — done
 
 The manifest is seeded with `ontoserver 0.4.0`, `ontoserver-extras 0.1.1`, `ontoserver-indexer 0.2.0`,
-matching the current `Chart.yaml` files and the hand-written changelog entries for this review.
-**Those three versions still need to be tagged and published once** (via `release.sh` below, or by
-hand) — the manifest asserts they are released, so Release Please will bump *past* them. Skip it and
-the Helm repo index will simply never contain them.
+matching the `Chart.yaml` files and the changelog entries stamped for this review. All three were
+tagged and published by hand as the branch merged, so the manifest's claim that they are released is
+true and Release Please bumps *past* them. Nothing further is needed; from here on the release PRs
+do the stamping and bumping.
 
 ### Manual release (`release.sh`)
 
@@ -134,13 +134,14 @@ not tag the non-`v` form by hand expecting a release.
 
 ### Chart versions
 
-| Chart | Published | In development |
+| Chart | Latest release | Notes |
 |---|---|---|
-| `ontoserver` | 0.3.0 (pre-release) | **0.4.0** (breaking: nginx-ingress subchart removed) |
-| `ontoserver-extras` | 0.1.0 | 0.1.1 |
-| `ontoserver-indexer` | 0.1.0 | 0.2.0 |
+| `ontoserver` | **0.4.0** | breaking: bundled nginx-ingress subchart removed |
+| `ontoserver-extras` | **0.1.1** | |
+| `ontoserver-indexer` | **0.2.0** | |
 
-`Chart.yaml` always holds the *in-development* version — the one `release.sh` will tag next —
-and the changelog's `## [Unreleased]` section holds its notes. Both extras and indexer were left
-at their published version after the 0.1.0 release (which predates `release.sh`), so their
-Chart.yaml lagged behind the template changes on this branch.
+Under Release Please, `Chart.yaml` holds the **last released** version, not the next one, and there
+is no standing `## [Unreleased]` section — the open release PR for a chart *is* the pending version,
+and merging it stamps the heading. Releases 0.1.0–0.3.0 are flagged pre-release on GitHub; 0.4.0 /
+0.1.1 / 0.2.0 are normal releases. The pre-release flag is not automated — set it by hand if a
+future release needs it (see above).
