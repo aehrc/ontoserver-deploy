@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/aehrc/ontoserver-deploy/compare/ontoserver-extras-v0.1.1...ontoserver-extras-v0.2.0) (2026-08-12)
+
+
+### Added
+
+* **charts:** opt-in securityContext for all three charts ([ad65b5f](https://github.com/aehrc/ontoserver-deploy/commit/ad65b5f5085b0292b04887dc2de044f66de7af2b))
+* **extras:** securityContext passthrough for the OTel collector ([57e69e0](https://github.com/aehrc/ontoserver-deploy/commit/57e69e0c337bf862fabc8f914eda66f99912f1ec))
+
+
+### Fixed
+
+* **charts:** closure route timeout, ServiceMonitor discovery, name limits ([c6a5ded](https://github.com/aehrc/ontoserver-deploy/commit/c6a5dedc371ed604cce5b9ae7abc559352b304e3))
+* **charts:** escape credentials in image pull secrets ([70238c9](https://github.com/aehrc/ontoserver-deploy/commit/70238c9e2237d3c865491e438ae9b908cb178c56))
+* **charts:** resolve pre-merge review blockers in all three charts ([f89fdf5](https://github.com/aehrc/ontoserver-deploy/commit/f89fdf5fa6b5d48d3e46671871aa18d18624b844))
+* **charts:** roll pods when configuration changes ([9730e8c](https://github.com/aehrc/ontoserver-deploy/commit/9730e8cfc29d634a647a19f9705355869da31dba))
+* **extras:** probe the varnish container, make traces actually ship ([ecc1294](https://github.com/aehrc/ontoserver-deploy/commit/ecc12948ca3669dd4618b5f5edc772692a08e773))
+
+
+### Documentation
+
+* back-fill and verify the changelogs against the release tags ([cdc04ae](https://github.com/aehrc/ontoserver-deploy/commit/cdc04ae4720f9da069b960c0ee0981d6c78ce77a))
+
+
+### Changed
+
+* move PV template from ontoserver-extras to ontoserver chart ([a605193](https://github.com/aehrc/ontoserver-deploy/commit/a605193481c820b0fcc7da209502c30492ba11fe))
+
 ## [0.1.1] - 2026-08-12
 
 > Note: checked against the `ontoserver-extras-0.1.0` tag by diffing the values keys, not assembled from commit
