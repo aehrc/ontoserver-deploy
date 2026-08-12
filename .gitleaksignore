@@ -1,0 +1,82 @@
+# gitleaks allowlist — triaged 2026-08-12 against gitleaks 8.30.0
+#
+# Each line is a finding fingerprint. Two forms exist and BOTH are needed, because the
+# fingerprint depends on how gitleaks was invoked:
+#
+#   gitleaks git .   ->  <commit-sha>:<file>:<rule-id>:<line>
+#   gitleaks dir .   ->  <file>:<rule-id>:<line>
+#
+# ⚠️ Fingerprints embed line numbers, so editing a listed file shifts its lines and
+# invalidates its entry. If a suppressed finding reappears, re-triage it rather than
+# blindly re-adding the new fingerprint. For something sturdier, a `.gitleaks.toml`
+# [allowlist] matching paths or regexes survives edits — worth switching to if these
+# entries start needing maintenance.
+#
+# Verify with:  gitleaks git . --no-banner --redact   /   gitleaks dir . --no-banner --redact
+
+# ---------------------------------------------------------------------------------
+# FALSE POSITIVES — synthetic helm-unittest fixtures, not credentials.
+#
+# These suites test that imagePullSecret rendering base64-encodes correctly, including
+# the awkward cases (a quote and a backslash in the password). The literals are
+# `myuser` / `mypass`, and the base64 blobs are just those strings encoded —
+# `bXl1c2VyOm15cGFzcw==` decodes to `myuser:mypass`. gitleaks' generic-api-key rule
+# matches the base64, not a real key.
+# ---------------------------------------------------------------------------------
+
+# gitleaks git (introduced in 70238c9e)
+70238c9e2237d3c865491e438ae9b908cb178c56:charts/ontoserver/tests/imagepullsecret_test.yaml:generic-api-key:51
+70238c9e2237d3c865491e438ae9b908cb178c56:charts/ontoserver/tests/imagepullsecret_test.yaml:generic-api-key:54
+70238c9e2237d3c865491e438ae9b908cb178c56:charts/ontoserver/tests/imagepullsecret_test.yaml:generic-api-key:63
+70238c9e2237d3c865491e438ae9b908cb178c56:charts/ontoserver/tests/imagepullsecret_test.yaml:generic-api-key:74
+70238c9e2237d3c865491e438ae9b908cb178c56:charts/ontoserver/tests/imagepullsecret_test.yaml:generic-api-key:86
+70238c9e2237d3c865491e438ae9b908cb178c56:charts/ontoserver-indexer/tests/imagepullsecret_test.yaml:generic-api-key:43
+70238c9e2237d3c865491e438ae9b908cb178c56:charts/ontoserver-indexer/tests/imagepullsecret_test.yaml:generic-api-key:46
+70238c9e2237d3c865491e438ae9b908cb178c56:charts/ontoserver-indexer/tests/imagepullsecret_test.yaml:generic-api-key:54
+70238c9e2237d3c865491e438ae9b908cb178c56:charts/ontoserver-indexer/tests/imagepullsecret_test.yaml:generic-api-key:64
+70238c9e2237d3c865491e438ae9b908cb178c56:charts/ontoserver-indexer/tests/imagepullsecret_test.yaml:generic-api-key:78
+
+# gitleaks dir (working tree)
+charts/ontoserver/tests/imagepullsecret_test.yaml:generic-api-key:51
+charts/ontoserver/tests/imagepullsecret_test.yaml:generic-api-key:54
+charts/ontoserver/tests/imagepullsecret_test.yaml:generic-api-key:63
+charts/ontoserver/tests/imagepullsecret_test.yaml:generic-api-key:74
+charts/ontoserver/tests/imagepullsecret_test.yaml:generic-api-key:86
+charts/ontoserver-indexer/tests/imagepullsecret_test.yaml:generic-api-key:43
+charts/ontoserver-indexer/tests/imagepullsecret_test.yaml:generic-api-key:46
+charts/ontoserver-indexer/tests/imagepullsecret_test.yaml:generic-api-key:54
+charts/ontoserver-indexer/tests/imagepullsecret_test.yaml:generic-api-key:64
+charts/ontoserver-indexer/tests/imagepullsecret_test.yaml:generic-api-key:78
+
+# ---------------------------------------------------------------------------------
+# LOCAL-ONLY CREDENTIALS — `.env` holds real QUAY_USERNAME / QUAY_PASSWORD for the
+# integration tests. It is untracked and ignored (.gitignore), and has never been
+# committed — verified across all refs. `gitleaks dir` scans ignored files anyway,
+# which is the only reason it shows up. Suppressed for the working-tree scan only;
+# there is deliberately no git-mode entry, because a `.env` appearing in history
+# would be a genuine incident and must not be pre-suppressed.
+# ---------------------------------------------------------------------------------
+.env:generic-api-key:2
+
+# ---------------------------------------------------------------------------------
+# NOT SUPPRESSED, DELIBERATELY: azure/install_cert_on_appgw/test-cert.{key,pfx}
+#
+# This is real private key material, so it is a true positive — just a low-risk one:
+# self-signed (CN=test~, subject == issuer), expired February 2023, RSA 2048, and the
+# key does match its cert. No trust chain, no real hostname.
+#
+# It is left visible on purpose. A clean run should report exactly these findings and
+# nothing else, which is a more honest signal than a zero that hides a known key.
+#
+# Preferred fix: delete the .key and .pfx from the tree and have
+# install-cert-appgw.sh generate a throwaway pair on demand:
+#     openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=test' \
+#       -keyout test-cert.key -out test-cert.crt
+# Rewriting history to purge them is NOT recommended — it means a force-push against
+# a repo with 11 forks to remove an expired self-signed test key.
+#
+# If you decide to keep the files as-is, uncomment these three lines to silence them:
+# d685ca249e512c244c448e1eee7b3883025bc3b2:azure/install_cert_on_appgw/test-cert.key:private-key:1
+# azure/install_cert_on_appgw/test-cert.key:private-key:1
+# azure/install_cert_on_appgw/test-cert.pfx:pkcs12-file:0
+# ---------------------------------------------------------------------------------
