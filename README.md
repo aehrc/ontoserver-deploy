@@ -55,12 +55,12 @@ See each chart's README for full configuration reference:
 - [`charts/ontoserver/README.md`](charts/ontoserver/README.md) — platform-specific examples (AKS, EKS, local k3d)
 - [`charts/ontoserver-extras/README.md`](charts/ontoserver-extras/README.md)
 - [`charts/ontoserver-indexer/README.md`](charts/ontoserver-indexer/README.md) — SNOMED CT and LOINC indexing examples
-- [`charts/README.md`](charts/README.md) — chart release and publishing instructions
+- [`RELEASE.md`](RELEASE.md) — chart release and publishing instructions
 
 ### Releasing Charts
 
-Maintainer-facing release instructions live in [`charts/README.md`](charts/README.md).
-Use that document for chart tag formats, workflow triggers, and post-release checks.
+Maintainer-facing release instructions live in [**`RELEASE.md`**](RELEASE.md) — the Release Please
+flow, per-chart versioning, the manual fallback, recovery steps, and Artifact Hub registration.
 
 ### Deployment Examples
 
