@@ -20,7 +20,8 @@ maintainers:
 annotations:
   artifacthub.io/category: integration-delivery
   artifacthub.io/license: Apache-2.0
-  # Describes the version in `version:` above. Keep in step with the changelog's [Unreleased].
+  # Describes the version in `version:` above — the last released version. Release Please bumps
+  # `version:` but does NOT touch this list; update it in the release PR before merging.
   artifacthub.io/changes: |
     - kind: fixed
       description: Varnish now restarts when the VCL changes (checksum/config pod annotation)

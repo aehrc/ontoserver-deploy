@@ -20,6 +20,8 @@ maintainers:
 annotations:
   artifacthub.io/category: integration-delivery
   artifacthub.io/license: Apache-2.0
+  # Describes the version in `version:` above — the last released version. Release Please bumps
+  # `version:` but does NOT touch this list; update it in the release PR before merging.
   artifacthub.io/changes: |
     - kind: added
       description: resources.heapGb to size the JVM heap independently of the container memory limit

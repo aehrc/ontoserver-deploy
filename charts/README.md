@@ -8,61 +8,24 @@ This directory contains the maintained Helm charts published from this repositor
 
 ## Releasing Charts
 
-Charts are released from Git tags via GitHub Actions.
+**See [`RELEASE.md`](../RELEASE.md) for the full process.** In short: charts are released by
+**Release Please**, which opens one release PR per chart on every push to `master`. Merging that PR
+tags, releases, and publishes the chart. You do not edit versions or changelogs by hand.
 
-Preferred distribution is the GitHub Pages Helm repository:
+Which chart a commit releases is decided by the **file paths it touches**, not by the commit scope,
+so keep a commit to one chart where you can.
+
+Distribution:
 
 ```bash
 helm repo add ontoserver https://aehrc.github.io/ontoserver-deploy
+helm install my-ontoserver ontoserver/ontoserver -f your-values.yaml
 ```
 
-Release tags must match the workflow triggers in `.github/workflows/release.yml`:
-
-- `ontoserver-vX.Y.Z`
-- `ontoserver-extras-vX.Y.Z`
-- `ontoserver-indexer-vX.Y.Z`
-
-Pushing one of those tags triggers the chart release workflow, which:
-
-- publishes the chart to the GitHub Pages Helm repository via `chart-releaser-action`
-- updates `artifacthub-repo.yml` on the `gh-pages` branch
-- pushes the packaged chart to `ghcr.io/aehrc` as a secondary OCI artifact
-
-### Using release.sh (recommended)
-
-Use `release.sh` to automate the full release cycle — tagging the current version, triggering the release workflow, then bumping `Chart.yaml` for the next cycle:
-
-```bash
-# Interactive — tags current version, prompts for next (default: minor bump)
-./charts/release.sh ontoserver
-
-# Fully automated minor bump, no prompt
-./charts/release.sh ontoserver --auto-increment
-
-# Patch or major bump
-./charts/release.sh ontoserver --patch
-./charts/release.sh ontoserver --major
-
-# Set next version explicitly
-./charts/release.sh ontoserver --next-version 1.0.0
-
-# Preview without making changes
-./charts/release.sh ontoserver --dry-run
-```
-
-Replace `ontoserver` with `ontoserver-extras` or `ontoserver-indexer` for the other charts.
-
-### Manual release (alternative)
-
-```bash
-git tag ontoserver-v0.1.0
-git push origin ontoserver-v0.1.0
-```
-
-After the first release, confirm:
-
-- GitHub Pages is enabled for the `gh-pages` branch
-- the new chart version appears in the Helm repo index
+`release.sh` and the tag-triggered `.github/workflows/release.yml` are retained for manual releases
+and recovery only — note that `release.sh` still follows the **older** convention where `Chart.yaml`
+holds the in-development version, so using it leaves `.release-please-manifest.json` out of step.
+`RELEASE.md` covers both, plus recovery steps.
 - the corresponding `ghcr.io` package visibility is set as intended
 
 ## Releasing Varnish Exporter
