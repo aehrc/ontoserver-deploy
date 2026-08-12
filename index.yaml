@@ -5,6 +5,49 @@ entries:
       artifacthub.io/category: integration-delivery
       artifacthub.io/changes: |
         - kind: added
+          description: Opt-in pod and container securityContext values (unset by default, so upgrades roll no pods)
+        - kind: added
+          description: extraVolumes and extraVolumeMounts, which make readOnlyRootFilesystem usable
+        - kind: added
+          description: allowScaledReadWrite, to opt in to the unsupported scaled read-write topology
+        - kind: fixed
+          description: Deployments with a ReadWriteOnce volume now use the Recreate strategy, which RollingUpdate deadlocks against
+        - kind: fixed
+          description: podDisruptionBudget now accepts percentages, and rejects configurations that would produce an unevictable workload
+        - kind: fixed
+          description: secretConfig no longer fails to render on a numeric or boolean value
+        - kind: fixed
+          description: Configuration changes now roll the pods (checksum annotations on the pod template)
+        - kind: fixed
+          description: Registry credentials containing a quote or backslash no longer corrupt the image pull secret
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    appVersion: ctsa-6
+    created: "2026-08-12T08:19:05.083348875Z"
+    description: Ontoserver FHIR terminology server helm chart with various deployment
+      configurations
+    digest: 6ccd6198d86c7ca3f48f7c4da6d03ed203c8237519e334d7f5dd88078a0e4e62
+    home: https://ontoserver.csiro.au
+    icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/master/icons/ontoserver.png
+    keywords:
+    - fhir
+    - terminology
+    - ontoserver
+    - hl7
+    maintainers:
+    - email: ontoserver-support@csiro.au
+      name: CSIRO
+    name: ontoserver
+    sources:
+    - https://github.com/aehrc/ontoserver-deploy
+    type: application
+    urls:
+    - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-0.4.0/ontoserver-0.4.0.tgz
+    version: 0.4.0
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/changes: |
+        - kind: added
           description: Initial public release
         - kind: added
           description: "existingSecretConfig: reference a pre-existing Secret as envFrom instead of having the chart create one"
@@ -75,6 +118,44 @@ entries:
   - annotations:
       artifacthub.io/category: integration-delivery
       artifacthub.io/changes: |
+        - kind: fixed
+          description: Varnish now restarts when the VCL changes (checksum/config pod annotation)
+        - kind: fixed
+          description: Traces now ship on a quiet server; the batch processor had a zero flush timeout
+        - kind: added
+          description: Opt-in pod and container securityContext values for the Varnish pod (unset by default)
+        - kind: added
+          description: Readiness and liveness probes on the varnish container
+        - kind: added
+          description: securityContext passthrough for the OpenTelemetry Collector CR
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    appVersion: ctsa-6
+    created: "2026-08-12T08:19:05.186843495Z"
+    description: Optional infrastructure components for Ontoserver (Varnish cache,
+      OpenTelemetry Collector)
+    digest: fbdcd22b07017fc2f0cc71c1382f295f06d33d1c01a54f14a94f23acaa4387c6
+    home: https://ontoserver.csiro.au
+    icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/master/icons/ontoserver-extras.png
+    keywords:
+    - fhir
+    - terminology
+    - ontoserver
+    - varnish
+    - opentelemetry
+    maintainers:
+    - email: ontoserver-support@csiro.au
+      name: CSIRO
+    name: ontoserver-extras
+    sources:
+    - https://github.com/aehrc/ontoserver-deploy
+    type: application
+    urls:
+    - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-extras-0.1.1/ontoserver-extras-0.1.1.tgz
+    version: 0.1.1
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/changes: |
         - kind: added
           description: Initial public release
       artifacthub.io/license: Apache-2.0
@@ -107,6 +188,40 @@ entries:
       artifacthub.io/category: integration-delivery
       artifacthub.io/changes: |
         - kind: added
+          description: resources.heapGb to size the JVM heap independently of the container memory limit
+        - kind: fixed
+          description: Registry credentials containing a quote or backslash no longer corrupt the image pull secret
+        - kind: added
+          description: Opt-in pod and container securityContext values for the indexer Job (unset by default)
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    appVersion: ctsa-6
+    created: "2026-08-12T08:19:05.321979421Z"
+    description: Runs a Kubernetes Job to index a SNOMED CT (or other) code system
+      and publish to a syndication server
+    digest: fd6798df7ac939a784caef013e2c3af9a55176f9412b5b0085bbca1d03d8a8a0
+    home: https://ontoserver.csiro.au
+    icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/master/icons/ontoserver-indexer.png
+    keywords:
+    - ontoserver
+    - fhir
+    - terminology
+    - snomed
+    - indexer
+    maintainers:
+    - email: ontoserver-support@csiro.au
+      name: CSIRO
+    name: ontoserver-indexer
+    sources:
+    - https://github.com/aehrc/ontoserver-deploy
+    type: application
+    urls:
+    - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-indexer-0.2.0/ontoserver-indexer-0.2.0.tgz
+    version: 0.2.0
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/changes: |
+        - kind: added
           description: Initial public release
       artifacthub.io/license: Apache-2.0
     apiVersion: v2
@@ -133,4 +248,4 @@ entries:
     urls:
     - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-indexer-0.1.0/ontoserver-indexer-0.1.0.tgz
     version: 0.1.0
-generated: "2026-04-02T00:04:02.030898+10:00"
+generated: "2026-08-12T08:19:05.322000822Z"
