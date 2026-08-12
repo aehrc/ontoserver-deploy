@@ -75,7 +75,27 @@ The GitHub Actions workflow (`release.yml`) then:
 - Packages all charts via `helm/chart-releaser-action` (`skip_existing: true` so only the new chart gets a release)
 - Creates a GitHub Release with the chart `.tgz` as an asset
 - Updates the `gh-pages` branch `index.yaml` (Helm repo index)
-- Pushes the chart to GHCR (`ghcr.io/aehrc/<chart>-helm`)
+- Pushes the chart to GHCR. It is pushed to `oci://ghcr.io/aehrc/<chart>-helm`, but `helm push`
+  appends the chart name from the package, so the **pullable reference repeats it**:
+  `oci://ghcr.io/aehrc/<chart>-helm/<chart>`. Pulling `oci://ghcr.io/aehrc/<chart>-helm` fails with
+  `not found`. Note that GHCR also answers `not found` for a package you lack `read:packages` for, so
+  a local `helm show chart` failure is not evidence the push failed — check the workflow log.
+
+### ⚠️ Push release tags one at a time
+
+`cancel-in-progress: false` does **not** give the `release-charts` concurrency group an unbounded
+queue. GitHub holds at most one *running* plus one *pending* run per group; a third arrival
+**cancels the pending one**. Pushing all three tags at once (observed 2026-08-12) left the middle
+run cancelled.
+
+The damage is limited but real: `chart-releaser` packages every chart with `skip_existing: true`, so
+the first run to survive creates all the GitHub Releases and the merged `index.yaml`. What a
+cancelled run loses is its own `index.html` badge bump and its GHCR push. Recover with
+`gh run rerun <id>` once the group is free — the tag still exists, so the re-run is safe and
+idempotent.
+
+Release Please's `publish` job is not exposed to this: its `max-parallel: 1` matrix runs inside a
+single workflow run, so the charts serialise without ever queueing separate runs.
 
 ### If the workflow fails with 403
 

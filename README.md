@@ -44,9 +44,11 @@ helm install my-ontoserver ontoserver/ontoserver -f your-values.yaml
 
 **From OCI (GitHub Container Registry):**
 ```bash
-helm install my-ontoserver oci://ghcr.io/aehrc/ontoserver --version <version> -f your-values.yaml
-helm install my-ontoserver-extras oci://ghcr.io/aehrc/ontoserver-extras --version <version> -f your-extras-values.yaml
-helm install my-indexer oci://ghcr.io/aehrc/ontoserver-indexer --version <version> -f your-indexer-values.yaml
+# The chart name appears twice: `helm push` to oci://ghcr.io/aehrc/<chart>-helm appends the
+# chart name from the package, so the pullable reference is <chart>-helm/<chart>.
+helm install my-ontoserver oci://ghcr.io/aehrc/ontoserver-helm/ontoserver --version <version> -f your-values.yaml
+helm install my-ontoserver-extras oci://ghcr.io/aehrc/ontoserver-extras-helm/ontoserver-extras --version <version> -f your-extras-values.yaml
+helm install my-indexer oci://ghcr.io/aehrc/ontoserver-indexer-helm/ontoserver-indexer --version <version> -f your-indexer-values.yaml
 ```
 
 See each chart's README for full configuration reference:
