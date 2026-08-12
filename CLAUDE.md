@@ -93,7 +93,7 @@ not tag the non-`v` form by hand expecting a release.
 
 | Chart | Published | In development |
 |---|---|---|
-| `ontoserver` | 0.3.0 (pre-release) | 0.3.1 |
+| `ontoserver` | 0.3.0 (pre-release) | **0.4.0** (breaking: nginx-ingress subchart removed) |
 | `ontoserver-extras` | 0.1.0 | 0.1.1 |
 | `ontoserver-indexer` | 0.1.0 | 0.2.0 |
 

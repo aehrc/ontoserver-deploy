@@ -45,20 +45,35 @@ tests:
       - failedTemplate:
           errorMessage: "traefik.ingressRoute.serversTransport.enabled requires traefik.ingressRoute.enabled"
 
-  - it: fails when nginx-ingress enabled without ingress
+  # The bundled nginx-ingress subchart was removed in chart 0.4.0. This has to *fail* rather than
+  # warn: nothing at the top level of values.schema.json sets additionalProperties: false, so a
+  # leftover `nginx-ingress:` block is accepted silently — and the consequence is that helm upgrade
+  # quietly stops deploying the ingress controller the release depends on, taking the service
+  # offline with no error anywhere.
+  - it: fails when the removed nginx-ingress values are still set
     set:
       "nginx-ingress.enabled": true
     asserts:
       - failedTemplate:
-          errorMessage: "Don't include nginx-ingress-controller when Ingress is disabled!"
+          errorPattern: "the bundled nginx-ingress subchart was removed in ontoserver chart 0.4.0"
 
-  - it: fails when nginx-ingress enabled with gateway
+  # `enabled: false` must fail too. The presence of the key is the signal that a values file has not
+  # been migrated; its value is irrelevant, and only failing on `true` would let the stale block sit
+  # there until someone flipped it and wondered why nothing happened.
+  - it: fails when the removed nginx-ingress key is present but disabled
     set:
-      "nginx-ingress.enabled": true
-      ontoserver.gateway.enabled: true
+      "nginx-ingress.enabled": false
     asserts:
       - failedTemplate:
-          errorMessage: "Don't include nginx-ingress-controller when Gateway API is enabled!"
+          errorPattern: "the bundled nginx-ingress subchart was removed in ontoserver chart 0.4.0"
+
+  - it: passes with no nginx-ingress key at all
+    set:
+      ontoserver.ingress.enabled: true
+      ontoserver.ingress.className: ontoserver-nginx
+    asserts:
+      - hasDocuments:
+          count: 0
 
   - it: fails when db sidecar disabled and no datasource url
     set:

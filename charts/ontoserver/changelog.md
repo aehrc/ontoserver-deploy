@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **BREAKING: the bundled `nginx-ingress` subchart.** The chart no longer installs an ingress
+  controller. It was pinned at `2.1.0` and nobody was updating it, which makes a vendored
+  network-facing controller a liability rather than a convenience.
+
+  **Migration.** Install a controller yourself and point the chart at its IngressClass:
+
+  ```bash
+  helm repo add nginx-stable https://helm.nginx.com/stable
+  helm install nginx-ingress nginx-stable/nginx-ingress \
+    --namespace nginx-ingress --create-namespace \
+    --set controller.ingressClass.name=ontoserver-nginx
+  ```
+  ```yaml
+  ontoserver:
+    ingress:
+      enabled: true
+      className: ontoserver-nginx   # must match the controller's IngressClass
+  # delete the whole nginx-ingress: block
+  ```
+
+  The chart **fails to render** if a `nginx-ingress:` block is still present — including
+  `enabled: false`. That is deliberate: nothing at the top level of `values.schema.json` sets
+  `additionalProperties: false`, so the key would otherwise be accepted silently and `helm upgrade`
+  would quietly stop deploying the controller, taking the service offline with no error anywhere.
+  The presence of the key, not its value, is the signal that a values file has not been migrated.
+
+  Consequences worth knowing: the chart now has **no dependencies at all**, so `Chart.lock` and the
+  vendored `charts/` directory are gone and `helm dependency build` is a no-op.
+
 > Note: verified against the `ontoserver-v0.3.0` tag rather than assembled from commit messages —
 > 18 commits touch this chart since that release, and the values-key diff was used to confirm
 > nothing user-facing is missing. Changes predating 0.3.0 are covered by the sections below.

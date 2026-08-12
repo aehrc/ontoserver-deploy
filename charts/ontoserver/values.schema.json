@@ -998,33 +998,6 @@
           }
         }
       }
-    },
-    "nginx-ingress": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "controller": {
-          "type": "object",
-          "properties": {
-            "ingressClass": {
-              "type": "object",
-              "properties": {
-                "create": {
-                  "type": "boolean"
-                },
-                "name": {
-                  "type": "string"
-                }
-              }
-            },
-            "ingressClassByName": {
-              "type": "boolean"
-            }
-          }
-        }
-      }
     }
   },
   "required": [

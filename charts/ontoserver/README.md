@@ -1,12 +1,12 @@
 # Ontoserver Helm Chart
 
-This chart provides flexible deployment options for [Ontoserver](https://ontoserver.csiro.au/) — a FHIR terminology server — on Kubernetes. It supports single or scaled deployments, read-only or read-write modes, optional persistence, and networking via the Kubernetes Gateway API, standard Ingress, or Traefik IngressRoute (with an optional bundled [F5 Nginx Ingress Controller](https://docs.nginx.com/nginx-ingress-controller/)). Optional features include a Postgres sidecar, Prometheus metrics, OpenTelemetry distributed tracing, Envoy Gateway traffic policies, and External Secrets integration.
+This chart provides flexible deployment options for [Ontoserver](https://ontoserver.csiro.au/) — a FHIR terminology server — on Kubernetes. It supports single or scaled deployments, read-only or read-write modes, optional persistence, and networking via the Kubernetes Gateway API, standard Ingress, or Traefik IngressRoute. Optional features include a Postgres sidecar, Prometheus metrics, OpenTelemetry distributed tracing, Envoy Gateway traffic policies, and External Secrets integration.
 
 > **Prerequisites:** Depending on which features you enable, the following cluster-level components may be required — install them separately if not already present:
 >
 > - **Kubernetes 1.29+** — required when `ontoserver.deployment.db.enabled: true` (the default). The Postgres sidecar uses the [native sidecar init container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) pattern (`restartPolicy: Always`), which is stable from K8s 1.29.
 > - **[Envoy Gateway](https://gateway.envoyproxy.io/)** — required when `ontoserver.gateway.enabled: true` (Gateway API networking, and any Envoy traffic/security policies)
-> - **[F5 Nginx Ingress Controller](https://docs.nginx.com/nginx-ingress-controller/)** — required when `ontoserver.ingress.enabled: true` and you are **not** using the bundled `nginx-ingress` subchart (`nginx-ingress.enabled: false`)
+> - **An Ingress controller** — required when `ontoserver.ingress.enabled: true`. The chart does not install one (the bundled `nginx-ingress` subchart was removed in 0.4.0); point `ontoserver.ingress.className` at a controller you already run.
 > - **[Traefik](https://doc.traefik.io/traefik/)** with CRD support — required when `traefik.ingressRoute.enabled: true`
 > - **[External Secrets Operator](https://external-secrets.io/) 0.16.0+** — required when `ontoserver.externalSecret.enabled: true`. The version floor is real: the chart uses `external-secrets.io/v1`, which does not exist before 0.16.0. See [External Secrets](#external-secrets).
 
@@ -536,7 +536,7 @@ ontoserver:
     enabled: false  # TLS terminated at the ALB
 ```
 
-The bundled F5 nginx-ingress subchart also works on EKS and deploys via an NLB.
+An NGINX ingress controller installed separately also works on EKS and typically fronts itself with an NLB.
 
 Gateway API is supported if [Envoy Gateway](https://gateway.envoyproxy.io/) is installed. AWS Load Balancer Controller also exposes a Gateway API implementation, but the Envoy-specific policies (`ClientTrafficPolicy`, `BackendTrafficPolicy`, `SecurityPolicy`) will not apply with it.
 
@@ -651,17 +651,21 @@ ontoserver:
     enabled: false
 ```
 
-Option C — bundled F5 nginx-ingress subchart (works on any local cluster):
+Option C — an NGINX controller you install yourself (works on any local cluster). The chart used to
+bundle this as a subchart; that was removed in 0.4.0, so install the controller first:
+```bash
+helm repo add nginx-stable https://helm.nginx.com/stable
+helm install nginx-ingress nginx-stable/nginx-ingress \
+  --namespace nginx-ingress --create-namespace \
+  --set controller.ingressClass.name=ontoserver-nginx
+```
 ```yaml
 ontoserver:
   ingress:
     enabled: true
-    className: ontoserver-nginx
+    className: ontoserver-nginx   # must match the controller's IngressClass
   tls:
     enabled: false
-
-nginx-ingress:
-  enabled: true
 ```
 
 ### k3d quick-start
@@ -922,7 +926,9 @@ By default none is enabled — the chart deploys Ontoserver with no external acc
 * **Gateway API** (`ontoserver.gateway.enabled: true`) *(recommended)*: requires Gateway API CRDs and a compatible GatewayClass (e.g. [Envoy Gateway](https://gateway.envoyproxy.io/), [Traefik](https://doc.traefik.io/traefik/routing/providers/kubernetes-gateway/), [Cilium](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/), or any conformant implementation). Creates `Gateway`, `HTTPRoute`, and optionally a cert-manager `Issuer` resource. The default `className` is `envoy-gateway-class` — set `ontoserver.gateway.className` to match your GatewayClass. The default listener port is `443`; some implementations use a different port (e.g. Traefik defaults to `8443` — set `ontoserver.gateway.listenerPortSecure: 8443`). Set `ontoserver.tls.enabled: true` with a certificate reference in `ontoserver.tls.certRef`, optionally adding `ontoserver.certmanager.enabled: true` to have cert-manager issue and populate that Secret automatically.
 
   TLS is required for the Gateway path unless you explicitly opt out. Gateway API rejects an HTTPS listener that carries no `certificateRefs`, so with `ontoserver.tls.enabled: false` the chart renders an **HTTP** listener on `ontoserver.gateway.listenerPortPlain` (default `80`) instead. Because that serves Ontoserver unencrypted, it must be requested deliberately via `ontoserver.gateway.allowPlaintext: true`; otherwise the chart fails to render with an explanatory error. Use it for local development, or where TLS is terminated upstream by a load balancer or service mesh — never on an internet-facing instance.
-* **Ingress** (`ontoserver.ingress.enabled: true`) *(deprecated)*: creates a standard `networking.k8s.io/v1` Ingress. Use the bundled F5 nginx-ingress subchart (`nginx-ingress.enabled: true`), the cluster's default controller (e.g. Traefik on k3d/k3s), or any other Ingress controller by setting `ontoserver.ingress.className` appropriately.
+> **Upgrading from 0.3.x:** the bundled `nginx-ingress` subchart was removed in **0.4.0**. If your values file still has a `nginx-ingress:` block the chart will **fail to render** with instructions — deliberately, because the key would otherwise be accepted silently and `helm upgrade` would quietly stop deploying your ingress controller, taking the service offline with no error. Install a controller separately, point `ontoserver.ingress.className` at its IngressClass, and delete the block.
+
+* **Ingress** (`ontoserver.ingress.enabled: true`) *(deprecated)*: creates a standard `networking.k8s.io/v1` Ingress. The chart does not install a controller — use the cluster's default (e.g. Traefik on k3d/k3s) or any controller you install yourself, and set `ontoserver.ingress.className` to match its IngressClass.
 * **Traefik IngressRoute** (`traefik.ingressRoute.enabled: true`): creates a Traefik-native `IngressRoute` CRD resource. Use this instead of `ontoserver.ingress` when Traefik is your ingress controller **and** any backend pod exposes HTTPS/TLS. See [Traefik Ingress Controller](#traefik-ingress-controller-1) below.
 
 Gateway API, Ingress, and IngressRoute are mutually exclusive. All three support a `backendServiceNameOverride` to route traffic through an intermediate proxy such as the Varnish cache from `ontoserver-extras`:
@@ -958,7 +964,7 @@ The routing is validated by the `$closure` routing integration test (`helm test`
 
 `$` is a legal URI path character, and the API server accepts it in an Ingress `path` under all three `pathType` values. Controllers differ in how they *match* it, though — tested against the two controllers this chart can drive, routing `/fhir/$closure` to a dedicated backend and everything else to a catchall:
 
-| Client sends | F5 NGINX Ingress 2.1.0 (bundled subchart) | Traefik IngressRoute |
+| Client sends | F5 NGINX Ingress 2.1.0 | Traefik IngressRoute |
 | --- | --- | --- |
 | `/fhir/$closure` | dedicated backend ✅ | dedicated backend ✅ |
 | `/fhir/%24closure` (percent-encoded) | dedicated backend ✅ | **catchall ❌** |
@@ -1360,17 +1366,3 @@ Requires the [External Secrets Operator](https://external-secrets.io/) installed
 | `traefik.ingressRoute.serversTransport.rootCAsSecrets`      | List of Secret names containing root CA certificates used to verify the backend TLS certificate                             | `[]`            |
 | `traefik.ingressRoute.serversTransport.certificatesSecrets` | List of Secret names containing client certificates for mutual TLS with the backend                                         | `[]`            |
 
-### Nginx Ingress Controller
-
-| Name                                           | Description                        | Value              |
-| ---------------------------------------------- | ---------------------------------- | ------------------ |
-| `nginx-ingress.enabled`                        | Enable F5 nginx-ingress-controller | `false`            |
-| `nginx-ingress.controller.ingressClass.create` | Create a custom IngressClass       | `true`             |
-| `nginx-ingress.controller.ingressClass.name`   | Name of the custom IngressClass    | `ontoserver-nginx` |
-| `nginx-ingress.controller.ingressClassByName`  | Lookup IngressClasses by name      | `true`             |
-
-Table generated with Readme Generator For Helm: [https://github.com/bitnami/readme-generator-for-helm](https://github.com/bitnami/readme-generator-for-helm)
-
----
-
-Copyright &copy; 2026 Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230. All rights reserved.

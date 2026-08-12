@@ -1,11 +1,18 @@
 # networking/single-ro-nginx-ingress.yaml
-# Single read-only Ontoserver using the bundled F5 nginx-ingress subchart.
-# Works on any Kubernetes cluster — no pre-installed ingress controller required.
+# Single read-only Ontoserver behind an NGINX ingress controller.
 #
-# The chart includes an optional nginx-ingress subchart that deploys its own
-# dedicated ingress controller scoped to this release. This is the simplest
-# option for clusters that don't have an ingress controller installed, or
-# when you want an isolated controller that won't affect other workloads.
+# The controller is NOT installed by this chart — it was a bundled subchart up to
+# chart 0.3.x and was removed in 0.4.0, because a vendored controller pinned to one
+# version is a security liability when nobody is updating it. Install one yourself:
+#
+#   helm repo add nginx-stable https://helm.nginx.com/stable
+#   helm install nginx-ingress nginx-stable/nginx-ingress \
+#     --namespace nginx-ingress --create-namespace \
+#     --set controller.ingressClass.name=ontoserver-nginx
+#
+# Then point ontoserver.ingress.className at that IngressClass, as below. Any other
+# NGINX distribution (ingress-nginx, or a cluster-wide controller you already run)
+# works the same way — only the className has to match.
 #
 # For cloud-native networking options see:
 #   - aks/single-ro-envoy.yaml         — AKS with Envoy Gateway (recommended)
@@ -59,8 +66,9 @@ ontoserver:
             enabled: false
           name: ""
 
-  # The bundled nginx-ingress subchart creates an IngressClass named 'ontoserver-nginx'.
-  # This controller is scoped to this Helm release and won't affect other ingress resources.
+  # Must match the IngressClass of the controller you installed. `kubectl get ingressclass`
+  # lists what is available; a mismatch means no controller claims the Ingress and it
+  # silently never routes.
   ingress:
     enabled: true
     className: ontoserver-nginx
@@ -90,13 +98,3 @@ ontoserver:
   # config:
   #   atom.preload.feedLocation: "file:///data/preload.xml"
   # healthCheckOption: -s
-
-# ── Enable the bundled nginx-ingress subchart ──────────────────────────────
-# This deploys an F5 nginx ingress controller dedicated to this release.
-nginx-ingress:
-  enabled: true
-  controller:
-    ingressClass:
-      create: true
-      name: ontoserver-nginx
-    ingressClassByName: true

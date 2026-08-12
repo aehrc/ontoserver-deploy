@@ -26,12 +26,15 @@
   {{- fail "traefik.ingressRoute.serversTransport.enabled requires traefik.ingressRoute.enabled" }}
 {{- end }}
 
-{{- $ngi := index .Values "nginx-ingress" }}
-{{- if and  $ngi.enabled .Values.ontoserver.gateway.enabled }}
-  {{- fail "Don't include nginx-ingress-controller when Gateway API is enabled!" }}
-{{- end }}
-{{- if and  $ngi.enabled  (not .Values.ontoserver.ingress.enabled) }}
-  {{- fail "Don't include nginx-ingress-controller when Ingress is disabled!" }}
+{{- /* Migration guard for the removed nginx-ingress subchart (chart 0.4.0).
+
+     This has to fail rather than warn. Nothing at the top level of values.schema.json sets
+     additionalProperties: false, so a leftover `nginx-ingress:` block is accepted silently — and
+     the consequence is that `helm upgrade` quietly stops deploying the ingress controller the
+     release depends on, taking the service offline with no error anywhere. Failing here is the
+     only way the operator finds out before the traffic does. */}}
+{{- if hasKey .Values "nginx-ingress" }}
+  {{- fail "the bundled nginx-ingress subchart was removed in ontoserver chart 0.4.0, but `nginx-ingress:` is still set in your values. It is no longer installed by this chart, and leaving the key would silently drop your ingress controller on upgrade. Install a controller separately (e.g. `helm install nginx-ingress nginx-stable/nginx-ingress`), point `ontoserver.ingress.className` at its IngressClass, and remove the `nginx-ingress:` block. See the chart README, 'Ingress'." }}
 {{- end }}
 
 {{- if and (not .Values.ontoserver.deployment.db.enabled) (empty (index .Values.ontoserver.config "spring.datasource.url")) }}

@@ -470,15 +470,3 @@ traefik:
       rootCAsSecrets: []
       ## @param traefik.ingressRoute.serversTransport.certificatesSecrets List of Secret names containing client certificates for mutual TLS with the backend
       certificatesSecrets: []
-## @section Nginx Ingress Controller
-nginx-ingress:
-  ## @param nginx-ingress.enabled                        Enable F5 nginx-ingress-controller
-  enabled: false
-  controller:
-    ingressClass:
-      ## @param nginx-ingress.controller.ingressClass.create    Create a custom IngressClass
-      create: true
-      ## @param nginx-ingress.controller.ingressClass.name      Name of the custom IngressClass
-      name: ontoserver-nginx
-    ## @param nginx-ingress.controller.ingressClassByName       Lookup IngressClasses by name
-    ingressClassByName: true
