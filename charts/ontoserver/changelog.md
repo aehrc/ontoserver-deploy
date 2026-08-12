@@ -83,7 +83,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   renders a byte-identical pod spec.
 
   This makes `readOnlyRootFilesystem: true` reachable, which it previously was not: the server
-  needs a writable `/tmp` and the chart had no way to supply one. `/tmp` turned out to be
+  needs a writable `/tmp` and the chart had no way to supply one. Validated on a cluster (AKS,
+  external PostgreSQL, Gatekeeper auditing): Ready in ~50s with 0 restarts, root filesystem
+  genuinely read-only, FHIR served, both `helm test` suites passing, and **zero** violations of
+  `readOnlyRootFilesystem`, `allowedUsersGroups` or `noPrivilegeEscalation` for the namespace. `/tmp` turned out to be
   load-bearing rather than just a log destination — a running server writes `spring.log`,
   `hsperfdata`, Tomcat's work directories and `downlaod-*` scratch files there. The hardened
   README recipe now includes both, asserted together by a test so it cannot ship half-applied.

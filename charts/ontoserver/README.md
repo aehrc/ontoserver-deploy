@@ -882,11 +882,14 @@ Two combinations cannot be made to work with the chart as it stands. Each fails 
 
 This configuration has been run on a cluster (AKS, Azure Disk `managed-csi` PVC, external PostgreSQL, Gatekeeper auditing), not only rendered. Confirmed there: the pod runs as `uid=7531`, `fsGroup` makes the volume group-writable (`/var/onto` becomes `root:7531 drwxrwsr-x`) and `/var/onto/lucene` is created owned by `ontoserver`; both `helm test` suites pass including the read-write one; and a full NCTS preload of SNOMED CT AU and LOINC installs and serves `$lookup`, ECL `$expand` and `$validate-code` normally.
 
-Against the AKS built-in policy set, the cluster run reported **no** violations of `allowedUsersGroups` or `noPrivilegeEscalation`.
+`readOnlyRootFilesystem` was validated on a cluster in a second run: the pod reached Ready in ~50s with **0 restarts**, `touch /probe` inside the container fails with `Read-only file system`, `/fhir/metadata` and a `CodeSystem` search both return HTTP 200, and both `helm test` suites pass. That run also confirmed on a real cluster what the image probe showed — `/tmp` fills with `spring.log`, `hsperfdata`, Tomcat's work directories and a pile of `downlaod-*` scratch files, so the `emptyDir` is doing real work.
 
-> **Still validate before rolling this out.** Three things remain unverified and are worth checking against your own deployment:
+Against the AKS built-in policy set, the full recipe above — **including `readOnlyRootFilesystem`** — reports **zero** violations of `allowedUsersGroups`, `noPrivilegeEscalation` or `readOnlyRootFilesystem` for the namespace. Every pod in it satisfies all three: the Ontoserver pod (uid 7531), the chart's own `helm test` hooks (uid 100), the CloudNativePG Postgres it used as its external database (uid 26), and an OpenTelemetry Collector.
+
+Two notes on reading a Gatekeeper result at all: the policies were in `dryrun` mode, so they audit without blocking, which is what makes the audit a *measurement* of hardening rather than a gate. And an audit is only meaningful if its `status.auditTimestamp` **post-dates the pod** — the first reading taken here predated it by 7 seconds and was discarded.
+
+> **Still validate before rolling this out.** Two things remain unverified and are worth checking against your own deployment:
 >
-> - **`readOnlyRootFilesystem` on a cluster.** It was verified by running the image directly — read-only root, all capabilities dropped, `no-new-privileges`, uid 7531, a `tmpfs` at `/tmp` and a writable `/var/onto`, serving `/fhir/metadata` and a `CodeSystem` search with HTTP 200 — but the cluster run predates it, and its Gatekeeper audit therefore still shows the two `readOnlyRootFilesystem` violations.
 > - **An existing PVC with data on it.** Kubernetes relabels the volume it mounts, and a large pre-existing Lucene index can take a long time to `chown` — the validation above used a freshly provisioned, empty volume, so it says nothing about that delay.
 > - **A mounted `ontoserver.customization` ConfigMap**, which was not part of the tested configuration.
 >

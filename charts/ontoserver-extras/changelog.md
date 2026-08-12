@@ -20,9 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fields rather than pod-spec fields: `spec.podSecurityContext` and `spec.securityContext` — the
   latter being the *container* context despite the name. Both verified against the `v1beta1` CRD
   shipped with operator 0.156.0. `spec.containerSecurityContext`, the plausible spelling, is not a
-  field on the CRD, and since the CRD does not reject unknown fields it would have applied cleanly
-  and been ignored; a test asserts the chart does not emit it. Rendering is validated, but this has
-  not been run against a live Operator.
+  field on the CRD. How that fails depends on the client, and both were tested against a live
+  operator: `kubectl apply` rejects it with a strict decoding error, while **Helm succeeds and the
+  API server prunes the field** — the release reports `deployed` and the collector runs with no
+  container security context at all. The Helm path is the one that matters here and it is silent, so
+  a test asserts the chart never emits that spelling.
+  Validated on a cluster: the Operator (0.131.0) applies both contexts verbatim to the collector
+  pod it builds, and the collector starts and runs under `readOnlyRootFilesystem` with all
+  capabilities dropped.
 
 - Readiness and liveness probes on the `varnish` container (`varnish.probes.*`, on by default).
   Only the metrics exporter sidecar had one before, so the Service began routing to a pod whose

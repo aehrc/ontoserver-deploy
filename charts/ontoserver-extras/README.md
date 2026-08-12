@@ -285,7 +285,14 @@ The collector pod is not created by this chart — the OpenTelemetry Operator bu
 | `collector.podSecurityContext` | `spec.podSecurityContext` on the CR |
 | `collector.containerSecurityContext` | `spec.securityContext` on the CR |
 
-Note the asymmetry: the CR's `spec.securityContext` is the **container** context, despite the name. There is no `spec.containerSecurityContext` field — that plausible-looking spelling is not defined on the CRD, and because the CRD does not reject unknown fields, using it would produce a CR that applies cleanly and is silently ignored. Both names here were checked against the `v1beta1` CRD shipped with operator **0.156.0**, where each carries the full corresponding Kubernetes type.
+Note the asymmetry: the CR's `spec.securityContext` is the **container** context, despite the name. There is no `spec.containerSecurityContext` field — that plausible-looking spelling is not defined on the CRD, and how it fails depends on how you apply it (both tested against a live operator):
+
+- `kubectl apply` **rejects** it: `strict decoding error: unknown field "spec.containerSecurityContext"`.
+- **Helm succeeds**, and the API server prunes the unknown field. The release reports `deployed`, the CR is stored without it, and the collector runs with no container security context at all.
+
+The Helm path is the one that matters for a chart, and it is silent — which is why a unit test asserts the chart never emits that spelling.
+
+Both correct names were checked against the `v1beta1` CRD, where each carries the full corresponding Kubernetes type — first against operator 0.156.0's release manifest, then against 0.131.0 as installed on the validation cluster; identical in both.
 
 ```yaml
 collector:
@@ -300,7 +307,7 @@ collector:
       drop: [ALL]
 ```
 
-This has been validated as rendering the fields the CRD declares; it has **not** been run against a live Operator, so confirm the collector still starts before adopting it — in particular `readOnlyRootFilesystem`, which is included above only as an example.
+**Validated on a cluster.** Against OpenTelemetry Operator **0.131.0** on AKS, the Operator applies both contexts verbatim to the collector pod it builds, and the collector starts and runs under `readOnlyRootFilesystem: true` with all capabilities dropped and `runAsUser: 10001` — `Everything is ready. Begin running and processing data.`, 0 restarts. The collector image is distroless, so there is no shell to probe from inside; the evidence is the applied pod spec plus a healthy start.
 
 ## Resource Naming
 

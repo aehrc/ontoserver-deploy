@@ -2,7 +2,50 @@
 
 ## Releasing a chart
 
-### Normal flow
+Two mechanisms exist. **Release Please is the intended path**; `release.sh` and the tag-triggered
+`release.yml` are kept for manual releases and recovery.
+
+### Release Please (per-chart)
+
+`release-please-config.json` + `.release-please-manifest.json` drive
+`.github/workflows/release-please.yml`. On every push to `master`, Release Please maintains **one
+open release PR per chart**. Merging a chart's PR stamps its `changelog.md`, bumps its `Chart.yaml`,
+tags `<chart>-vX.Y.Z`, creates the GitHub Release, and then the same workflow packages that one
+chart and publishes it to the gh-pages Helm index and GHCR.
+
+**How the three charts stay separate:** Release Please decides what to bump from the **file paths** a
+commit touches, not from the commit scope. A commit touching only `charts/ontoserver-indexer/` opens
+a release PR for the indexer alone. `separate-pull-requests: true` keeps the PRs independent so one
+chart can be released without dragging the others along. A commit touching two charts opens two PRs.
+
+Version bumps come from Conventional Commits: `fix:` → patch, `feat:` → minor, `feat!:`/
+`BREAKING CHANGE:` → **minor** while below 1.0.0 (`bump-minor-pre-major: true`), so a breaking change
+gives 0.4.0 → 0.5.0 rather than 1.0.0. Commit scopes are free-form; only paths matter.
+
+⚠️ **This inverts the old convention.** Under `release.sh`, `Chart.yaml` held the *in-development*
+version. Under Release Please, `Chart.yaml` holds the **last released** version and the release PR
+bumps it. `.release-please-manifest.json` must always agree with the `version:` in each `Chart.yaml`
+— if they drift, Release Please computes the next version from the manifest and the two disagree
+about what is released.
+
+⚠️ **Publishing runs inside `release-please.yml`, deliberately.** A tag created with `GITHUB_TOKEN`
+does not trigger other workflows, so the tag-triggered `release.yml` would never fire for a Release
+Please tag — the chart would be tagged and GitHub-Released but never reach the Helm index or GHCR, a
+silent half-release. Both workflows share the `release-charts` concurrency group because both rewrite
+`index.yaml` on `gh-pages`.
+
+Both paths gate on tests: publishing refuses unless the Unit Tests and Integration Tests runs for
+that exact commit succeeded.
+
+### Adopting it — one-time step
+
+The manifest is seeded with `ontoserver 0.4.0`, `ontoserver-extras 0.1.1`, `ontoserver-indexer 0.2.0`,
+matching the current `Chart.yaml` files and the hand-written changelog entries for this review.
+**Those three versions still need to be tagged and published once** (via `release.sh` below, or by
+hand) — the manifest asserts they are released, so Release Please will bump *past* them. Skip it and
+the Helm repo index will simply never contain them.
+
+### Manual release (`release.sh`)
 
 ```bash
 cd charts
