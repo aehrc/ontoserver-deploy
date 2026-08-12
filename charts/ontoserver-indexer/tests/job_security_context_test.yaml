@@ -1,0 +1,83 @@
+suite: Indexer Job security context tests
+templates:
+  - templates/job.yaml
+
+tests:
+  # The `set` block is anchored as *required and reused below. It must stay on the first test:
+  # a YAML anchor has to be defined before it is aliased, and helm-unittest rejects unknown
+  # top-level keys, so it cannot live outside `tests`. Same convention as job_test.yaml.
+  - it: sets no security context by default
+    set: &required
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      output.path: /output/snomed.zip
+    asserts:
+      - isNull:
+          path: spec.template.spec.securityContext
+      - isNull:
+          path: spec.template.spec.automountServiceAccountToken
+      - isNull:
+          path: spec.template.spec.containers[0].securityContext
+
+  - it: renders a pod security context
+    set:
+      <<: *required
+      job.podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 7531
+        fsGroup: 7531
+        seccompProfile:
+          type: RuntimeDefault
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      # 7531 is the `ontoserver` user present in the indexer image (it is the same image).
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 7531
+      # fsGroup is what makes the output PVC writable. Without it a non-root indexer Job fails
+      # outright when it tries to write its output ZIP.
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 7531
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+
+  - it: renders a container security context
+    set:
+      <<: *required
+      job.containerSecurityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value:
+            - ALL
+
+  # Tri-state: `with` would treat false as unset and drop the only value anyone sets here.
+  - it: renders automountServiceAccountToken false
+    set:
+      <<: *required
+      job.automountServiceAccountToken: false
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+
+  - it: renders automountServiceAccountToken true
+    set:
+      <<: *required
+      job.automountServiceAccountToken: true
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true

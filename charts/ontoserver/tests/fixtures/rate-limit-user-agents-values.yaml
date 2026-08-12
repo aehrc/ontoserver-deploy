@@ -1,0 +1,11 @@
+ontoserver:
+  gateway:
+    enabled: true
+  tls:
+    enabled: true
+envoygateway:
+  backendTrafficPolicy:
+    enabled: true
+    rateLimitUserAgents:
+      - SemrushBot
+      - AhrefsBot

@@ -1,0 +1,388 @@
+suite: Optional features tests
+tests:
+  - it: renders no management service by default
+    templates:
+      - templates/management-service.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders management service when enabled
+    templates:
+      - templates/management-service.yaml
+    set:
+      ontoserver.managementService.enabled: true
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-management-service
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 18080
+
+  - it: renders no ServiceMonitor by default
+    templates:
+      - templates/servicemonitor.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders ServiceMonitor when enabled with managementService
+    templates:
+      - templates/servicemonitor.yaml
+    set:
+      ontoserver.metrics.serviceMonitor.enabled: true
+      ontoserver.managementService.enabled: true
+    asserts:
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-service-monitor
+
+  - it: renders no OTel Instrumentation by default
+    templates:
+      - templates/opentelemetry-instrumentation.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders OTel Instrumentation when enabled
+    templates:
+      - templates/opentelemetry-instrumentation.yaml
+    set:
+      ontoserver.opentelemetry.instrumentation.enabled: true
+      ontoserver.opentelemetry.instrumentation.exporter.endpoint: "http://jaeger:4317"
+    asserts:
+      - isKind:
+          of: Instrumentation
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-java-instrumentation
+      - equal:
+          path: spec.exporter.endpoint
+          value: "http://jaeger:4317"
+
+  - it: renders no Envoy policies by default
+    templates:
+      - templates/envoy-gateway-policies.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders ClientTrafficPolicy when enabled with gateway
+    templates:
+      - templates/envoy-gateway-policies.yaml
+    set:
+      ontoserver.gateway.enabled: true
+      ontoserver.tls.enabled: true
+      envoygateway.clientTrafficPolicy.enabled: true
+    asserts:
+      - isKind:
+          of: ClientTrafficPolicy
+          documentIndex: 0
+      - equal:
+          path: metadata.name
+          documentIndex: 0
+          value: RELEASE-NAME-client-settings
+
+  - it: renders BackendTrafficPolicy with single global rate limit rule when no rateLimitUserAgents
+    templates:
+      - templates/envoy-gateway-policies.yaml
+    set:
+      ontoserver.gateway.enabled: true
+      ontoserver.tls.enabled: true
+      envoygateway.backendTrafficPolicy.enabled: true
+    asserts:
+      - isKind:
+          of: BackendTrafficPolicy
+          documentIndex: 0
+      - equal:
+          path: spec.rateLimit.local.rules
+          documentIndex: 0
+          value:
+            - limit:
+                requests: 50
+                unit: Second
+
+  - it: renders BackendTrafficPolicy with bot-blocking rule when rateLimitUserAgents configured
+    templates:
+      - templates/envoy-gateway-policies.yaml
+    set:
+      ontoserver.gateway.enabled: true
+      ontoserver.tls.enabled: true
+      envoygateway.backendTrafficPolicy.enabled: true
+      envoygateway.backendTrafficPolicy.rateLimitUserAgents[0]: SemrushBot
+    asserts:
+      - isKind:
+          of: BackendTrafficPolicy
+          documentIndex: 0
+      - equal:
+          path: spec.rateLimit.local.rules
+          documentIndex: 0
+          value:
+            - clientSelectors:
+                - headers:
+                    - name: User-Agent
+                      value: SemrushBot
+                      type: RegularExpression
+              limit:
+                requests: 1
+                unit: Hour
+            - limit:
+                requests: 50
+                unit: Second
+
+  - it: renders BackendTrafficPolicy with multiple bot-blocking rules when multiple rateLimitUserAgents configured
+    templates:
+      - templates/envoy-gateway-policies.yaml
+    values:
+      - fixtures/rate-limit-user-agents-values.yaml
+    asserts:
+      - isKind:
+          of: BackendTrafficPolicy
+          documentIndex: 0
+      - equal:
+          path: spec.rateLimit.local.rules
+          documentIndex: 0
+          value:
+            - clientSelectors:
+                - headers:
+                    - name: User-Agent
+                      value: SemrushBot
+                      type: RegularExpression
+              limit:
+                requests: 1
+                unit: Hour
+            - clientSelectors:
+                - headers:
+                    - name: User-Agent
+                      value: AhrefsBot
+                      type: RegularExpression
+              limit:
+                requests: 1
+                unit: Hour
+            - limit:
+                requests: 50
+                unit: Second
+
+  - it: renders no PV by default
+    templates:
+      - templates/pv.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders files PV when enabled
+    templates:
+      - templates/pv.yaml
+    set:
+      ontoserver.deployment.persistence.files.pv.enabled: true
+      ontoserver.deployment.persistence.files.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+      ontoserver.deployment.persistence.files.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: PersistentVolume
+      - equal:
+          path: metadata.name
+          value: my-files-pv
+      - equal:
+          path: spec.storageClassName
+          value: RELEASE-NAME-ontoserver-files
+      - equal:
+          path: spec.csi.driver
+          value: disk.csi.azure.com
+      - equal:
+          path: spec.csi.volumeHandle
+          value: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+
+  - it: renders files PV with custom storageClassName
+    templates:
+      - templates/pv.yaml
+    set:
+      ontoserver.deployment.persistence.files.pv.enabled: true
+      ontoserver.deployment.persistence.files.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+      ontoserver.deployment.persistence.files.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.files.pv.storageClassName: my-storage-class
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+    asserts:
+      - equal:
+          path: spec.storageClassName
+          value: my-storage-class
+
+  - it: does not render dbfiles PV when files PV enabled but not in split mode with db
+    templates:
+      - templates/pv.yaml
+    set:
+      ontoserver.deployment.persistence.files.pv.enabled: true
+      ontoserver.deployment.persistence.files.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+      ontoserver.deployment.persistence.files.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+      ontoserver.deployment.persistence.dbfiles.pv.enabled: true
+      ontoserver.deployment.persistence.dbfiles.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydbdisk
+      ontoserver.deployment.persistence.dbfiles.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.dbfiles.existingVolume.name: my-dbfiles-pv
+      ontoserver.deployment.persistence.mode: shared
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: renders two PVs in split mode with db enabled
+    templates:
+      - templates/pv.yaml
+    set:
+      ontoserver.deployment.persistence.files.pv.enabled: true
+      ontoserver.deployment.persistence.files.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+      ontoserver.deployment.persistence.files.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+      ontoserver.deployment.persistence.dbfiles.pv.enabled: true
+      ontoserver.deployment.persistence.dbfiles.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydbdisk
+      ontoserver.deployment.persistence.dbfiles.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.dbfiles.existingVolume.name: my-dbfiles-pv
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.db.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: renders files PV as first document in split mode
+    templates:
+      - templates/pv.yaml
+    set:
+      ontoserver.deployment.persistence.files.pv.enabled: true
+      ontoserver.deployment.persistence.files.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+      ontoserver.deployment.persistence.files.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+      ontoserver.deployment.persistence.dbfiles.pv.enabled: true
+      ontoserver.deployment.persistence.dbfiles.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydbdisk
+      ontoserver.deployment.persistence.dbfiles.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.dbfiles.existingVolume.name: my-dbfiles-pv
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.db.enabled: true
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: PersistentVolume
+      - equal:
+          path: metadata.name
+          value: my-files-pv
+      - equal:
+          path: spec.storageClassName
+          value: RELEASE-NAME-ontoserver-files
+
+  - it: renders dbfiles PV as second document in split mode
+    templates:
+      - templates/pv.yaml
+    set:
+      ontoserver.deployment.persistence.files.pv.enabled: true
+      ontoserver.deployment.persistence.files.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydisk
+      ontoserver.deployment.persistence.files.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+      ontoserver.deployment.persistence.dbfiles.pv.enabled: true
+      ontoserver.deployment.persistence.dbfiles.pv.diskURI: /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/mydbdisk
+      ontoserver.deployment.persistence.dbfiles.pv.csiDriver: disk.csi.azure.com
+      ontoserver.deployment.persistence.dbfiles.existingVolume.name: my-dbfiles-pv
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.db.enabled: true
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: PersistentVolume
+      - equal:
+          path: metadata.name
+          value: my-dbfiles-pv
+      - equal:
+          path: spec.storageClassName
+          value: RELEASE-NAME-ontoserver-db-files
+
+  - it: renders no gateway ServiceMonitor by default
+    templates:
+      - templates/servicemonitor.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders gateway ServiceMonitor when enabled with gateway
+    templates:
+      - templates/servicemonitor.yaml
+    set:
+      ontoserver.gateway.enabled: true
+      ontoserver.tls.enabled: true
+      envoygateway.gatewayServiceMonitor.enabled: true
+    asserts:
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-gateway-servicemonitor
+
+  - it: renders no pull secret ExternalSecret by default
+    templates:
+      - templates/imagepullsecretexternal.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders pull secret ExternalSecret when both keys set
+    templates:
+      - templates/imagepullsecretexternal.yaml
+    set:
+      ontoserver.externalSecret.imagePullSecret.data.username.key: quay-creds
+      ontoserver.externalSecret.imagePullSecret.data.password.key: quay-creds
+      ontoserver.externalSecret.secretStoreRef.name: my-store
+    asserts:
+      - isKind:
+          of: ExternalSecret
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-pull-secret-external-sync
+      - equal:
+          path: spec.target.name
+          value: RELEASE-NAME-ontoserver-pull-secret-external
+      - equal:
+          path: spec.target.template.type
+          value: kubernetes.io/dockerconfigjson
+      - equal:
+          path: spec.secretStoreRef.name
+          value: my-store
+      - equal:
+          path: spec.secretStoreRef.kind
+          value: ClusterSecretStore
+      - equal:
+          path: spec.data[0].secretKey
+          value: username
+      - equal:
+          path: spec.data[1].secretKey
+          value: password
+
+  - it: uses imagePullSecret secretStoreRef override when set
+    templates:
+      - templates/imagepullsecretexternal.yaml
+    set:
+      ontoserver.externalSecret.imagePullSecret.data.username.key: quay-creds
+      ontoserver.externalSecret.imagePullSecret.data.password.key: quay-creds
+      ontoserver.externalSecret.secretStoreRef.name: parent-store
+      ontoserver.externalSecret.imagePullSecret.secretStoreRef.name: override-store
+      ontoserver.externalSecret.imagePullSecret.secretStoreRef.kind: SecretStore
+    asserts:
+      - equal:
+          path: spec.secretStoreRef.name
+          value: override-store
+      - equal:
+          path: spec.secretStoreRef.kind
+          value: SecretStore
+
+  - it: fails when imagePullSecret keys set but no secretStoreRef name
+    templates:
+      - templates/imagepullsecretexternal.yaml
+    set:
+      ontoserver.externalSecret.imagePullSecret.data.username.key: quay-creds
+      ontoserver.externalSecret.imagePullSecret.data.password.key: quay-creds
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.externalSecret.imagePullSecret: secretStoreRef.name (or ontoserver.externalSecret.secretStoreRef.name) is required"

@@ -1,0 +1,3 @@
+# values.yaml
+# Provide overrides for the ontoserver chart here.
+# Leave empty to use chart defaults.

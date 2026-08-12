@@ -1,0 +1,153 @@
+## @section Varnish
+varnish:
+  ## @param varnish.enabled                                     Enable Varnish caching proxy
+  enabled: false
+  ## @param varnish.backendServiceName                        Kubernetes service name for the Varnish backend (defaults to RELEASE-ontoserver-service)
+  backendServiceName: ""
+  ## @param varnish.closureBackend                            Kubernetes hostname for the $closure operation backend. The $closure FHIR operation is stateful — it requires all requests to hit the same instance. Set to a stable pod hostname (e.g. RELEASE-statefulset-0.RELEASE-ontoserver-headless) when using a scaled deployment. Empty string disables dedicated $closure routing.
+  closureBackend: ""
+  ## @param varnish.replicas                                   Number of Varnish pod replicas. For a scaled Ontoserver deployment consider 2+ to avoid a single point of failure. Note: multiple replicas each maintain their own independent cache.
+  replicas: 1
+  ## @param varnish.graceSeconds                               Seconds to serve stale cached content when the backend is unavailable (e.g. during a rolling update). Set to 0 to disable grace mode.
+  graceSeconds: 30
+  ## Security context. All three default to unset, so upgrading an existing release changes
+  ## nothing. See the chart README ("Security context") for a verified hardened configuration.
+  ## @param varnish.podSecurityContext                          Pod-level securityContext for the Varnish pod, passed through as-is (e.g. runAsNonRoot, runAsUser, fsGroup, seccompProfile)
+  podSecurityContext: {}
+  ## @param varnish.containerSecurityContext                    Container-level securityContext, applied to every container in the Varnish pod (varnish, metrics exporter, trace converter, trace forwarder). They share a process namespace, so per-container isolation would be misleading.
+  containerSecurityContext: {}
+  ## @param varnish.automountServiceAccountToken                Mount the ServiceAccount token into the Varnish pod. Varnish does not call the Kubernetes API, so false is safe. Leave unset (null) for the cluster default.
+  automountServiceAccountToken: ~
+  ## Probes for the varnish container itself. Only the metrics exporter sidecar had one before, so
+  ## the Service began routing to a pod whose varnishd was not yet accepting connections.
+  ##
+  ## Both are tcpSocket rather than httpGet, deliberately. An HTTP probe would be proxied to
+  ## Ontoserver: it would generate backend traffic on every period, and it would mark the cache
+  ## unready whenever the backend was down — turning a backend outage into a cache outage, which
+  ## is the opposite of what graceSeconds exists to do. varnishd accepting TCP on :8080 is the
+  ## thing this pod is responsible for. The VCL defines no synthetic health endpoint to use.
+  probes:
+    ## @param varnish.probes.enabled                              Add readiness and liveness probes to the varnish container. Enabling this rolls the pod once on upgrade.
+    enabled: true
+    readiness:
+      ## @param varnish.probes.readiness.initialDelaySeconds      Readiness probe initial delay
+      initialDelaySeconds: 3
+      ## @param varnish.probes.readiness.periodSeconds            Readiness probe period
+      periodSeconds: 5
+      ## @param varnish.probes.readiness.timeoutSeconds           Readiness probe timeout
+      timeoutSeconds: 2
+      ## @param varnish.probes.readiness.failureThreshold         Readiness probe failure threshold
+      failureThreshold: 3
+    liveness:
+      ## @param varnish.probes.liveness.initialDelaySeconds       Liveness probe initial delay
+      initialDelaySeconds: 10
+      ## @param varnish.probes.liveness.periodSeconds             Liveness probe period
+      periodSeconds: 10
+      ## @param varnish.probes.liveness.timeoutSeconds            Liveness probe timeout
+      timeoutSeconds: 2
+      ## @param varnish.probes.liveness.failureThreshold          Liveness probe failure threshold. Restarting varnishd discards the whole cache, so this is deliberately tolerant.
+      failureThreshold: 6
+  opentelemetry:
+    ## @param varnish.opentelemetry.enabled                     Enable tracing VCL and sidecar containers (trace-converter + trace-forwarder)
+    enabled: false
+    ## @param varnish.opentelemetry.collectorEndpoint           Zipkin endpoint for trace forwarding (required when opentelemetry enabled)
+    collectorEndpoint: ""
+  metrics:
+    ## @param varnish.metrics.enabled                            Enable Prometheus metrics exporter sidecar
+    enabled: false
+    ## @param varnish.metrics.interval                           Prometheus scrape interval
+    interval: 60s
+    ## @param varnish.metrics.scrapeTimeout                      Prometheus scrape timeout (must be less than interval)
+    scrapeTimeout: 55s
+  ## @param varnish.image                                       Varnish container image
+  image: varnish:7.7.1
+  ## @param varnish.exporterImage                               Prometheus exporter image
+  exporterImage: ghcr.io/aehrc/varnish-exporter:7.7-1
+  ## @param varnish.traceForwarderImage                        Trace forwarder container image (must have curl and sh)
+  traceForwarderImage: curlimages/curl:8.14.1
+  resources:
+    varnish:
+      requests:
+        ## @param varnish.resources.varnish.requests.cpu        Varnish CPU request
+        cpu: "200m"
+        ## @param varnish.resources.varnish.requests.memory     Varnish memory request
+        memory: "256Mi"
+      limits:
+        ## @param varnish.resources.varnish.limits.cpu          Varnish CPU limit
+        cpu: "500m"
+        ## @param varnish.resources.varnish.limits.memory       Varnish memory limit
+        memory: "1024Mi"
+    exporter:
+      requests:
+        ## @param varnish.resources.exporter.requests.cpu       Exporter CPU request
+        cpu: "50m"
+        ## @param varnish.resources.exporter.requests.memory    Exporter memory request
+        memory: "64Mi"
+      limits:
+        ## @param varnish.resources.exporter.limits.cpu         Exporter CPU limit
+        cpu: "100m"
+        ## @param varnish.resources.exporter.limits.memory      Exporter memory limit
+        memory: "128Mi"
+    traceConverter:
+      requests:
+        ## @param varnish.resources.traceConverter.requests.cpu     Trace converter CPU request
+        cpu: "25m"
+        ## @param varnish.resources.traceConverter.requests.memory  Trace converter memory request
+        memory: "25Mi"
+      limits:
+        ## @param varnish.resources.traceConverter.limits.cpu       Trace converter CPU limit
+        cpu: "50m"
+        ## @param varnish.resources.traceConverter.limits.memory    Trace converter memory limit
+        memory: "50Mi"
+    traceForwarder:
+      requests:
+        ## @param varnish.resources.traceForwarder.requests.cpu     Trace forwarder CPU request
+        cpu: "25m"
+        ## @param varnish.resources.traceForwarder.requests.memory  Trace forwarder memory request
+        memory: "32Mi"
+      limits:
+        ## @param varnish.resources.traceForwarder.limits.cpu       Trace forwarder CPU limit
+        cpu: "50m"
+        ## @param varnish.resources.traceForwarder.limits.memory    Trace forwarder memory limit
+        memory: "64Mi"
+  ## @param varnish.tolerations                                Pod tolerations for the Varnish deployment
+  tolerations: []
+  cache:
+    ## @param varnish.cache.time200                             Cache TTL for 200 responses
+    time200: 10m
+    ## @param varnish.cache.time404                             Cache TTL for 404 responses
+    time404: 1m
+    ## @param varnish.cache.timeExpand                          Cache TTL for $expand responses (defaults to time200 if empty)
+    timeExpand: ""
+    ## @param varnish.cache.passAuthHeaderRequests             Pass through (bypass cache) for requests with Authorization header
+    passAuthHeaderRequests: true
+    ## @param varnish.cache.memorySize                         Varnish malloc storage pool size (e.g. 800m, 1g)
+    memorySize: "800m"
+
+## @section OpenTelemetry Collector
+collector:
+  ## @param collector.enabled                                   Enable OpenTelemetryCollector CRD (Instrumentation CRD is in the ontoserver chart)
+  enabled: false
+  ## @param collector.otlpEndpoint                              OTLP gRPC exporter endpoint (required when enabled)
+  otlpEndpoint: ""
+  ## @param collector.zipkinEndpoint                            Zipkin exporter endpoint (required when enabled)
+  zipkinEndpoint: ""
+  ## @param collector.tolerations                               Pod tolerations for the OpenTelemetryCollector
+  tolerations: []
+  ## @param collector.debug  Enable debug exporter with detailed verbosity (not suitable for production)
+  debug: false
+  ## Security context for the collector pod. These are NOT ordinary pod-spec fields — the pod is
+  ## created by the OpenTelemetry Operator from this CR, so they are passed through as
+  ## spec.podSecurityContext and spec.securityContext on the OpenTelemetryCollector resource.
+  ## Both field names verified against the v1beta1 CRD shipped with operator 0.156.0, where each
+  ## is the full Kubernetes type. Both default to unset, so existing releases are unchanged.
+  ## @param collector.podSecurityContext                         Pod-level securityContext for the collector pod, passed to the CR's spec.podSecurityContext (e.g. runAsNonRoot, runAsUser, fsGroup, seccompProfile)
+  podSecurityContext: {}
+  ## @param collector.containerSecurityContext                   Container-level securityContext for the collector container, passed to the CR's spec.securityContext (e.g. allowPrivilegeEscalation, capabilities, readOnlyRootFilesystem)
+  containerSecurityContext: {}
+  batch:
+    ## @param collector.batch.sendBatchSize                       Spans per batch before the batch processor flushes
+    sendBatchSize: 1000
+    ## @param collector.batch.timeout                             Maximum time a span waits before being flushed regardless of batch size. Must not be 0s — that disables the timer entirely, so on a quiet server spans wait indefinitely for the batch to fill.
+    timeout: 5s
+

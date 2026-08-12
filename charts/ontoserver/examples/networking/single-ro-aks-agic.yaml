@@ -1,0 +1,138 @@
+# networking/single-ro-aks-agic.yaml
+# Single read-only Ontoserver on Azure Kubernetes Service (AKS).
+# Networking: Application Gateway Ingress Controller (AGIC).
+#
+# AGIC integrates Kubernetes ingress with Azure Application Gateway, which
+# provides WAF (Web Application Firewall) capabilities, SSL offloading, and
+# URL-based routing managed in Azure. Use this when your organisation's
+# policy requires Application Gateway, or when WAF protection is needed at
+# the gateway layer.
+#
+# For Envoy Gateway on AKS (recommended, enables fine-grained traffic policies)
+# see aks/single-ro-envoy.yaml.
+#
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+#   - AGIC add-on enabled on the AKS cluster:
+#       az aks enable-addons --addons ingress-appgw \
+#         --resource-group <rg> --name <cluster> \
+#         --appgw-name <appgw-name> --appgw-subnet-cidr 10.225.0.0/16
+#   - Azure Disk CSI driver enabled (default on AKS)
+#   - TLS certificate in Azure Key Vault or supplied as a Kubernetes secret
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver -f networking/single-ro-aks-agic.yaml \
+#     --set ontoserver.imageCredentials.username=<quay-username> \
+#     --set ontoserver.imageCredentials.password=<quay-password>
+
+ontoserver:
+  serverName: ontoserver.example.com
+  hostNames:
+    - ontoserver.example.com
+
+  deployment:
+    # Image pull auth:
+    # - preferred for production: create a docker-registry Secret and reference it here
+    # - alternative: pass ontoserver.imageCredentials.username/password via --set at install time
+    imagePullSecrets:
+      - name: ontoserver-quay-pull-secret
+    kind: Deployment
+    type: single
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 1
+    isReadOnly: true
+
+    db:
+      enabled: true
+      postgresVersion: 16
+
+    persistence:
+      enabledForDeployment: true
+      mode: split
+      files:
+        accessMode: ReadWriteOnce
+        storageSize: 20G
+        storageClass:
+          provided:
+            enabled: true
+            storageProvisioner: disk.csi.azure.com
+            reclaimPolicy: Retain
+            allowVolumeExpansion: true
+            storageParameters:
+              skuName: Premium_LRS
+              kind: Managed
+      dbfiles:
+        accessMode: ReadWriteOnce
+        storageSize: 10G
+        storageClass:
+          provided:
+            enabled: true
+            storageProvisioner: disk.csi.azure.com
+            reclaimPolicy: Retain
+            allowVolumeExpansion: true
+            storageParameters:
+              skuName: Premium_LRS
+              kind: Managed
+
+  # AGIC — the IngressClass 'azure-application-gateway' is created automatically
+  # when the AGIC add-on is enabled.
+  ingress:
+    enabled: true
+    className: azure-application-gateway
+    annotations:
+      appgw.ingress.kubernetes.io/request-timeout: "120"
+      appgw.ingress.kubernetes.io/connection-draining: "true"
+      appgw.ingress.kubernetes.io/connection-draining-timeout: "30"
+      # Uncomment to force HTTPS redirect at the Application Gateway:
+      # appgw.ingress.kubernetes.io/ssl-redirect: "true"
+
+  # ── TLS ───────────────────────────────────────────────────────────────────
+  # Option A: Supply a Kubernetes TLS secret (e.g. from cert-manager).
+  # tls:
+  #   enabled: true
+  #   certRef: ontoserver-tls
+  # certmanager:
+  #   enabled: true
+  #   clusterIssuerName: letsencrypt-prod
+  #   email: your-email@example.com
+  #
+  # Option B: Reference a certificate stored in Azure Key Vault via AGIC.
+  # ingress:
+  #   annotations:
+  #     appgw.ingress.kubernetes.io/appgw-ssl-certificate: "my-keyvault-cert"
+
+  tls:
+    enabled: false   # set to true when TLS is configured above
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2
+        memory: 4G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2800m
+      maxHeapSize: 2800m
+    db:
+      requests:
+        cpu: 1
+        memory: 1G
+      limits:
+        cpu: 1
+        memory: 1G
+
+  # ── Preload ───────────────────────────────────────────────────────────────
+  # config:
+  #   atom.preload.feedLocation: "file:///data/preload.xml"
+  # healthCheckOption: -s
+
+  # ── External Secrets (optional) ───────────────────────────────────────────
+  # externalSecret:
+  #   enabled: true
+  #   secretStoreRef:
+  #     name: azure-keyvault-store
+  #     kind: ClusterSecretStore
+  #   data:
+  #     - secretKey: spring.datasource.password
+  #       remoteRef:
+  #         key: ontoserver-db-password

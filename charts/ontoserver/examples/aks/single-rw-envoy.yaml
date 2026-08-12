@@ -1,0 +1,127 @@
+# aks/single-rw-envoy.yaml
+# Single read-write Ontoserver on Azure Kubernetes Service (AKS).
+# Networking: Gateway API with Envoy Gateway.
+# Database: external Azure Database for PostgreSQL (production practice).
+#
+# A read-write server accepts FHIR write operations (POST/PUT/DELETE on
+# CodeSystems, ValueSets, ConceptMaps, etc). Use this for:
+#   - Content development and authoring
+#   - Uploading and validating terminology resources
+#   - Public demo or sandbox servers (e.g. r4.ontoserver.csiro.au)
+#
+# For development/testing with a built-in PostgreSQL sidecar (no external DB
+# required) see sidecar-db/single-rw-envoy.yaml.
+# For a production read-only server see single-ro-envoy.yaml.
+# For a multi-instance high-availability deployment see scaled-ro-envoy.yaml.
+#
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+#   - Azure Database for PostgreSQL provisioned and accessible from the cluster
+#   - Envoy Gateway installed:
+#       kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/v1.3.1/install.yaml
+#   - Azure Disk CSI driver enabled on the node pool (default on AKS)
+#   - cert-manager installed (optional, for TLS):
+#       helm install cert-manager jetstack/cert-manager --set crds.enabled=true
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver -f aks/single-rw-envoy.yaml \
+#     --set ontoserver.imageCredentials.username=<quay-username> \
+#     --set ontoserver.imageCredentials.password=<quay-password>
+
+ontoserver:
+  serverName: ontoserver.example.com
+  hostNames:
+    - ontoserver.example.com
+
+  deployment:
+    # Image pull auth:
+    # - preferred for production: create a docker-registry Secret and reference it here
+    # - alternative: pass ontoserver.imageCredentials.username/password via --set at install time
+    imagePullSecrets:
+      - name: ontoserver-quay-pull-secret
+    kind: Deployment
+    type: single
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 1
+    isReadOnly: false   # ← read-write: accepts FHIR write operations
+
+    db:
+      enabled: false   # external PostgreSQL — sidecar not used in production
+
+    persistence:
+      enabledForDeployment: true
+      # Azure Disk (Premium_LRS) — ReadWriteOnce, backed by Azure managed disks.
+      files:
+        accessMode: ReadWriteOnce
+        storageSize: 20G
+        storageClass:
+          provided:
+            enabled: true
+            storageProvisioner: disk.csi.azure.com
+            reclaimPolicy: Retain
+            allowVolumeExpansion: true
+            storageParameters:
+              skuName: Premium_LRS
+              kind: Managed
+
+  # ── External PostgreSQL connection ────────────────────────────────────────
+  config:
+    spring.datasource.url: "jdbc:postgresql://your-postgres-server.postgres.database.azure.com:5432/ontoserver?sslmode=require"
+    spring.datasource.username: "ontoserver"
+
+  # Supply the password via secretConfig (inline) or externalSecret (Key Vault).
+  # Option A — inline secret (base64-encoded):
+  secretConfig:
+    spring.datasource.password: ""   # base64-encoded PostgreSQL password
+
+  # Option B — Azure Key Vault via External Secrets Operator:
+  # externalSecret:
+  #   enabled: true
+  #   secretStoreRef:
+  #     name: azure-keyvault-store
+  #     kind: ClusterSecretStore
+  #   data:
+  #     - secretKey: spring.datasource.password
+  #       remoteRef:
+  #         key: ontoserver-db-password
+
+  gateway:
+    enabled: true
+    className: envoy-gateway-class
+
+  # ── TLS ───────────────────────────────────────────────────────────────────
+  # Ontoserver must not be served over plaintext HTTP. Supply the certificate as a
+  # Kubernetes TLS Secret named by certRef, or uncomment certmanager below to have
+  # cert-manager issue and populate that Secret for you.
+  tls:
+    enabled: true
+    certRef: ontoserver-tls
+  # certmanager:
+  #   enabled: true
+  #   clusterIssuerName: letsencrypt-prod
+  #   email: your-email@example.com
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2
+        memory: 4G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2800m
+      maxHeapSize: 2800m
+
+  # ── Syndication (optional) ────────────────────────────────────────────────
+  # Pull content from an Atom syndication feed into the read-write server.
+  #
+  # config:
+  #   atom.syndication.feedLocation: "https://api.healthterminologies.gov.au/syndication/v1/syndication.xml"
+
+# ── Envoy Gateway traffic policies (optional) ─────────────────────────────
+# envoygateway:
+#   clientTrafficPolicy:
+#     enabled: true
+#     idleTimeout: 300s
+#   backendTrafficPolicy:
+#     enabled: true
+#     requestBufferLimit: 1Gi

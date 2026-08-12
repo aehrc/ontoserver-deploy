@@ -1,0 +1,49 @@
+{{- if .Values.ontoserver.deployment.persistence.enabledForDeployment }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-ontoserver-files
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  {{- if .Values.ontoserver.deployment.persistence.files.existingVolume.enabled }}
+  volumeName: {{ .Values.ontoserver.deployment.persistence.files.existingVolume.name }}
+  {{- end }}
+  resources:
+    requests:
+      storage: "{{ required "ontoserver.deployment.persistence.files.storageSize is required" .Values.ontoserver.deployment.persistence.files.storageSize }}"
+  {{- if .Values.ontoserver.deployment.persistence.files.storageClass.provided.enabled }}
+  storageClassName: {{ .Release.Name }}-ontoserver-files
+  {{- else if .Values.ontoserver.deployment.persistence.files.storageClass.name }}
+  storageClassName: {{ .Values.ontoserver.deployment.persistence.files.storageClass.name }}
+  {{- end }}
+  accessModes:
+    - "{{ .Values.ontoserver.deployment.persistence.files.accessMode }}"
+{{- if and (eq .Values.ontoserver.deployment.persistence.mode "split") .Values.ontoserver.deployment.db.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-ontoserver-db-files
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  {{- if .Values.ontoserver.deployment.persistence.dbfiles.existingVolume.enabled }}
+  volumeName: {{ .Values.ontoserver.deployment.persistence.dbfiles.existingVolume.name }}
+  {{- end }}
+  resources:
+    requests:
+      storage: "{{ required "ontoserver.deployment.persistence.dbfiles.storageSize is required" .Values.ontoserver.deployment.persistence.dbfiles.storageSize }}"
+  {{- if .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.enabled }}
+  storageClassName: {{ .Release.Name }}-ontoserver-db-files
+  {{- else if .Values.ontoserver.deployment.persistence.dbfiles.storageClass.name }}
+  storageClassName: {{ .Values.ontoserver.deployment.persistence.dbfiles.storageClass.name }}
+  {{- end }}
+  accessModes:
+    - "{{ .Values.ontoserver.deployment.persistence.dbfiles.accessMode }}"
+{{- end }}
+{{- end }}

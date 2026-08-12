@@ -1,0 +1,22 @@
+{{- if and .Values.collector.enabled (empty .Values.collector.otlpEndpoint) (empty .Values.collector.zipkinEndpoint) }}
+  {{- fail "collector requires at least one of collector.otlpEndpoint or collector.zipkinEndpoint" }}
+{{- end }}
+
+{{- if and .Values.varnish.opentelemetry.enabled (not .Values.varnish.enabled) }}
+  {{- fail "varnish.opentelemetry.enabled requires varnish.enabled" }}
+{{- end }}
+
+{{- if and .Values.varnish.opentelemetry.enabled (empty .Values.varnish.opentelemetry.collectorEndpoint) }}
+  {{- fail "varnish.opentelemetry.collectorEndpoint is required when varnish.opentelemetry.enabled" }}
+{{- end }}
+
+{{- /* A zero batch timeout disables the flush timer rather than meaning "flush immediately", so
+     spans are held until send_batch_size accumulates. That is silent: tracing appears configured
+     and nothing arrives. Rejected outright because there is no case where 0 is what was wanted —
+     the collector's own default is 200ms. Matches any unit, since 0ms is the same trap as 0s. */}}
+{{- if .Values.collector.enabled }}
+  {{- $t := .Values.collector.batch.timeout | toString }}
+  {{- if regexMatch "^0+(ns|us|µs|ms|s|m|h)?$" $t }}
+    {{- fail (printf "collector.batch.timeout must not be zero (got %q) — a zero timeout disables the batch flush timer, so spans are held until collector.batch.sendBatchSize accumulates and on a quiet server traces never ship. Use a real duration such as 5s." $t) }}
+  {{- end }}
+{{- end }}

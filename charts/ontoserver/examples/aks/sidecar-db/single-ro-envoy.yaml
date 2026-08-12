@@ -1,0 +1,128 @@
+# aks/sidecar-db/single-ro-envoy.yaml
+# Single read-only Ontoserver on AKS with built-in PostgreSQL sidecar.
+# Networking: Gateway API with Envoy Gateway.
+#
+# Uses the chart's built-in PostgreSQL 16 sidecar container — convenient for
+# development, testing, or low-traffic deployments where managing an external
+# database is not justified.
+#
+# For production deployments with an external managed database
+# (Azure Database for PostgreSQL) see ../single-ro-envoy.yaml.
+# For a multi-instance high-availability deployment see ../scaled-ro-envoy.yaml.
+#
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+#   - Envoy Gateway installed:
+#       kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/v1.3.1/install.yaml
+#   - Azure Disk CSI driver enabled on the node pool (default on AKS)
+#   - cert-manager installed (optional, for TLS):
+#       helm install cert-manager jetstack/cert-manager --set crds.enabled=true
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver -f aks/sidecar-db/single-ro-envoy.yaml \
+#     --set ontoserver.imageCredentials.username=<quay-username> \
+#     --set ontoserver.imageCredentials.password=<quay-password>
+
+ontoserver:
+  serverName: ontoserver.example.com
+  hostNames:
+    - ontoserver.example.com
+
+  deployment:
+    # Image pull auth:
+    # - preferred for production: create a docker-registry Secret and reference it here
+    # - alternative: pass ontoserver.imageCredentials.username/password via --set at install time
+    imagePullSecrets:
+      - name: ontoserver-quay-pull-secret
+    kind: Deployment
+    type: single
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 1
+    isReadOnly: true
+
+    db:
+      enabled: true
+      postgresVersion: 16
+
+    persistence:
+      enabledForDeployment: true
+      mode: split
+      # Azure Disk (Premium_LRS) — ReadWriteOnce, backed by Azure managed disks.
+      files:
+        accessMode: ReadWriteOnce
+        storageSize: 20G
+        storageClass:
+          provided:
+            enabled: true
+            storageProvisioner: disk.csi.azure.com
+            reclaimPolicy: Retain
+            allowVolumeExpansion: true
+            storageParameters:
+              skuName: Premium_LRS
+              kind: Managed
+      dbfiles:
+        accessMode: ReadWriteOnce
+        storageSize: 10G
+        storageClass:
+          provided:
+            enabled: true
+            storageProvisioner: disk.csi.azure.com
+            reclaimPolicy: Retain
+            allowVolumeExpansion: true
+            storageParameters:
+              skuName: Premium_LRS
+              kind: Managed
+
+  gateway:
+    enabled: true
+    className: envoy-gateway-class
+
+  # ── TLS ───────────────────────────────────────────────────────────────────
+  # Ontoserver must not be served over plaintext HTTP. Supply the certificate as a
+  # Kubernetes TLS Secret named by certRef, or uncomment certmanager below to have
+  # cert-manager issue and populate that Secret for you.
+  tls:
+    enabled: true
+    certRef: ontoserver-tls
+  # certmanager:
+  #   enabled: true
+  #   clusterIssuerName: letsencrypt-prod
+  #   email: your-email@example.com
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2
+        memory: 4G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2800m
+      maxHeapSize: 2800m
+    db:
+      requests:
+        cpu: 1
+        memory: 1G
+      limits:
+        cpu: 1
+        memory: 1G
+
+  # ── Preload ───────────────────────────────────────────────────────────────
+  # config:
+  #   atom.preload.feedLocation: "file:///data/preload.xml"
+  # healthCheckOption: -s
+
+# ── Envoy Gateway traffic policies (optional) ─────────────────────────────
+# envoygateway:
+#   clientTrafficPolicy:
+#     enabled: true
+#     idleTimeout: 300s
+#   backendTrafficPolicy:
+#     enabled: true
+#     requestBufferLimit: 1Gi
+#     rateLimit:
+#       requests: 50
+#       unit: Second
+#   securityPolicy:
+#     enabled: true
+#     defaultAction: Allow
+#     deniedCIDRs: []

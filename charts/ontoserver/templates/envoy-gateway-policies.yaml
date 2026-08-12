@@ -1,0 +1,83 @@
+{{- if and .Values.ontoserver.gateway.enabled .Values.envoygateway.clientTrafficPolicy.enabled }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: {{ .Release.Name }}-client-settings
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: {{ .Release.Name }}-gw
+  timeout:
+    http:
+      idleTimeout: {{ .Values.envoygateway.clientTrafficPolicy.idleTimeout }}
+{{- if .Values.envoygateway.clientTrafficPolicy.proxyProtocol.enabled }}
+  enableProxyProtocol: true
+{{- end }}
+{{- if not (kindIs "invalid" .Values.envoygateway.clientTrafficPolicy.clientIPDetection.xForwardedFor.numTrustedHops) }}
+  clientIPDetection:
+    xForwardedFor:
+      numTrustedHops: {{ .Values.envoygateway.clientTrafficPolicy.clientIPDetection.xForwardedFor.numTrustedHops }}
+{{- end }}
+{{- end }}
+{{- if and .Values.ontoserver.gateway.enabled .Values.envoygateway.backendTrafficPolicy.enabled }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: {{ .Release.Name }}-backend-settings
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ .Release.Name }}-route
+  requestBuffer:
+    limit: {{ .Values.envoygateway.backendTrafficPolicy.requestBufferLimit }}
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        {{- range .Values.envoygateway.backendTrafficPolicy.rateLimitUserAgents }}
+        - clientSelectors:
+            - headers:
+                - name: User-Agent
+                  value: {{ . }}
+                  type: RegularExpression
+          limit:
+            requests: 1
+            unit: Hour
+        {{- end }}
+        - limit:
+            requests: {{ .Values.envoygateway.backendTrafficPolicy.rateLimit.requests }}
+            unit: {{ .Values.envoygateway.backendTrafficPolicy.rateLimit.unit }}
+{{- end }}
+{{- if and .Values.ontoserver.gateway.enabled .Values.envoygateway.securityPolicy.enabled }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ .Release.Name }}-ip-filter
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ .Release.Name }}-route
+  authorization:
+    defaultAction: {{ .Values.envoygateway.securityPolicy.defaultAction }}
+    {{- if .Values.envoygateway.securityPolicy.deniedCIDRs }}
+    rules:
+      - action: Deny
+        principal:
+          clientCIDRs:
+            {{- range .Values.envoygateway.securityPolicy.deniedCIDRs }}
+            - {{ . }}
+            {{- end }}
+    {{- end }}
+{{- end }}

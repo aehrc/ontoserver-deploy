@@ -1,0 +1,158 @@
+suite: StorageClass tests
+templates:
+  - templates/storage-class.yaml
+tests:
+  # Deployment kind without enabledForDeployment uses no PVCs at all, so neither StorageClass
+  # should appear.
+  - it: renders nothing for a Deployment without persistence
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Shared mode keeps db files on the same volume, so only the files StorageClass applies.
+  # Note the chart default for persistence.mode is `split`, so this has to be set explicitly.
+  - it: renders only the files StorageClass in shared mode
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.persistence.mode: shared
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-files
+      - equal:
+          path: kind
+          value: StorageClass
+      - equal:
+          path: volumeBindingMode
+          value: WaitForFirstConsumer
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: ontoserver
+
+  - it: renders both StorageClasses in split mode with the sidecar db
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.persistence.mode: split
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-files
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-db-files
+        documentIndex: 1
+
+  # The bug: this block tested `.provided` — the enclosing map, always truthy — so the
+  # StorageClass was created even when disabled, while pvc.yaml correctly pointed at
+  # storageClass.name instead. The result was an orphaned StorageClass.
+  - it: does not render the db-files StorageClass when provided is disabled
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.persistence.dbfiles.storageClass.provided.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-files
+
+  - it: does not render the files StorageClass when provided is disabled
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.persistence.files.storageClass.provided.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-db-files
+
+  - it: renders nothing when both provided flags are disabled
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.persistence.files.storageClass.provided.enabled: false
+      ontoserver.deployment.persistence.dbfiles.storageClass.provided.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Scaled deployments require an external database, so dbfiles is never used there.
+  - it: does not render the db-files StorageClass when the sidecar db is disabled
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.persistence.mode: split
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-files
+
+  - it: renders the files StorageClass for a StatefulSet without enabledForDeployment
+    values:
+      - fixtures/scaled-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-files
+
+  # documentIndex is required on every assert here: without it helm-unittest applies the assert
+  # to *all* rendered documents, and split mode renders two StorageClasses.
+  - it: passes through provisioner, reclaimPolicy, parameters and expansion
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.persistence.mode: shared
+      ontoserver.deployment.persistence.files.storageClass.provided.storageProvisioner: disk.csi.azure.com
+      ontoserver.deployment.persistence.files.storageClass.provided.reclaimPolicy: Delete
+      ontoserver.deployment.persistence.files.storageClass.provided.allowVolumeExpansion: false
+      ontoserver.deployment.persistence.files.storageClass.provided.storageParameters.skuName: StandardSSD_LRS
+    asserts:
+      - equal:
+          path: provisioner
+          value: disk.csi.azure.com
+        documentIndex: 0
+      - equal:
+          path: reclaimPolicy
+          value: Delete
+        documentIndex: 0
+      - equal:
+          path: allowVolumeExpansion
+          value: false
+        documentIndex: 0
+      - equal:
+          path: parameters.skuName
+          value: StandardSSD_LRS
+        documentIndex: 0
+
+  # `set` merges into the defaults, so storageParameters: {} would leave the shipped
+  # skuName/kind in place and the guard would never fire. Null the keys individually.
+  - it: fails when files storageParameters is empty
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.persistence.mode: shared
+      ontoserver.deployment.persistence.files.storageClass.provided.storageParameters.skuName: null
+      ontoserver.deployment.persistence.files.storageClass.provided.storageParameters.kind: null
+    asserts:
+      - failedTemplate:
+          errorMessage: "Provide storage parameters in ontoserver.deployment.persistence.files.storageClass.provided.storageParameters"
+
+  - it: fails when dbfiles storageParameters is empty
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters.skuName: null
+      ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters.kind: null
+    asserts:
+      - failedTemplate:
+          errorMessage: "Provide storage parameters in ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters"

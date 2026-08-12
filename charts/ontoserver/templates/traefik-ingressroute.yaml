@@ -1,0 +1,60 @@
+{{- if .Values.traefik.ingressRoute.enabled }}
+{{- $releaseName := .Release.Name }}
+# Traefik IngressRoute (CRD) — use instead of standard Ingress when Traefik is the
+# ingress controller and any backend pod exposes HTTPS/TLS. Unlike standard Kubernetes
+# Ingress, IngressRoute lets you attach a ServersTransport to explicitly configure how
+# Traefik connects to TLS backends (trust, client certificates, skip-verify).
+#
+# Requires Traefik CRDs installed in the cluster. API group traefik.io/v1alpha1 (Traefik v3);
+# for Traefik v2 change the apiVersion to traefik.containo.us/v1alpha1.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ .Release.Name }}-ontoserver-ingressroute
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+{{- if gt (len .Values.traefik.ingressRoute.annotations) 0 }}
+  annotations:
+    {{- range $k, $v := .Values.traefik.ingressRoute.annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+{{- end }}
+spec:
+  entryPoints:
+    {{- range .Values.traefik.ingressRoute.entryPoints }}
+    - {{ . }}
+    {{- end }}
+  routes:
+    {{- range .Values.ontoserver.hostNames }}
+    {{- if and (eq $.Values.ontoserver.deployment.kind "StatefulSet") (eq $.Values.ontoserver.deployment.type "scaled") }}
+    # Route $closure to a dedicated pod — this FHIR operation is stateful and requires
+    # all requests to always hit the same Ontoserver instance.
+    - match: Host(`{{ . }}`) && PathPrefix(`/fhir/$closure`)
+      kind: Rule
+      services:
+        - name: {{ $.Values.traefik.ingressRoute.backendServiceNameOverride | default (printf "%s-ontoserver-pod0-service" $releaseName) }}
+          port: {{ $.Values.traefik.ingressRoute.backendPort }}
+          {{- if $.Values.traefik.ingressRoute.backendScheme }}
+          scheme: {{ $.Values.traefik.ingressRoute.backendScheme }}
+          {{- end }}
+          {{- if $.Values.traefik.ingressRoute.serversTransport.enabled }}
+          serversTransport: {{ $releaseName }}-ontoserver-serverstransport
+          {{- end }}
+    {{- end }}
+    - match: Host(`{{ . }}`)
+      kind: Rule
+      services:
+        - name: {{ $.Values.traefik.ingressRoute.backendServiceNameOverride | default (printf "%s-ontoserver-service" $releaseName) }}
+          port: {{ $.Values.traefik.ingressRoute.backendPort }}
+          {{- if $.Values.traefik.ingressRoute.backendScheme }}
+          scheme: {{ $.Values.traefik.ingressRoute.backendScheme }}
+          {{- end }}
+          {{- if $.Values.traefik.ingressRoute.serversTransport.enabled }}
+          serversTransport: {{ $releaseName }}-ontoserver-serverstransport
+          {{- end }}
+    {{- end }}
+  {{- if .Values.ontoserver.tls.enabled }}
+  tls:
+    secretName: {{ .Values.ontoserver.tls.certRef }}
+  {{- end }}
+{{- end }}

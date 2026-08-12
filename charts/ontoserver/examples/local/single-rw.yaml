@@ -1,0 +1,87 @@
+# local/single-rw.yaml
+# Universal single read-write Ontoserver — no ingress, no cloud credentials.
+# Works on k3d, k3s, minikube, kind, or any other local cluster.
+#
+# A read-write server accepts FHIR write operations (POST/PUT/DELETE on
+# CodeSystems, ValueSets, ConceptMaps, etc). Use this for:
+#   - Content development and authoring
+#   - Uploading and validating new terminology resources
+#   - Testing before promoting content to a production read-only server
+#
+# See r4.ontoserver.csiro.au for an example of a public read-write server.
+# For a production cloud deployment see aks/ and eks/.
+#
+# Access via port-forwarding (no ingress required):
+#   kubectl port-forward svc/<release>-ontoserver 8080:80
+#   curl http://localhost:8080/fhir/metadata
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver -f local/single-rw.yaml \
+#     --set ontoserver.imageCredentials.username=<quay-username> \
+#     --set ontoserver.imageCredentials.password=<quay-password>
+
+ontoserver:
+  serverName: localhost
+  hostNames:
+    - localhost
+
+  deployment:
+    # Image pull auth:
+    # - preferred for production: create a docker-registry Secret and reference it here
+    # - alternative: pass ontoserver.imageCredentials.username/password via --set at install time
+    imagePullSecrets:
+      - name: ontoserver-quay-pull-secret
+    kind: Deployment
+    type: single
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 1
+    isReadOnly: false   # ← read-write: accepts FHIR write operations
+
+    db:
+      enabled: true
+      postgresVersion: 16
+
+    persistence:
+      enabledForDeployment: true
+      mode: split
+      # No chart-managed StorageClass — uses the cluster default.
+      # k3d/k3s: local-path   minikube: standard   kind: local-path-provisioner
+      files:
+        accessMode: ReadWriteOnce
+        storageSize: 10G
+        storageClass:
+          provided:
+            enabled: false
+          name: ""
+      dbfiles:
+        accessMode: ReadWriteOnce
+        storageSize: 5G
+        storageClass:
+          provided:
+            enabled: false
+          name: ""
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 1
+        memory: 3G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2400m
+      maxHeapSize: 2400m
+    db:
+      requests:
+        cpu: 500m
+        memory: 512M
+      limits:
+        cpu: 1
+        memory: 1G
+
+  # ── Syndication (optional) ────────────────────────────────────────────────
+  # Pull content from an Atom syndication feed into the read-write server.
+  # The server must have network access to the feed endpoint.
+  #
+  # config:
+  #   atom.syndication.feedLocation: "https://api.healthterminologies.gov.au/syndication/v1/syndication.xml"

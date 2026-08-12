@@ -1,0 +1,11 @@
+{{- if .Values.varnish.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-varnish-configmap
+  labels:
+    {{- include "ontoserver-extras.labels" . | nindent 4 }}
+data:
+  default.vcl: |
+  {{- include "ontoserver-extras.varnish.vcl" . | nindent 4 }}
+{{- end }}

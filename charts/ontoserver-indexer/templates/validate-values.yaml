@@ -1,0 +1,73 @@
+{{- if empty .Values.codeSystem.url }}
+  {{- fail "codeSystem.url is required" }}
+{{- end }}
+
+{{- if empty .Values.codeSystem.version }}
+  {{- fail "codeSystem.version is required" }}
+{{- end }}
+
+{{- if empty .Values.rf2.files }}
+  {{- fail "rf2.files must contain at least one URL" }}
+{{- end }}
+
+{{- if ne .Values.codeSystem.url "http://loinc.org" }}
+  {{- $validKinds := list "FULL" "SNAPSHOT" }}
+  {{- if not (has .Values.rf2.kind $validKinds) }}
+    {{- fail "rf2.kind must be one of: FULL, SNAPSHOT" }}
+  {{- end }}
+{{- end }}
+
+{{- if and (empty .Values.syndication.endpoint) (empty .Values.output.path) }}
+  {{- fail "either syndication.endpoint or output.path must be set" }}
+{{- end }}
+
+{{- if .Values.syndication.endpoint }}
+  {{- if empty .Values.syndication.feed }}
+    {{- fail "syndication.feed is required when syndication.endpoint is set" }}
+  {{- end }}
+  {{- if empty .Values.syndication.entryTitle }}
+    {{- fail "syndication.entryTitle is required when syndication.endpoint is set" }}
+  {{- end }}
+{{- end }}
+
+{{- if and .Values.output.pvcName (empty .Values.output.path) }}
+  {{- fail "output.path is required when output.pvcName is set" }}
+{{- end }}
+
+{{- $hasOauth2 := or .Values.auth.oauth2.secretRef .Values.auth.oauth2.clientId }}
+{{- if and $hasOauth2 (empty .Values.syndication.tokenEndpoint) }}
+  {{- fail "syndication.tokenEndpoint is required when oauth2 auth is configured" }}
+{{- end }}
+
+{{- $hasOauth2 := or .Values.auth.oauth2.secretRef .Values.auth.oauth2.clientId }}
+{{- $hasBasic  := or .Values.auth.basic.secretRef  .Values.auth.basic.username }}
+{{- if and $hasOauth2 $hasBasic }}
+  {{- fail "auth.oauth2 and auth.basic are mutually exclusive" }}
+{{- end }}
+
+{{- if and .Values.auth.oauth2.secretRef .Values.auth.oauth2.clientId }}
+  {{- fail "auth.oauth2.secretRef and auth.oauth2.clientId are mutually exclusive" }}
+{{- end }}
+
+{{- if and .Values.auth.basic.secretRef .Values.auth.basic.username }}
+  {{- fail "auth.basic.secretRef and auth.basic.username are mutually exclusive" }}
+{{- end }}
+
+{{- if and .Values.auth.oauth2.clientId (empty .Values.auth.oauth2.clientSecret) }}
+  {{- fail "auth.oauth2.clientSecret is required when auth.oauth2.clientId is set" }}
+{{- end }}
+
+{{- if and .Values.auth.basic.username (empty .Values.auth.basic.password) }}
+  {{- fail "auth.basic.password is required when auth.basic.username is set" }}
+{{- end }}
+
+{{- /* The JVM heap must stay below the container memory limit so that non-heap JVM
+     memory (metaspace, code cache, thread stacks, GC structures, direct buffers) has
+     somewhere to live. Without this, the pod is OOMKilled rather than failing fast. */ -}}
+{{- $heap := .Values.resources.heapGb | default (sub .Values.resources.memoryGb 2) }}
+{{- if le (int $heap) 0 }}
+  {{- fail (printf "resources.memoryGb must be at least 3 to leave a 2Gi non-heap reserve (got %v). Set resources.heapGb explicitly to override the default heap sizing." .Values.resources.memoryGb) }}
+{{- end }}
+{{- if ge (int $heap) (int .Values.resources.memoryGb) }}
+  {{- fail (printf "resources.heapGb (%v) must be less than resources.memoryGb (%v): the JVM heap cannot fill the entire container memory limit" $heap .Values.resources.memoryGb) }}
+{{- end }}

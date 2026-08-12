@@ -1,0 +1,100 @@
+suite: ServiceMonitor tests
+templates:
+  - templates/servicemonitor.yaml
+tests:
+  - it: renders nothing by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # The pre-existing shape must not change for anyone already using this: no extra labels, no
+  # namespaceSelector, and no interval, so Prometheus's global default still applies.
+  - it: renders the same as before when no new values are set
+    set:
+      ontoserver.managementService.enabled: true
+      ontoserver.metrics.serviceMonitor.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.selector.matchLabels.service
+          value: RELEASE-NAME-ontoserver-management
+      - isNull:
+          path: spec.namespaceSelector
+      - isNull:
+          path: spec.endpoints[0].interval
+      - isNull:
+          path: spec.endpoints[0].scrapeTimeout
+      - equal:
+          path: spec.endpoints[0].path
+          value: /actuator/prometheus
+
+  # The reason this value exists: most Prometheus installations set a non-empty
+  # serviceMonitorSelector, and a ServiceMonitor carrying no matching label is silently never
+  # discovered. Nothing errors — the metrics simply never appear — so it is worth a test.
+  - it: adds discovery labels for a Prometheus serviceMonitorSelector
+    set:
+      ontoserver.managementService.enabled: true
+      ontoserver.metrics.serviceMonitor.enabled: true
+      ontoserver.metrics.serviceMonitor.labels:
+        release: kube-prometheus-stack
+    asserts:
+      - equal:
+          path: metadata.labels["release"]
+          value: kube-prometheus-stack
+      # Must not displace the chart's own labels.
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: metrics
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: ontoserver
+
+  - it: sets the scrape interval and timeout when given
+    set:
+      ontoserver.managementService.enabled: true
+      ontoserver.metrics.serviceMonitor.enabled: true
+      ontoserver.metrics.serviceMonitor.interval: 30s
+      ontoserver.metrics.serviceMonitor.scrapeTimeout: 25s
+    asserts:
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 30s
+      - equal:
+          path: spec.endpoints[0].scrapeTimeout
+          value: 25s
+
+  - it: sets a namespaceSelector when given
+    set:
+      ontoserver.managementService.enabled: true
+      ontoserver.metrics.serviceMonitor.enabled: true
+      ontoserver.metrics.serviceMonitor.namespaceSelector:
+        - monitoring
+        - observability
+    asserts:
+      - equal:
+          path: spec.namespaceSelector.matchNames
+          value:
+            - monitoring
+            - observability
+
+  # The Envoy Gateway ServiceMonitor is a separate document with its own selector and interval,
+  # and must not pick up the Ontoserver one's values.
+  - it: does not apply the values to the gateway ServiceMonitor
+    set:
+      ontoserver.managementService.enabled: true
+      ontoserver.metrics.serviceMonitor.enabled: true
+      ontoserver.metrics.serviceMonitor.interval: 30s
+      ontoserver.metrics.serviceMonitor.labels:
+        release: kube-prometheus-stack
+      envoygateway.gatewayServiceMonitor.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 15s
+        documentIndex: 1
+      - isNull:
+          path: metadata.labels["release"]
+        documentIndex: 1

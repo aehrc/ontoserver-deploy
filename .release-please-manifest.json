@@ -1,0 +1,5 @@
+{
+  "charts/ontoserver": "0.4.0",
+  "charts/ontoserver-extras": "0.1.1",
+  "charts/ontoserver-indexer": "0.2.0"
+}

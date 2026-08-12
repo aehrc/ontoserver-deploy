@@ -1,0 +1,136 @@
+suite: StatefulSet template tests
+templates:
+  - templates/statefulset.yaml
+tests:
+  - it: renders nothing when kind is Deployment (default)
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a StatefulSet when kind is StatefulSet
+    set:
+      ontoserver.deployment.kind: StatefulSet
+    asserts:
+      - isKind:
+          of: StatefulSet
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-statefulset
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.podManagementPolicy
+          value: Parallel
+
+  - it: sets serviceName to headless service
+    set:
+      ontoserver.deployment.kind: StatefulSet
+    asserts:
+      - equal:
+          path: spec.serviceName
+          value: RELEASE-NAME-ontoserver-headless
+
+  - it: split persistence mode creates two volumeClaimTemplates
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.db.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isNotNull:
+          path: spec.volumeClaimTemplates[1]
+
+  - it: shared persistence mode creates one volumeClaimTemplate
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.persistence.mode: shared
+    asserts:
+      - isNull:
+          path: spec.volumeClaimTemplates[1]
+
+  - it: renders scaled StatefulSet with replicas=2
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: false
+      ontoserver.deployment.persistence.files.accessMode: ReadWriteMany
+      ontoserver.deployment.persistence.dbfiles.accessMode: ReadWriteMany
+    values:
+      - fixtures/external-db-values.yaml
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+
+  - it: fails for scaled StatefulSet with replicas=1
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 1
+    asserts:
+      - failedTemplate:
+          errorMessage: "scaled deployments require ontoserver.deployment.replicas should be greater or equal to 2 or 0"
+
+  - it: fails for scaled StatefulSet with sidecar DB enabled
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "Scaled deployments require shared database and cannot have the default sidecar database. Set ontoserver.deployment.db.enabled to false and set spring.datasource.url in ontoserver.config to an external db jdbc URL."
+
+  - it: includes external pull secret in imagePullSecrets when imagePullSecret keys set
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.externalSecret.imagePullSecret.data.username.key: quay-creds
+      ontoserver.externalSecret.imagePullSecret.data.password.key: quay-creds
+      ontoserver.externalSecret.secretStoreRef.name: my-store
+    asserts:
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: RELEASE-NAME-ontoserver-pull-secret-external
+
+  # ── Labels ─────────────────────────────────────────────────────────────────
+  - it: stamps the standard labels on the StatefulSet
+    set:
+      ontoserver.deployment.kind: StatefulSet
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: ontoserver
+      - equal:
+          path: metadata.labels["app.kubernetes.io/version"]
+          value: ctsa-6
+
+  # Both spec.selector and spec.volumeClaimTemplates are immutable on a StatefulSet.
+  # Adding labels to either would break helm upgrade on an existing release, so the
+  # selector stays release-scoped and the volumeClaimTemplates carry no labels at all.
+  - it: keeps the selector and volumeClaimTemplates free of the standard labels
+    set:
+      ontoserver.deployment.kind: StatefulSet
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app: RELEASE-NAME-ontoserver
+      - isNull:
+          path: spec.volumeClaimTemplates[0].metadata.labels
+
+  - it: carries both selector and standard labels on the StatefulSet pod template
+    set:
+      ontoserver.deployment.kind: StatefulSet
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["app"]
+          value: RELEASE-NAME-ontoserver
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/name"]
+          value: ontoserver

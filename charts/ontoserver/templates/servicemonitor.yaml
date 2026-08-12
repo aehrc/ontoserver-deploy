@@ -1,0 +1,60 @@
+{{- if .Values.ontoserver.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-service-monitor
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics
+    {{- /* Most Prometheus installations set a non-empty serviceMonitorSelector, and a
+         ServiceMonitor with no matching label is silently never discovered — nothing errors,
+         the metrics just never appear. These labels are how the caller opts in. */}}
+    {{- with .Values.ontoserver.metrics.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- /* Empty means the release namespace only, which is correct unless the Prometheus doing the
+       discovery is restricted to particular namespaces. */}}
+  {{- with .Values.ontoserver.metrics.serviceMonitor.namespaceSelector }}
+  namespaceSelector:
+    matchNames:
+      {{- toYaml . | nindent 6 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      service: {{ .Release.Name }}-ontoserver-management
+  endpoints:
+    - port: http-traffic
+      path: "/actuator/prometheus"
+      {{- with .Values.ontoserver.metrics.serviceMonitor.interval }}
+      interval: {{ . | quote }}
+      {{- end }}
+      {{- with .Values.ontoserver.metrics.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . | quote }}
+      {{- end }}
+{{- end }}
+{{- if .Values.envoygateway.gatewayServiceMonitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-ontoserver-gateway-servicemonitor
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway-metrics
+spec:
+  namespaceSelector:
+    matchNames:
+      - {{ .Values.envoygateway.controlPlaneNamespace }}
+  selector:
+    matchLabels:
+      gateway.envoyproxy.io/owning-gateway-name: {{ .Release.Name }}-gw
+  endpoints:
+    - port: metrics
+      path: /stats/prometheus
+      interval: 15s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_label_gateway_envoyproxy_io_owning_gateway_name]
+          targetLabel: gateway
+          action: replace
+{{- end }}

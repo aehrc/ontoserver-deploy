@@ -1,0 +1,157 @@
+suite: Varnish ConfigMap tests
+templates:
+  - templates/varnish-configmap.yaml
+tests:
+  - it: renders nothing when varnish disabled (default)
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a ConfigMap when varnish enabled
+    set:
+      varnish.enabled: true
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - hasDocuments:
+          count: 1
+
+  - it: names the ConfigMap correctly
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-varnish-configmap
+
+  - it: uses default backend service name derived from release name
+    set:
+      varnish.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: '\.host = "RELEASE-NAME-ontoserver-service"'
+
+  - it: uses custom backendServiceName when provided
+    set:
+      varnish.enabled: true
+      varnish.backendServiceName: my-custom-backend
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: '\.host = "my-custom-backend"'
+
+  - it: includes Authorization passthrough by default
+    set:
+      varnish.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'req\.http\.Authorization'
+
+  - it: omits Authorization passthrough when passAuthHeaderRequests false
+    set:
+      varnish.enabled: true
+      varnish.cache.passAuthHeaderRequests: false
+    asserts:
+      - notMatchRegex:
+          path: data["default.vcl"]
+          pattern: 'req\.http\.Authorization'
+
+  - it: includes cache TTL for 200 responses
+    set:
+      varnish.enabled: true
+      varnish.cache.time200: 5m
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'beresp\.ttl = 5m'
+
+  - it: includes cache TTL for 404 responses
+    set:
+      varnish.enabled: true
+      varnish.cache.time404: 2m
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'beresp\.ttl = 2m'
+
+  - it: includes grace period by default
+    set:
+      varnish.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'beresp\.grace = 30s'
+
+  - it: uses custom grace period from values
+    set:
+      varnish.enabled: true
+      varnish.graceSeconds: 60
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'beresp\.grace = 60s'
+
+  - it: omits grace period when graceSeconds is 0
+    set:
+      varnish.enabled: true
+      varnish.graceSeconds: 0
+    asserts:
+      - notMatchRegex:
+          path: data["default.vcl"]
+          pattern: 'beresp\.grace'
+
+  - it: includes opentelemetry VCL blocks when otel enabled
+    set:
+      varnish.enabled: true
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: "http://collector/api/v2/spans"
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'OTEL_SPAN'
+
+  - it: omits opentelemetry VCL blocks when otel disabled
+    set:
+      varnish.enabled: true
+    asserts:
+      - notMatchRegex:
+          path: data["default.vcl"]
+          pattern: 'OTEL_SPAN'
+
+  - it: omits closure backend and routing when closureBackend not set
+    set:
+      varnish.enabled: true
+    asserts:
+      - notMatchRegex:
+          path: data["default.vcl"]
+          pattern: 'backend closure'
+      - notMatchRegex:
+          path: data["default.vcl"]
+          pattern: '\$closure'
+
+  - it: adds closure backend block when closureBackend is set
+    set:
+      varnish.enabled: true
+      varnish.closureBackend: "my-release-statefulset-0.my-release-ontoserver-headless"
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'backend closure'
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: '\.host = "my-release-statefulset-0\.my-release-ontoserver-headless"'
+
+  - it: routes closure requests to closure backend and passes through
+    set:
+      varnish.enabled: true
+      varnish.closureBackend: "my-release-statefulset-0.my-release-ontoserver-headless"
+    asserts:
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: 'req\.backend_hint = closure'
+      - matchRegex:
+          path: data["default.vcl"]
+          pattern: '/fhir/\\\$closure'
+

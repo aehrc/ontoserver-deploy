@@ -1,0 +1,100 @@
+# Read-only development server
+#
+# Topology: Deployment (single) · isReadOnly · sidecar PostgreSQL · ephemeral storage · Varnish cache
+#
+# Not suitable for production — storage is ephemeral so the Lucene index is
+# rebuilt from syndication feeds on every pod restart.
+#
+# Networking is intentionally omitted — hostnames and ingress/gateway config
+# are site-specific. Add your gateway or ingress block under ontoserver before
+# applying. See charts/ontoserver/README.md for Gateway API and Ingress options.
+#
+# Image pull credentials
+#   This Application expects a Kubernetes secret named quay-pull-secret of type
+#   kubernetes.io/dockerconfigjson to exist in the ontoserver-dev namespace.
+#   Create it via your own mechanism (ExternalSecret, SealedSecret, Vault, …)
+#   and supply it as a second source in your App-of-Apps — see app-of-apps.yaml.
+#
+# Can be referenced directly from an ArgoCD App-of-Apps:
+#
+#   apiVersion: argoproj.io/v1alpha1
+#   kind: Application
+#   spec:
+#     source:
+#       repoURL: https://github.com/aehrc/ontoserver-deploy
+#       path: examples/argocd
+#       targetRevision: HEAD
+#       directory:
+#         include: 'dev-readonly.yaml'
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ontoserver-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ontoserver-dev
+  sources:
+    - repoURL: https://github.com/aehrc/ontoserver-deploy
+      targetRevision: update-charts
+      path: charts/ontoserver
+      helm:
+        valuesObject:
+          ontoserver:
+            serverPort: 8001               # port forward the onto or varnish service to this local port
+            deployment:
+              kind: Deployment
+              type: single
+              isReadOnly: true
+              replicas: 1
+              imagePullSecrets:
+                - name: quay-pull-secret   # must exist in ontoserver-dev — see app-of-apps.yaml
+              db:
+                enabled: true              # sidecar PostgreSQL
+
+            timeZone: Australia/Brisbane
+            language: en_AU
+
+            resources:
+              ontoserver:
+                requests:
+                  cpu: "500m"
+                  memory: "2Gi"
+                limits:
+                  cpu: "2000m"
+                  memory: "4Gi"
+                initialHeapSize: "512m"
+                maxHeapSize: "3000m"
+              db:
+                requests:
+                  cpu: "100m"
+                  memory: "256Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "512Mi"
+
+            healthCheckOption: -l
+
+    - repoURL: https://github.com/aehrc/ontoserver-deploy
+      targetRevision: update-charts
+      path: charts/ontoserver-extras
+      helm:
+        valuesObject:
+          varnish:
+            enabled: true
+            graceSeconds: 30
+            cache:
+              time200: 10m
+              time404: 1m
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

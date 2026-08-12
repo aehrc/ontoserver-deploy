@@ -1,0 +1,111 @@
+# charts/ontoserver/tests/fixtures/scaled-values.yaml
+#
+# Integration test fixture for scaled StatefulSet mode.
+# Run locally with k3d (requires ≥8 GB RAM for 2 Ontoserver pods + PostgreSQL + k3d overhead):
+#
+#   # Create a k3d cluster
+#   k3d cluster create ontoserver-scaled-test --agents 1 --no-lb \
+#     --image rancher/k3s:v1.32.10-k3s1
+#
+#   # Deploy PostgreSQL
+#   kubectl apply -f - <<'EOF'
+#   apiVersion: apps/v1
+#   kind: Deployment
+#   metadata:
+#     name: postgres
+#   spec:
+#     replicas: 1
+#     selector:
+#       matchLabels:
+#         app: postgres
+#     template:
+#       metadata:
+#         labels:
+#           app: postgres
+#       spec:
+#         containers:
+#           - name: postgres
+#             image: postgres:16
+#             env:
+#               - name: POSTGRES_DB
+#                 value: ontoserver
+#               - name: POSTGRES_USER
+#                 value: ontoserver
+#               - name: POSTGRES_PASSWORD
+#                 value: ontoserver
+#             ports:
+#               - containerPort: 5432
+#   ---
+#   apiVersion: v1
+#   kind: Service
+#   metadata:
+#     name: postgres
+#   spec:
+#     selector:
+#       app: postgres
+#     ports:
+#       - port: 5432
+#         targetPort: 5432
+#   EOF
+#   kubectl rollout status deployment/postgres --timeout=2m
+#
+#   # Build chart dependencies
+#   helm dependency build ./charts/ontoserver
+#
+#   # Install chart (spring.datasource.password passed separately)
+#   helm install ontoserver-scaled ./charts/ontoserver \
+#     --values ./charts/ontoserver/tests/fixtures/scaled-values.yaml \
+#     --set ontoserver.secretConfig."spring\.datasource\.password"=ontoserver \
+#     --set ontoserver.imageCredentials.username="$QUAY_USERNAME" \
+#     --set ontoserver.imageCredentials.password="$QUAY_PASSWORD" \
+#     --set ontoserver.resources.ontoserver.requests.cpu=500m \
+#     --set ontoserver.resources.ontoserver.limits.cpu=2 \
+#     --set ontoserver.resources.ontoserver.requests.memory=2G \
+#     --set ontoserver.resources.ontoserver.limits.memory=2G \
+#     --set ontoserver.resources.ontoserver.initialHeapSize=1500m \
+#     --set ontoserver.resources.ontoserver.maxHeapSize=1500m \
+#     --set ontoserver.resources.db.requests.cpu=250m \
+#     --set ontoserver.resources.db.limits.cpu=1 \
+#     --set ontoserver.resources.db.requests.memory=512Mi \
+#     --set ontoserver.resources.db.limits.memory=1G \
+#     --set ontoserver.deployment.persistence.files.storageClass.provided.enabled=false \
+#     --set ontoserver.deployment.persistence.files.storageClass.name=local-path \
+#     --wait --timeout 15m
+#
+#   # Run integration tests
+#   helm test ontoserver-scaled --timeout 10m
+#
+#   # Collect logs if needed
+#   kubectl logs -l job-name=ontoserver-scaled-ontoserver-test-closure-scaled --tail=200
+#   kubectl logs -l job-name=ontoserver-scaled-ontoserver-test-fhir-rw --tail=200
+#   kubectl logs -l job-name=ontoserver-scaled-ontoserver-test-metadata --tail=200
+#
+#   # Tear down
+#   k3d cluster delete ontoserver-scaled-test
+#
+# Assumes a PostgreSQL Service named 'postgres' already exists in the cluster.
+# spring.datasource.password is passed separately via --set in the commands above.
+ontoserver:
+  hostNames:
+    - ontoserver.scaled-test.local
+  serverName: ontoserver.scaled-test.local
+  deployment:
+    kind: StatefulSet
+    type: scaled
+    replicas: 2
+    # Scaled deployments are always read-only — validate-values.yaml enforces it. $closure is
+    # still available: it is a stateful operation, which is why it must always be routed to
+    # one specific pod (pod-0, via <release>-ontoserver-pod0-service).
+    isReadOnly: true
+    db:
+      enabled: false
+  config:
+    spring.datasource.url: "jdbc:postgresql://postgres:5432/ontoserver"
+    spring.datasource.username: "ontoserver"
+
+traefik:
+  ingressRoute:
+    enabled: true
+    entryPoints:
+      - web
+    backendPort: 80

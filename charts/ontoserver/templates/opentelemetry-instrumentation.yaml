@@ -1,0 +1,32 @@
+{{- if .Values.ontoserver.opentelemetry.instrumentation.enabled }}
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: {{ .Release.Name }}-java-instrumentation
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+spec:
+  exporter:
+    endpoint: {{ required "ontoserver.opentelemetry.instrumentation.exporter.endpoint is required" .Values.ontoserver.opentelemetry.instrumentation.exporter.endpoint | quote }}
+  java:
+    image: {{ .Values.ontoserver.opentelemetry.instrumentation.image }}
+    env:
+      - name: OTEL_TRACES_EXPORTER
+        value: {{ .Values.ontoserver.opentelemetry.instrumentation.exporter.type | quote }}
+      - name: OTEL_SERVICE_NAME
+        value: {{ .Values.ontoserver.opentelemetry.instrumentation.serviceName | default (printf "%s/%s-ontoserver" .Release.Name .Release.Name) | quote }}
+      {{- if eq .Values.ontoserver.opentelemetry.instrumentation.exporter.type "zipkin" }}
+      - name: OTEL_EXPORTER_ZIPKIN_ENDPOINT
+        value: {{ .Values.ontoserver.opentelemetry.instrumentation.exporter.endpoint | quote }}
+      {{- end }}
+      - name: OTEL_METRICS_EXPORTER
+        value: "none"
+      - name: OTEL_LOGS_EXPORTER
+        value: "none"
+      - name: OTEL_PROPAGATORS
+        value: {{ .Values.ontoserver.opentelemetry.instrumentation.propagators | quote }}
+      - name: OTEL_INSTRUMENTATION_COMMON_ENDUSER_ENABLED
+        value: "true"
+      - name: OTEL_JAVAAGENT_EXCLUDE_CLASSES
+        value: {{ .Values.ontoserver.opentelemetry.instrumentation.excludedClasses | quote }}
+{{- end }}

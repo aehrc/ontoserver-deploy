@@ -1,0 +1,39 @@
+{{- if and (or .Values.ontoserver.deployment.persistence.enabledForDeployment (eq .Values.ontoserver.deployment.kind "StatefulSet")) .Values.ontoserver.deployment.persistence.files.storageClass.provided.enabled }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Release.Name }}-ontoserver-files
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+provisioner: {{ required "ontoserver.deployment.persistence.files.storageClass.provided.storageProvisioner is required" .Values.ontoserver.deployment.persistence.files.storageClass.provided.storageProvisioner }}
+reclaimPolicy: {{ required "ontoserver.deployment.persistence.files.storageClass.provided.reclaimPolicy is required" .Values.ontoserver.deployment.persistence.files.storageClass.provided.reclaimPolicy }}
+volumeBindingMode: WaitForFirstConsumer
+{{- if empty .Values.ontoserver.deployment.persistence.files.storageClass.provided.storageParameters }}
+  {{- fail "Provide storage parameters in ontoserver.deployment.persistence.files.storageClass.provided.storageParameters" }}
+{{- end }}
+parameters:  {{ toJson .Values.ontoserver.deployment.persistence.files.storageClass.provided.storageParameters }}
+allowVolumeExpansion: {{ .Values.ontoserver.deployment.persistence.files.storageClass.provided.allowVolumeExpansion }}
+{{- end }}
+{{- if and (eq .Values.ontoserver.deployment.persistence.mode "split") .Values.ontoserver.deployment.db.enabled }}
+{{- /* .provided.enabled, not .provided: the latter is the enclosing map and is always truthy,
+     so this StorageClass used to be created even with enabled: false while pvc.yaml correctly
+     pointed at storageClass.name — leaving an orphaned StorageClass behind. Matches the files
+     block above and the consumers in pvc.yaml and statefulset.yaml. */ -}}
+{{- if and (or .Values.ontoserver.deployment.persistence.enabledForDeployment (eq .Values.ontoserver.deployment.kind "StatefulSet")) .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.enabled }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Release.Name }}-ontoserver-db-files
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+provisioner: {{ required "ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageProvisioner is required" .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageProvisioner }}
+reclaimPolicy: {{ required "ontoserver.deployment.persistence.dbfiles.storageClass.provided.reclaimPolicy is required" .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.reclaimPolicy }}
+volumeBindingMode: WaitForFirstConsumer
+{{- if empty .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters }}
+  {{- fail "Provide storage parameters in ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters" }}
+{{- end }}
+parameters:  {{ toJson .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.storageParameters }}
+allowVolumeExpansion: {{ .Values.ontoserver.deployment.persistence.dbfiles.storageClass.provided.allowVolumeExpansion }}
+{{- end }}
+{{- end }}

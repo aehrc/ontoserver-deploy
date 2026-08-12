@@ -1,0 +1,100 @@
+# networking/single-ro-nginx-ingress.yaml
+# Single read-only Ontoserver behind an NGINX ingress controller.
+#
+# The controller is NOT installed by this chart — it was a bundled subchart up to
+# chart 0.3.x and was removed in 0.4.0, because a vendored controller pinned to one
+# version is a security liability when nobody is updating it. Install one yourself:
+#
+#   helm repo add nginx-stable https://helm.nginx.com/stable
+#   helm install nginx-ingress nginx-stable/nginx-ingress \
+#     --namespace nginx-ingress --create-namespace \
+#     --set controller.ingressClass.name=ontoserver-nginx
+#
+# Then point ontoserver.ingress.className at that IngressClass, as below. Any other
+# NGINX distribution (ingress-nginx, or a cluster-wide controller you already run)
+# works the same way — only the className has to match.
+#
+# For cloud-native networking options see:
+#   - aks/single-ro-envoy.yaml         — AKS with Envoy Gateway (recommended)
+#   - networking/single-ro-aks-agic.yaml — AKS with Application Gateway
+#   - eks/single-ro-envoy.yaml         — EKS with Envoy Gateway (recommended)
+#   - networking/single-ro-eks-alb.yaml  — EKS with ALB
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver -f networking/single-ro-nginx-ingress.yaml \
+#     --set ontoserver.imageCredentials.username=<quay-username> \
+#     --set ontoserver.imageCredentials.password=<quay-password>
+
+ontoserver:
+  serverName: ontoserver.example.com
+  hostNames:
+    - ontoserver.example.com
+
+  deployment:
+    # Image pull auth:
+    # - preferred for production: create a docker-registry Secret and reference it here
+    # - alternative: pass ontoserver.imageCredentials.username/password via --set at install time
+    imagePullSecrets:
+      - name: ontoserver-quay-pull-secret
+    kind: Deployment
+    type: single
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 1
+    isReadOnly: true
+
+    db:
+      enabled: true
+      postgresVersion: 16
+
+    persistence:
+      enabledForDeployment: true
+      mode: split
+      # No chart-managed StorageClass — uses the cluster default.
+      # Override storageClass.provided if your cluster requires a specific CSI driver.
+      files:
+        accessMode: ReadWriteOnce
+        storageSize: 20G
+        storageClass:
+          provided:
+            enabled: false
+          name: ""
+      dbfiles:
+        accessMode: ReadWriteOnce
+        storageSize: 10G
+        storageClass:
+          provided:
+            enabled: false
+          name: ""
+
+  # Must match the IngressClass of the controller you installed. `kubectl get ingressclass`
+  # lists what is available; a mismatch means no controller claims the Ingress and it
+  # silently never routes.
+  ingress:
+    enabled: true
+    className: ontoserver-nginx
+
+  tls:
+    enabled: false
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2
+        memory: 4G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2800m
+      maxHeapSize: 2800m
+    db:
+      requests:
+        cpu: 1
+        memory: 1G
+      limits:
+        cpu: 1
+        memory: 1G
+
+  # ── Preload ───────────────────────────────────────────────────────────────
+  # config:
+  #   atom.preload.feedLocation: "file:///data/preload.xml"
+  # healthCheckOption: -s

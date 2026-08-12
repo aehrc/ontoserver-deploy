@@ -1,0 +1,658 @@
+suite: job template tests
+templates:
+  - templates/job.yaml
+
+tests:
+  # The `set` block below is anchored as *snomed and reused by the tests that follow.
+  # It must stay on the first test: a YAML anchor has to be defined before it is aliased,
+  # and helm-unittest rejects unknown top-level keys, so it cannot live outside `tests`.
+  - it: renders a Job
+    set: &snomed
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - isKind:
+          of: Job
+      - hasDocuments:
+          count: 1
+
+  # helm-unittest defaults Release.Revision to 0, whereas a real `helm install` starts at 1,
+  # so the revision is set explicitly here rather than relying on the plugin default.
+  - it: uses Release.Name suffixed with the release revision as job name by default
+    set:
+      <<: *snomed
+    release:
+      revision: 1
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-1
+
+  - it: tracks the release revision in the job name across upgrades
+    set:
+      <<: *snomed
+    release:
+      revision: 7
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-7
+
+  # Regression guard: the job name helper must resolve to the same value at every call
+  # site. A randomised suffix re-evaluates per `include`, silently producing a different
+  # name for the Job, its labels and the pod labels in a single render.
+  - it: uses an identical job name for metadata.name and both app labels
+    set:
+      <<: *snomed
+    release:
+      revision: 1
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-1
+      - equal:
+          path: metadata.labels.app
+          value: RELEASE-NAME-1
+      - equal:
+          path: spec.template.metadata.labels.app
+          value: RELEASE-NAME-1
+
+  - it: uses job.name for metadata.name and both app labels when set
+    set:
+      <<: *snomed
+      job.name: my-custom-job
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-custom-job
+      - equal:
+          path: metadata.labels.app
+          value: my-custom-job
+      - equal:
+          path: spec.template.metadata.labels.app
+          value: my-custom-job
+
+  - it: uses job.name when set
+    set:
+      <<: *snomed
+      job.name: my-custom-job
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-custom-job
+
+  - it: sets activeDeadlineSeconds
+    set:
+      <<: *snomed
+      job.activeDeadlineSeconds: 9000
+    asserts:
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 9000
+
+  - it: sets ttlSecondsAfterFinished
+    set:
+      <<: *snomed
+    asserts:
+      - equal:
+          path: spec.ttlSecondsAfterFinished
+          value: 3600
+
+  - it: sets backoffLimit to 0
+    set:
+      <<: *snomed
+    asserts:
+      - equal:
+          path: spec.backoffLimit
+          value: 0
+
+  - it: sets restartPolicy to Never
+    set:
+      <<: *snomed
+    asserts:
+      - equal:
+          path: spec.template.spec.restartPolicy
+          value: Never
+
+  - it: sets container image from values
+    set:
+      <<: *snomed
+      image.repository: quay.io/aehrc/ontoserver
+      image.tag: ctsa-6
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: quay.io/aehrc/ontoserver:ctsa-6
+
+  # Gi, not G: the JVM's -Xmx...g is a power-of-two unit, so the container limit must use
+  # the matching binary suffix for the non-heap reserve to be the size it claims to be.
+  - it: sets memory request and limit from resources.memoryGb in Gi
+    set:
+      <<: *snomed
+      resources.memoryGb: 24
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: 24Gi
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 24Gi
+
+  - it: sets imagePullSecrets from image.imagePullSecrets list
+    set:
+      <<: *snomed
+      image.imagePullSecrets[0].name: my-pull-secret
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: my-pull-secret
+
+  - it: appends chart-created pull secret when credentials provided
+    set:
+      <<: *snomed
+      image.credentials.username: myuser
+      image.credentials.password: mypass
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: RELEASE-NAME-indexer-pull-secret
+
+  - it: merges list and chart-created pull secret when both provided
+    set:
+      <<: *snomed
+      image.imagePullSecrets[0].name: existing-secret
+      image.credentials.username: myuser
+      image.credentials.password: mypass
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: existing-secret
+      - equal:
+          path: spec.template.spec.imagePullSecrets[1].name
+          value: RELEASE-NAME-indexer-pull-secret
+
+  - it: sets tolerations when provided
+    set:
+      <<: *snomed
+      tolerations:
+        - key: "kubernetes.azure.com/scalesetpriority"
+          operator: "Equal"
+          value: "spot"
+          effect: "NoSchedule"
+    asserts:
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: "kubernetes.azure.com/scalesetpriority"
+
+  - it: omits tolerations when not set
+    set:
+      <<: *snomed
+    asserts:
+      - isNull:
+          path: spec.template.spec.tolerations
+
+  - it: omits imagePullSecrets when none configured
+    set:
+      <<: *snomed
+    asserts:
+      - isNull:
+          path: spec.template.spec.imagePullSecrets
+
+  # Regression guard: -Xmx must stay strictly below the container memory limit. Setting the
+  # heap equal to the limit leaves nothing for metaspace, thread stacks or direct buffers
+  # and reliably ends in an OOMKill partway through an index run.
+  - it: reserves 2Gi of non-heap headroom below the memory limit by default
+    set:
+      <<: *snomed
+      resources.memoryGb: 16
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JAVA_OPTS
+            value: "-Xmx14g"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 16Gi
+
+  - it: uses resources.heapGb for -Xmx when set explicitly
+    set:
+      <<: *snomed
+      resources.memoryGb: 32
+      resources.heapGb: 26
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JAVA_OPTS
+            value: "-Xmx26g"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 32Gi
+
+  - it: keeps the documented default sizing at 20Gi
+    set:
+      <<: *snomed
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JAVA_OPTS
+            value: "-Xmx18g"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 20Gi
+
+  - it: sets command to /run.sh and first arg to indexCodeSystemDebug
+    set:
+      <<: *snomed
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command[0]
+          value: /run.sh
+      - equal:
+          path: spec.template.spec.containers[0].args[0]
+          value: indexCodeSystemDebug
+
+  - it: passes codeSystem url and version as args
+    set:
+      <<: *snomed
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-s"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "http://snomed.info/sct/32506021000036107"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-v"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "http://snomed.info/sct/32506021000036107/version/20231130"
+
+  - it: passes rf2 files as repeated -f args
+    values:
+      - fixtures/two-rf2-files.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "https://example.com/file1.zip"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "https://example.com/file2.zip"
+
+  - it: passes rf2.kind lowercased as -k arg for SNOMED
+    set:
+      <<: *snomed
+      rf2.kind: SNAPSHOT
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-k"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "snapshot"
+
+  - it: omits -k arg for LOINC
+    set:
+      codeSystem.url: http://loinc.org
+      codeSystem.version: "2.76"
+      rf2.files[0]: https://example.com/Loinc_2.76.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: loinc
+      syndication.entryTitle: LOINC 2.76
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "-k"
+
+  - it: passes syndication endpoint, feed and entryTitle
+    set:
+      <<: *snomed
+      syndication.entryTitle: "SNOMED CT AU November 2023"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-synd"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "https://synd.example.com"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-feed"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "my-feed"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-t"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "SNOMED CT AU November 2023"
+
+  - it: includes -file arg when entryFileName set
+    set:
+      <<: *snomed
+      syndication.entryFileName: snomed-au-20231130.zip
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-file"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "snomed-au-20231130.zip"
+
+  - it: omits -file arg when entryFileName empty
+    set:
+      <<: *snomed
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "-file"
+
+  - it: omits -synd and -feed args when syndication.endpoint empty and output.path set
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      output.path: /output/snomed-au-20231130.zip
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "-synd"
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "-feed"
+
+  - it: includes -o arg when output.path set
+    set:
+      <<: *snomed
+      output.path: /output/snomed-au-20231130.zip
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-o"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "/output/snomed-au-20231130.zip"
+
+  - it: omits -o arg when output.path empty
+    set:
+      <<: *snomed
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "-o"
+
+  - it: mounts PVC at /output when output.pvcName set
+    set:
+      <<: *snomed
+      output.pvcName: my-azure-fileshare
+      output.path: /output/snomed-au-20231130.zip
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: output-volume
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: my-azure-fileshare
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /output
+
+  - it: omits volumes and volumeMounts when neither output.pvcName nor input.pvcName set
+    set:
+      <<: *snomed
+    asserts:
+      - isNull:
+          path: spec.template.spec.volumes
+      - isNull:
+          path: spec.template.spec.containers[0].volumeMounts
+
+  - it: mounts input PVC read-only at input.mountPath
+    set:
+      <<: *snomed
+      input.pvcName: my-release-share
+      input.mountPath: /releases
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: input-volume
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: my-release-share
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.readOnly
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /releases
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].readOnly
+          value: true
+
+  - it: mounts both input and output PVCs when both set
+    set:
+      <<: *snomed
+      output.pvcName: my-binaries
+      output.path: /output/snomed.zip
+      input.pvcName: my-releases
+      input.mountPath: /releases
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: output-volume
+      - equal:
+          path: spec.template.spec.volumes[1].name
+          value: input-volume
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].name
+          value: output-volume
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].name
+          value: input-volume
+
+  - it: passes each security label as a separate -perms arg
+    values:
+      - fixtures/two-security-labels.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-perms"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "restricted.read"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "community.read"
+
+  - it: adds OAuth2 env vars when oauth2 secretRef provided
+    set:
+      <<: *snomed
+      auth.oauth2.secretRef: my-oauth-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.oauth.endpoint.0
+            value: https://synd.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.oauth.endpoint.token_endpoint.0
+            value: https://auth.example.com/token
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.oauth.endpoint.strategy.0
+            value: body
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.oauth.endpoint.client_id.0
+            valueFrom:
+              secretKeyRef:
+                name: my-oauth-secret
+                key: clientId
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.oauth.endpoint.client_secret.0
+            valueFrom:
+              secretKeyRef:
+                name: my-oauth-secret
+                key: clientSecret
+
+  - it: adds OAuth2 env vars using chart-created secret when clientId provided inline
+    set:
+      <<: *snomed
+      auth.oauth2.clientId: my-client
+      auth.oauth2.clientSecret: my-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.oauth.endpoint.client_id.0
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-indexer-auth
+                key: clientId
+
+  - it: omits OAuth2 env vars when no auth configured
+    set:
+      <<: *snomed
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.oauth.endpoint.0
+
+  - it: adds Basic auth env vars when basic secretRef provided
+    set:
+      <<: *snomed
+      auth.basic.secretRef: my-basic-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.basic.endpoint.0
+            value: https://synd.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.basic.endpoint.user.0
+            valueFrom:
+              secretKeyRef:
+                name: my-basic-secret
+                key: username
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.basic.endpoint.password.0
+            valueFrom:
+              secretKeyRef:
+                name: my-basic-secret
+                key: password
+
+  - it: adds Basic auth env vars using chart-created secret when username provided inline
+    set:
+      <<: *snomed
+      auth.basic.username: my-user
+      auth.basic.password: my-pass
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.basic.endpoint.user.0
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-indexer-auth
+                key: username
+
+  - it: omits Basic auth env vars when no auth configured
+    set:
+      <<: *snomed
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: authentication.basic.endpoint.0
+
+  - it: adds language.refset env vars for each forModule entry
+    set:
+      <<: *snomed
+      languageRefsets.forModule.32506021000036107: "32570271000036106,900000000000509007"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: language.refset.32506021000036107
+            value: "32570271000036106,900000000000509007"
+
+  - it: omits language.refset env vars when forModule empty
+    set:
+      <<: *snomed
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: language.refset.32506021000036107
+
+  - it: adds resolveSkew env var when set
+    set:
+      <<: *snomed
+      resolveSkew: "20231130"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: snomed.editions.resolveSkew
+            value: "20231130"
+
+  - it: omits resolveSkew env var when empty
+    set:
+      <<: *snomed
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: snomed.editions.resolveSkew
+
+  - it: adds sentry env vars when sentry.dsn set
+    set:
+      <<: *snomed
+      sentry.dsn: https://key@sentry.example.com/1
+      sentry.environment: Production
+      sentry.serverName: my-indexer
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: sentry.dsn
+            value: https://key@sentry.example.com/1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: sentry.environment
+            value: Production
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: sentry.servername
+            value: my-indexer
+
+  - it: omits sentry env vars when sentry.dsn empty
+    set:
+      <<: *snomed
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: sentry.dsn

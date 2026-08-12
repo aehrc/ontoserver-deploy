@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'ontoserver-v*'
+      - 'ontoserver-extras-v*'
+      - 'ontoserver-indexer-v*'
+
+permissions:
+  contents: write
+  pages: write
+  packages: write
+
+# Serialise releases. Every run rewrites index.yaml on the gh-pages branch, so two tags pushed
+# close together race: both clone the same index.yaml, each adds only its own chart, and whichever
+# pushes second either fails or drops the other's entry — leaving a published release that the Helm
+# repo index does not list. Not cancel-in-progress: a half-finished release must be allowed to
+# finish, since the tag and the GitHub Release are already created by then.
+concurrency:
+  group: release-charts
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # The test workflows trigger on `branches: ['**']`, which excludes tags — so without this gate a
+  # tag publishes whatever the tagged commit happens to be, tested or not. Rather than re-run the
+  # suites here (the integration matrix is expensive and would double every release), check that
+  # the runs for this exact commit already succeeded. They normally have: the tag points at a
+  # commit that was pushed to a branch first, which is what triggered them.
+  verify-tests:
+    name: Verify tests passed for this commit
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Require successful Unit and Integration test runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Status and conclusion are extracted inside a single `gh api --jq` call rather than by
+          # piping the run object into jq. The object embeds the commit message, and a multi-line
+          # message contains raw control characters that make a second jq parse fail.
+          query() {
+            gh api "repos/${REPO}/actions/runs?head_sha=${SHA}&per_page=100" \
+              --jq "[.workflow_runs[] | select(.name == \"$1\")] | sort_by(.created_at) | last
+                    | if . == null then \"none none\" else \"\(.status) \(.conclusion // \"pending\")\" end"
+          }
+          # A run triggered by the branch push may still be in flight when the tag lands moments
+          # later, so poll rather than failing on a race. 20 x 30s = 10 minutes, which comfortably
+          # covers the unit suite; a slower integration run is reported as still running and the
+          # release can be retried by re-running this workflow.
+          for wf in "Unit Tests" "Integration Tests"; do
+            status=""; conclusion=""
+            for attempt in $(seq 1 20); do
+              read -r status conclusion <<<"$(query "$wf")"
+              if [[ "$status" == "none" ]]; then
+                echo "::error::No '${wf}' run found for commit ${SHA}. The test workflows trigger on branch pushes only, so this commit was never tested. Push it to a branch before tagging."
+                exit 1
+              fi
+              [[ "$status" == "completed" ]] && break
+              echo "'${wf}' is ${status}; waiting (attempt ${attempt}/20)..."
+              sleep 30
+            done
+            if [[ "$status" != "completed" ]]; then
+              echo "::error::'${wf}' for commit ${SHA} did not finish in time (still ${status}). Re-run this release workflow once it completes."
+              exit 1
+            fi
+            if [[ "$conclusion" != "success" ]]; then
+              echo "::error::'${wf}' for commit ${SHA} concluded '${conclusion}', not success. Refusing to publish an untested chart."
+              exit 1
+            fi
+            echo "'${wf}': success"
+          done
+
+  release-charts:
+    name: Release Helm Charts
+    needs: verify-tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v5.0.1
+        with:
+          version: v3.18.4
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.6.0
+        with:
+          charts_dir: charts
+          skip_existing: true
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Publish artifacthub-repo.yml to gh-pages
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          chart="${tag%-v*}"
+          version="${tag#*-v}"
+
+          git fetch origin gh-pages
+          git checkout gh-pages
+          git checkout ${{ github.sha }} -- artifacthub-repo.yml
+          git add artifacthub-repo.yml
+
+          sed -i "s|data-chart=\"${chart}\">[0-9][0-9.]*<|data-chart=\"${chart}\">${version}<|g" index.html
+          git add index.html
+
+          git diff --staged --quiet || git commit -m "Release ${chart} ${version} [skip ci]"
+          git push origin gh-pages
+
+  push-charts-oci:
+    name: Push Helm Charts to OCI
+    runs-on: ubuntu-latest
+    needs: release-charts
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Extract chart name and version from tag
+        id: chart
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          echo "chart=${tag%-v*}" >> $GITHUB_OUTPUT
+          echo "version=${tag#*-v}" >> $GITHUB_OUTPUT
+
+      - name: Install Helm
+        uses: azure/setup-helm@v5.0.1
+        with:
+          version: v3.18.4
+
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io --username ${{ github.actor }} --password-stdin
+
+      - name: Package and push chart
+        run: |
+          chart="${{ steps.chart.outputs.chart }}"
+          helm dependency build charts/$chart
+          helm package charts/$chart -d charts-pkg
+          helm push charts-pkg/$chart-*.tgz oci://ghcr.io/aehrc/$chart-helm

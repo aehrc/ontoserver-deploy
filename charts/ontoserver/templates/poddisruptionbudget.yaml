@@ -1,0 +1,79 @@
+{{- /* A PodDisruptionBudget only makes sense for a scaled deployment. A single instance owns
+     its Lucene index on a ReadWriteOnce PVC, so it must be replaced rather than kept
+     available during a disruption — a second pod sharing that volume would corrupt the
+     index. Protecting a single pod with a PDB would instead block node drains indefinitely. */ -}}
+{{- if and (eq .Values.ontoserver.deployment.type "scaled") .Values.ontoserver.deployment.podDisruptionBudget.enabled }}
+{{- $pdb := .Values.ontoserver.deployment.podDisruptionBudget }}
+{{- $hasMin := eq (include "ontoserver.pdbIsSet" $pdb.minAvailable) "true" }}
+{{- $hasMax := eq (include "ontoserver.pdbIsSet" $pdb.maxUnavailable) "true" }}
+
+{{- /* Both fields are IntOrString in the Kubernetes API: an absolute count or a percentage
+     such as "25%". The previous guard compared `int` against 1, but int "25%" is 0, so every
+     percentage was rejected — including the maxUnavailable: 25% form values.yaml suggests.
+     Validate the shape textually instead of coercing to a number. */ -}}
+{{- range $field, $value := dict "minAvailable" $pdb.minAvailable "maxUnavailable" $pdb.maxUnavailable }}
+  {{- if eq (include "ontoserver.pdbIsSet" $value) "true" }}
+    {{- $s := toString $value }}
+    {{- if not (regexMatch "^[0-9]+%?$" $s) }}
+      {{- fail (printf "ontoserver.deployment.podDisruptionBudget.%s must be a whole number (2) or a percentage string (\"25%%\"). Got: %q" $field $s) }}
+    {{- end }}
+    {{- if hasSuffix "%" $s }}
+      {{- if gt (int (trimSuffix "%" $s)) 100 }}
+        {{- fail (printf "ontoserver.deployment.podDisruptionBudget.%s percentage must be between 0%% and 100%%. Got: %q" $field $s) }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{- /* Mutually exclusive: the Kubernetes API rejects a PDB that sets both. Previously
+     minAvailable silently won, so a user who uncommented maxUnavailable without also removing
+     the default minAvailable: 1 got no warning and no effect. */ -}}
+{{- if and $hasMin $hasMax }}
+  {{- fail "Set only one of ontoserver.deployment.podDisruptionBudget.minAvailable or .maxUnavailable — the Kubernetes API rejects a PodDisruptionBudget that specifies both. minAvailable defaults to 1, so clear it (minAvailable: null) when setting maxUnavailable." }}
+{{- end }}
+{{- if not (or $hasMin $hasMax) }}
+  {{- fail "Set one of ontoserver.deployment.podDisruptionBudget.minAvailable or .maxUnavailable, or disable the PodDisruptionBudget with ontoserver.deployment.podDisruptionBudget.enabled: false." }}
+{{- end }}
+
+{{- /* maxUnavailable: 0 is accepted by the API but permanently forbids voluntary eviction, so
+     node drains and cluster upgrades hang on this workload rather than failing loudly. */ -}}
+{{- if and $hasMax (eq (toString $pdb.maxUnavailable) "0") }}
+  {{- fail "ontoserver.deployment.podDisruptionBudget.maxUnavailable: 0 blocks all voluntary evictions, so node drains and cluster upgrades will hang indefinitely. Use minAvailable to express how many pods must stay up." }}
+{{- end }}
+{{- if and $hasMin (eq (toString $pdb.minAvailable) "0") }}
+  {{- fail "ontoserver.deployment.podDisruptionBudget.minAvailable: 0 provides no protection at all. Use a value of 1 or more, or disable the PodDisruptionBudget with ontoserver.deployment.podDisruptionBudget.enabled: false." }}
+{{- end }}
+
+{{- /* minAvailable equal to (or above) the replica count leaves no eviction headroom, which is
+     the same trap as maxUnavailable: 0 but easier to reach by accident — e.g. minAvailable: 2
+     on a 2-replica cluster. Only checked for the absolute form: a percentage is always
+     satisfiable, and replicas: 0 means scaled to zero. */ -}}
+{{- $replicas := int .Values.ontoserver.deployment.replicas }}
+{{- if and $hasMin (not (hasSuffix "%" (toString $pdb.minAvailable))) (gt $replicas 0) }}
+  {{- if ge (int $pdb.minAvailable) $replicas }}
+    {{- fail (printf "ontoserver.deployment.podDisruptionBudget.minAvailable (%v) must be less than ontoserver.deployment.replicas (%v), otherwise no pod can ever be evicted voluntarily and node drains will hang. Use %v or fewer, or raise the replica count." $pdb.minAvailable $replicas (sub $replicas 1)) }}
+  {{- end }}
+{{- end }}
+
+{{- /* unhealthyPodEvictionPolicy is constrained by an enum in values.schema.json, which reports
+     the allowed values and fires before this template renders. Deliberately not re-checked
+     here — a duplicate guard would only shadow that message with a worse one. */ -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-pdb
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+spec:
+  {{- if $hasMin }}
+  minAvailable: {{ include "ontoserver.pdbValue" $pdb.minAvailable }}
+  {{- else }}
+  maxUnavailable: {{ include "ontoserver.pdbValue" $pdb.maxUnavailable }}
+  {{- end }}
+  {{- if $pdb.unhealthyPodEvictionPolicy }}
+  unhealthyPodEvictionPolicy: {{ $pdb.unhealthyPodEvictionPolicy }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "ontoserver.selectorLabels" . | nindent 6 }}
+{{- end }}

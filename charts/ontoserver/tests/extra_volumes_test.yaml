@@ -1,0 +1,207 @@
+suite: Extra volumes tests
+templates:
+  - templates/deployment.yaml
+  - templates/statefulset.yaml
+tests:
+  # Both keys default to empty, so an existing release must render exactly as before. On the
+  # Deployment the `volumes` key is absent entirely when nothing else needs it — the extra-volume
+  # support must not materialise an empty list, which would be a spurious pod-spec diff on upgrade.
+  - it: adds nothing by default on the Deployment
+    template: templates/deployment.yaml
+    asserts:
+      - isNull:
+          path: spec.template.spec.volumes
+      - isNull:
+          path: spec.template.spec.containers[0].volumeMounts
+
+  - it: adds nothing by default on the StatefulSet
+    template: templates/statefulset.yaml
+    values:
+      - fixtures/scaled-values.yaml
+    asserts:
+      - isNull:
+          path: spec.template.spec.volumes
+      - lengthEqual:
+          path: spec.template.spec.containers[0].volumeMounts
+          count: 1
+
+  # The values must reach the pod even when nothing else in the chart creates a volume — this is
+  # the case that needs the guard conditions widened, not just an append.
+  - it: renders extra volumes with no other volumes present
+    template: templates/deployment.yaml
+    set:
+      ontoserver.deployment.extraVolumes:
+        - name: tmp
+          emptyDir: {}
+      ontoserver.deployment.extraVolumeMounts:
+        - name: tmp
+          mountPath: /tmp
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.volumes
+          count: 1
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: tmp
+      - lengthEqual:
+          path: spec.template.spec.containers[0].volumeMounts
+          count: 1
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /tmp
+
+  # Ordering is a correctness property, not cosmetics: Kubernetes rejects duplicate volume names
+  # and takes the first mount for a path, so chart-managed entries must come first and win.
+  - it: appends after the chart's own volumes on the Deployment
+    template: templates/deployment.yaml
+    set:
+      ontoserver.customization: my-config
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.extraVolumes:
+        - name: tmp
+          emptyDir: {}
+      ontoserver.deployment.extraVolumeMounts:
+        - name: tmp
+          mountPath: /tmp
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: customization
+      - equal:
+          path: spec.template.spec.volumes[1].name
+          value: ontoserver-files
+      # index 2 is ontoserver-db-files: persistence defaults to mode `split` and the sidecar is on,
+      # so the extra volume lands at 3. Asserted positionally on purpose — the point of the test is
+      # that the caller's entry comes last, whatever the chart itself put ahead of it.
+      - equal:
+          path: spec.template.spec.volumes[2].name
+          value: ontoserver-db-files
+      - equal:
+          path: spec.template.spec.volumes[3].name
+          value: tmp
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /well-known
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].mountPath
+          value: /var/onto
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[2].mountPath
+          value: /tmp
+
+  - it: appends after the chart's own volumes on the StatefulSet
+    template: templates/statefulset.yaml
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.customization: my-config
+      ontoserver.deployment.extraVolumes:
+        - name: tmp
+          emptyDir: {}
+      ontoserver.deployment.extraVolumeMounts:
+        - name: tmp
+          mountPath: /tmp
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: customization
+      - equal:
+          path: spec.template.spec.volumes[1].name
+          value: tmp
+      # /var/onto comes from a volumeClaimTemplate, so the StatefulSet's first mount is the PVC.
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /var/onto
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[2].mountPath
+          value: /tmp
+
+  # More than one entry, and a source type other than emptyDir, to confirm the values are passed
+  # through verbatim rather than reshaped into something the chart understands.
+  - it: passes multiple volumes of different kinds through verbatim
+    template: templates/deployment.yaml
+    set:
+      ontoserver.deployment.extraVolumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi
+        - name: extra-certs
+          secret:
+            secretName: my-certs
+            defaultMode: 420
+      ontoserver.deployment.extraVolumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: extra-certs
+          mountPath: /certs
+          readOnly: true
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.volumes
+          count: 2
+      - equal:
+          path: spec.template.spec.volumes[0].emptyDir.sizeLimit
+          value: 1Gi
+      - equal:
+          path: spec.template.spec.volumes[1].secret.secretName
+          value: my-certs
+      - equal:
+          path: spec.template.spec.volumes[1].secret.defaultMode
+          value: 420
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].readOnly
+          value: true
+
+  # The mounts belong to the Ontoserver container only. The Postgres sidecar has its own volume
+  # requirements (an owned data directory) and must not inherit an arbitrary caller mount.
+  - it: does not mount extra volumes into the Postgres sidecar
+    template: templates/deployment.yaml
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.extraVolumes:
+        - name: tmp
+          emptyDir: {}
+      ontoserver.deployment.extraVolumeMounts:
+        - name: tmp
+          mountPath: /tmp
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          count: 1
+      - equal:
+          path: spec.template.spec.initContainers[0].volumeMounts[0].mountPath
+          value: /var/lib/postgresql/data
+
+  # Only one of the two keys set is a legitimate configuration — a volume declared for a sidecar
+  # added elsewhere, or a mount into a volume the chart already creates — and must not error.
+  - it: accepts extraVolumes without extraVolumeMounts
+    template: templates/deployment.yaml
+    set:
+      ontoserver.deployment.extraVolumes:
+        - name: tmp
+          emptyDir: {}
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.volumes
+          count: 1
+      - isNull:
+          path: spec.template.spec.containers[0].volumeMounts
+
+  - it: accepts extraVolumeMounts without extraVolumes
+    template: templates/deployment.yaml
+    set:
+      ontoserver.deployment.persistence.enabledForDeployment: true
+      ontoserver.deployment.extraVolumeMounts:
+        - name: ontoserver-files
+          mountPath: /var/onto/extra
+          subPath: extra
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers[0].volumeMounts
+          count: 2
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].subPath
+          value: extra
+      - lengthEqual:
+          path: spec.template.spec.volumes
+          count: 2

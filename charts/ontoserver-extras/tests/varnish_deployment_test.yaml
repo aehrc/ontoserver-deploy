@@ -1,0 +1,245 @@
+suite: Varnish Deployment tests
+templates:
+  - templates/varnish-deployment.yaml
+tests:
+  - it: renders nothing when varnish disabled (default)
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a Deployment when varnish enabled
+    set:
+      varnish.enabled: true
+    asserts:
+      - isKind:
+          of: Deployment
+      - hasDocuments:
+          count: 1
+
+  - it: names the Deployment correctly
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-varnish
+
+  - it: uses varnish image from values
+    set:
+      varnish.enabled: true
+      varnish.image: varnish:7.0.0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: varnish:7.0.0
+
+  - it: includes cache memory size in varnish command
+    set:
+      varnish.enabled: true
+      varnish.cache.memorySize: "1g"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: "malloc,1g"
+
+  - it: includes metrics exporter container when metrics enabled
+    set:
+      varnish.enabled: true
+      varnish.metrics.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: varnish-exporter
+
+  - it: uses exporter image from values
+    set:
+      varnish.enabled: true
+      varnish.metrics.enabled: true
+      varnish.exporterImage: ghcr.io/aehrc/varnish-exporter:test
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: ghcr.io/aehrc/varnish-exporter:test
+
+  - it: omits metrics exporter when metrics disabled
+    set:
+      varnish.enabled: true
+      varnish.metrics.enabled: false
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+
+  - it: adds opentelemetry sidecar containers when otel enabled
+    set:
+      varnish.enabled: true
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: "http://collector/api/v2/spans"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: varnish-trace-converter
+      - equal:
+          path: spec.template.spec.containers[2].name
+          value: trace-forwarder
+
+  - it: adds init container when otel enabled
+    set:
+      varnish.enabled: true
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: "http://collector/api/v2/spans"
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: init-trace-pipe
+
+  - it: omits opentelemetry containers when otel disabled
+    set:
+      varnish.enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+
+  - it: sets trace-pipe volume when otel enabled
+    set:
+      varnish.enabled: true
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: "http://collector/api/v2/spans"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: trace-pipe
+            emptyDir: {}
+
+  - it: omits trace-pipe volume when otel disabled
+    set:
+      varnish.enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: trace-pipe
+            emptyDir: {}
+
+  - it: defaults to 1 replica
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  - it: uses replicas from values
+    set:
+      varnish.enabled: true
+      varnish.replicas: 2
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+
+  - it: sets tolerations when provided
+    set:
+      varnish.enabled: true
+      varnish.tolerations:
+        - key: "dedicated"
+          operator: "Equal"
+          value: "varnish"
+          effect: "NoSchedule"
+    asserts:
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: "dedicated"
+
+  - it: sets varnish resource requests and limits
+    set:
+      varnish.enabled: true
+      varnish.resources.varnish.requests.cpu: "300m"
+      varnish.resources.varnish.limits.memory: "2048Mi"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: "300m"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: "2048Mi"
+
+  - it: sets COLLECTOR_URL env var on trace-forwarder from collectorEndpoint
+    set:
+      varnish.enabled: true
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[2].env[0].name
+          value: COLLECTOR_URL
+      - equal:
+          path: spec.template.spec.containers[2].env[0].value
+          value: "http://zipkin:9411/api/v2/spans"
+
+  - it: uses POSIX-safe span ID truncation in trace-forwarder
+    set:
+      varnish.enabled: true
+      varnish.opentelemetry.enabled: true
+      varnish.opentelemetry.collectorEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[2].args[0]
+          pattern: 'span_id_short=\$\(printf ''%s'' "\$span_id" \| cut -c1-16\)'
+      - matchRegex:
+          path: spec.template.spec.containers[2].args[0]
+          pattern: 'parent_id_short=\$\(printf ''%s'' "\$parent_id" \| cut -c1-16\)'
+      - notMatchRegex:
+          path: spec.template.spec.containers[2].args[0]
+          pattern: '\$\{span_id:0:16\}'
+
+  # varnishd parses the VCL once at startup and never re-reads the mounted ConfigMap, so without
+  # this annotation a `helm upgrade` that changes only a cache setting leaves the pod template
+  # byte-identical, no rollout happens, and Varnish serves the old VCL indefinitely.
+  - it: annotates the pod template with a checksum of the VCL
+    set:
+      varnish.enabled: true
+    asserts:
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/config"]
+          pattern: ^[0-9a-f]{64}$
+
+  # The two exact hashes below are what make this meaningful: a shape assertion alone would pass
+  # even if the checksum were a constant. These tests differ only in a cache TTL — a value that
+  # appears nowhere else in the pod template — so they prove the annotation tracks VCL content.
+  # Recompute both literals if the VCL body or the hash input is changed on purpose. Note the
+  # VCL embeds the release name (the default backend host is <release>-ontoserver-service), so
+  # these are the hashes for helm-unittest's RELEASE-NAME and cannot be reproduced with
+  # `helm template <other-name>`.
+  - it: derives the checksum from the VCL content (time200=60s)
+    set:
+      varnish.enabled: true
+      varnish.cache.time200: 60s
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/config"]
+          value: 554536abf5022be2c28fd4f1f0600f2d439e09c8c4e9dda9bd11de1345095c83
+
+  - it: derives the checksum from the VCL content (time200=3600s)
+    set:
+      varnish.enabled: true
+      varnish.cache.time200: 3600s
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/config"]
+          value: b3e12b05b7ba79a03e4d41b9d320ade20a0708fa732224f7fbc564be972b031f
+
+  # Deliberate: the checksum covers the VCL text only, so releasing a new chart version does not
+  # restart Varnish and throw away a warm cache. Same expected hash as the time200=60s test.
+  - it: does not change the checksum when only the chart version changes
+    chart:
+      version: 9.9.9
+    set:
+      varnish.enabled: true
+      varnish.cache.time200: 60s
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/config"]
+          value: 554536abf5022be2c28fd4f1f0600f2d439e09c8c4e9dda9bd11de1345095c83

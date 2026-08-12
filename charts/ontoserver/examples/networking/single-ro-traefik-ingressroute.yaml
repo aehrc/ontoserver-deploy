@@ -1,0 +1,103 @@
+# networking/single-ro-traefik-ingressroute.yaml
+# Single read-only Ontoserver using Traefik as the ingress controller.
+# Networking: Traefik IngressRoute CRD + ServersTransport for HTTPS backend trust.
+#
+# Use this instead of the standard Kubernetes Ingress (ingress.enabled) when:
+#   - Traefik is your ingress controller, AND
+#   - Any backend pod exposes HTTPS/TLS (e.g. OntoServer configured with TLS, OntoCloak/Keycloak)
+#
+# Key difference from NGINX: Traefik does NOT connect to self-signed backend certificates
+# by default. A ServersTransport resource must explicitly configure TLS trust for the backend.
+# The standard Kubernetes Ingress (ingress.enabled: true, className: traefik) does not
+# support attaching a ServersTransport — an IngressRoute (Traefik CRD) is required.
+#
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+#   - Traefik installed with CRD support (traefik.io/v1alpha1 for Traefik v3,
+#     or traefik.containo.us/v1alpha1 for Traefik v2 — update apiVersion in templates)
+#   - A TLS certificate Secret for the domain (e.g. from cert-manager or manually created)
+#   - If using a CA-signed backend cert: a Secret containing the CA certificate
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver \
+#     -f networking/single-ro-traefik-ingressroute.yaml \
+#     --set ontoserver.imageCredentials.username=<quay-username> \
+#     --set ontoserver.imageCredentials.password=<quay-password>
+
+ontoserver:
+  serverName: ontoserver.example.com
+  hostNames:
+    - ontoserver.example.com
+
+  deployment:
+    imagePullSecrets:
+      - name: ontoserver-quay-pull-secret
+    kind: Deployment
+    type: single
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 1
+    isReadOnly: true
+
+    db:
+      enabled: true
+      postgresVersion: 16
+
+    persistence:
+      enabledForDeployment: true
+      mode: split
+      files:
+        accessMode: ReadWriteOnce
+        storageSize: 20G
+      dbfiles:
+        accessMode: ReadWriteOnce
+        storageSize: 10G
+
+  # TLS termination at the ingress — cert stored in a Kubernetes Secret.
+  tls:
+    enabled: true
+    certRef: ontoserver-tls   # pre-existing Secret with tls.crt / tls.key
+
+traefik:
+  # Traefik IngressRoute (CRD) — required when backend uses HTTPS/TLS.
+  # For HTTP backends with Traefik, use ontoserver.ingress instead.
+  ingressRoute:
+    enabled: true
+    entryPoints:
+      - websecure
+
+    # ── HTTP backend (default) ────────────────────────────────────────────────
+    # OntoServer's default service is HTTP (port 80 → container 8080).
+    # No ServersTransport needed; TLS is terminated at the ingress.
+    backendPort: 80
+
+    # ── HTTPS backend ─────────────────────────────────────────────────────────
+    # Uncomment below when the backend service itself uses TLS (e.g. OntoServer
+    # configured with server.ssl.enabled=true, or routing through an HTTPS sidecar).
+    # backendPort: 443
+    # backendScheme: https
+    # serversTransport:
+    #   enabled: true
+    #   # Option A — self-signed certificate: skip verification
+    #   insecureSkipVerify: true
+    #   # Option B — CA-signed certificate: provide the CA Secret
+    #   # insecureSkipVerify: false
+    #   # rootCAsSecrets:
+    #   #   - ontoserver-backend-ca    # Secret with key tls.crt containing the CA cert
+
+ontoserver:
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2
+        memory: 4G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2800m
+      maxHeapSize: 2800m
+    db:
+      requests:
+        cpu: 1
+        memory: 1G
+      limits:
+        cpu: 1
+        memory: 1G

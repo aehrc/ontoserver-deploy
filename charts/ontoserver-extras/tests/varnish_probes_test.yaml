@@ -1,0 +1,103 @@
+suite: Varnish probe tests
+templates:
+  - templates/varnish-deployment.yaml
+tests:
+  # Before this, only the metrics exporter sidecar had a probe, so the Service began routing to a
+  # pod whose varnishd was not yet accepting connections — every rolling update dropped requests.
+  - it: probes the varnish container by default
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: varnish
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.tcpSocket.port
+          value: http
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.tcpSocket.port
+          value: http
+
+  # tcpSocket is a deliberate choice, not a shortcut. An httpGet probe is proxied to Ontoserver:
+  # it would put backend traffic on the wire every period, and it would mark the cache unready
+  # whenever the backend was down — converting a backend outage into a cache outage, which is
+  # precisely what varnish.graceSeconds exists to prevent. Asserted so nobody "improves" it.
+  - it: does not use an HTTP probe that would reach the backend
+    set:
+      varnish.enabled: true
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet
+      - isNull:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet
+      - isNull:
+          path: spec.template.spec.containers[0].readinessProbe.exec
+
+  - it: applies the configured timings
+    set:
+      varnish.enabled: true
+      varnish.probes.readiness.initialDelaySeconds: 1
+      varnish.probes.readiness.periodSeconds: 2
+      varnish.probes.readiness.timeoutSeconds: 3
+      varnish.probes.readiness.failureThreshold: 4
+      varnish.probes.liveness.initialDelaySeconds: 5
+      varnish.probes.liveness.periodSeconds: 6
+      varnish.probes.liveness.timeoutSeconds: 7
+      varnish.probes.liveness.failureThreshold: 8
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
+          value: 1
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.periodSeconds
+          value: 2
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.timeoutSeconds
+          value: 3
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.failureThreshold
+          value: 4
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.initialDelaySeconds
+          value: 5
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.failureThreshold
+          value: 8
+
+  # Restarting varnishd throws away the entire cache, so the liveness probe is deliberately more
+  # tolerant than the readiness probe. Pinned so the defaults cannot drift into a cache that
+  # restarts as eagerly as it is removed from the Service.
+  - it: defaults the liveness probe to be more tolerant than the readiness probe
+    set:
+      varnish.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.failureThreshold
+          value: 3
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.failureThreshold
+          value: 6
+
+  - it: omits both probes when disabled
+    set:
+      varnish.enabled: true
+      varnish.probes.enabled: false
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].readinessProbe
+      - isNull:
+          path: spec.template.spec.containers[0].livenessProbe
+
+  # The exporter sidecar's own probe is separate and must be unaffected by the varnish container's.
+  - it: leaves the exporter sidecar probe alone
+    set:
+      varnish.enabled: true
+      varnish.metrics.enabled: true
+      varnish.probes.enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: varnish-exporter
+      - equal:
+          path: spec.template.spec.containers[1].readinessProbe.httpGet.path
+          value: /metrics

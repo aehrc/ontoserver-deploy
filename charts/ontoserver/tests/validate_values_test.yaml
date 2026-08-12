@@ -1,0 +1,349 @@
+suite: validate-values tests
+templates:
+  - templates/validate-values.yaml
+tests:
+  - it: passes with default values
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when serverName not in hostNames
+    set:
+      ontoserver.serverName: notinlist.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: "ontoserver.serverName 'notinlist.example.com' must be one of hostNames"
+
+  - it: fails when both ingress and gateway enabled
+    set:
+      ontoserver.ingress.enabled: true
+      ontoserver.gateway.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "You must choose between Ingress, Gateway API, or IngressRoute!"
+
+  - it: fails when both ingressRoute and ingress enabled
+    set:
+      traefik.ingressRoute.enabled: true
+      ontoserver.ingress.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "You must choose between Ingress, Gateway API, or IngressRoute!"
+
+  - it: fails when both ingressRoute and gateway enabled
+    set:
+      traefik.ingressRoute.enabled: true
+      ontoserver.gateway.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "You must choose between Ingress, Gateway API, or IngressRoute!"
+
+  - it: fails when serversTransport enabled without ingressRoute
+    set:
+      traefik.ingressRoute.serversTransport.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "traefik.ingressRoute.serversTransport.enabled requires traefik.ingressRoute.enabled"
+
+  # The bundled nginx-ingress subchart was removed in chart 0.4.0. This has to *fail* rather than
+  # warn: nothing at the top level of values.schema.json sets additionalProperties: false, so a
+  # leftover `nginx-ingress:` block is accepted silently — and the consequence is that helm upgrade
+  # quietly stops deploying the ingress controller the release depends on, taking the service
+  # offline with no error anywhere.
+  - it: fails when the removed nginx-ingress values are still set
+    set:
+      "nginx-ingress.enabled": true
+    asserts:
+      - failedTemplate:
+          errorPattern: "the bundled nginx-ingress subchart was removed in ontoserver chart 0.4.0"
+
+  # `enabled: false` must fail too. The presence of the key is the signal that a values file has not
+  # been migrated; its value is irrelevant, and only failing on `true` would let the stale block sit
+  # there until someone flipped it and wondered why nothing happened.
+  - it: fails when the removed nginx-ingress key is present but disabled
+    set:
+      "nginx-ingress.enabled": false
+    asserts:
+      - failedTemplate:
+          errorPattern: "the bundled nginx-ingress subchart was removed in ontoserver chart 0.4.0"
+
+  - it: passes with no nginx-ingress key at all
+    set:
+      ontoserver.ingress.enabled: true
+      ontoserver.ingress.className: ontoserver-nginx
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when db sidecar disabled and no datasource url
+    set:
+      ontoserver.deployment.db.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: "If not using sidecar PostgreSQL container ontoserver.deployment.db.enabled=false you must specify ontoserver.config.spring.datasource.url"
+
+  - it: passes when db sidecar disabled but datasource url and username provided
+    values:
+      - fixtures/external-db-values.yaml
+    set:
+      ontoserver.deployment.db.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when datasource url set but username missing
+    values:
+      - fixtures/external-db-no-username.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "If using external database and ontoserver.config.spring.datasource.url is specified you also need to specify ontoserver.config.spring.datasource.username"
+
+  - it: fails when serviceMonitor enabled without managementService
+    set:
+      ontoserver.metrics.serviceMonitor.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "serviceMonitor requires managementService.enabled"
+
+  - it: fails when OTel instrumentation enabled without exporter endpoint
+    set:
+      ontoserver.opentelemetry.instrumentation.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "exporter.endpoint required when instrumentation enabled"
+
+  - it: fails when clientTrafficPolicy enabled without gateway
+    set:
+      envoygateway.clientTrafficPolicy.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "clientTrafficPolicy requires gateway.enabled"
+
+  - it: fails when backendTrafficPolicy enabled without gateway
+    set:
+      envoygateway.backendTrafficPolicy.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "backendTrafficPolicy requires gateway.enabled"
+
+  - it: fails when securityPolicy enabled without gateway
+    set:
+      envoygateway.securityPolicy.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "securityPolicy requires gateway.enabled"
+
+  - it: fails when createGatewayClass enabled without gateway
+    set:
+      envoygateway.createGatewayClass: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "envoygateway.createGatewayClass requires ontoserver.gateway.enabled"
+
+  - it: fails when gatewayServiceMonitor enabled without gateway
+    set:
+      envoygateway.gatewayServiceMonitor.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "envoygateway.gatewayServiceMonitor requires ontoserver.gateway.enabled"
+
+  - it: fails when externalSecret enabled without secretStoreRef name
+    set:
+      ontoserver.externalSecret.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.externalSecret.secretStoreRef.name is required when externalSecret.enabled"
+
+  - it: fails when externalSecret enabled but no data or dataFrom
+    set:
+      ontoserver.externalSecret.enabled: true
+      ontoserver.externalSecret.secretStoreRef.name: "my-store"
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.externalSecret.data or ontoserver.externalSecret.dataFrom must be specified when externalSecret.enabled"
+
+  - it: fails when scaled Deployment uses persistence (must use StatefulSet)
+    values:
+      - fixtures/external-db-values.yaml
+    set:
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: false
+      ontoserver.deployment.persistence.enabledForDeployment: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "Scaled deployments with persistence must use kind: StatefulSet, not Deployment. A scaled Deployment shares a single PVC across all replicas causing Lucene index corruption. StatefulSet volumeClaimTemplates provision a dedicated ReadWriteOnce volume per pod."
+
+  # Read-write is unsupported when scaled: each replica indexes to its own PVC, so a write
+  # served by one replica is missing from every other replica's Lucene index. Caught in CI by
+  # test-fhir-rw failing $expand and $validate-code with HTTP 500 on a scaled install.
+  - it: fails when a scaled deployment is read-write
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.isReadOnly: false
+    asserts:
+      - failedTemplate:
+          errorMessage: "Scaled deployments must set ontoserver.deployment.isReadOnly: true. Read-write is not supported when scaled: each replica has its own Lucene index, so content written through the round-robin Service is only indexed on the replica that served the write and $expand/$validate-code fail on the others. Load content with a single-instance read-write deployment, then serve it scaled and read-only. Set ontoserver.deployment.allowScaledReadWrite=true to opt in to the experimental topology anyway."
+
+  - it: allows a scaled deployment that is read-only
+    values:
+      - fixtures/scaled-values.yaml
+    asserts:
+      - notFailedTemplate: {}
+
+  # The two shipped scaled-rw-envoy-experimental.yaml examples rely on this opt-out, and CI
+  # renders every tracked example, so removing it would fail the render sweep rather than
+  # silently drop coverage.
+  - it: allows a scaled read-write deployment when explicitly opted in
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.deployment.isReadOnly: false
+      ontoserver.deployment.allowScaledReadWrite: true
+    asserts:
+      - notFailedTemplate: {}
+
+  # A single-instance deployment is the supported way to load content, so read-write there
+  # must stay legal — the guard has to key on `type`, not on isReadOnly alone.
+  - it: allows a single read-write deployment
+    set:
+      ontoserver.deployment.type: single
+      ontoserver.deployment.isReadOnly: false
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: fails when StatefulSet files.existingVolume is enabled
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.persistence.files.existingVolume.enabled: true
+      ontoserver.deployment.persistence.files.existingVolume.name: my-files-pv
+    asserts:
+      - failedTemplate:
+          errorMessage: "StatefulSet deployments do not support ontoserver.deployment.persistence.files.existingVolume. Each replica needs its own volume; use dynamic provisioning via storageClass or a Deployment for single-instance prebound volumes."
+
+  - it: fails when StatefulSet dbfiles.existingVolume is enabled
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.persistence.mode: split
+      ontoserver.deployment.persistence.dbfiles.existingVolume.enabled: true
+      ontoserver.deployment.persistence.dbfiles.existingVolume.name: my-dbfiles-pv
+    asserts:
+      - failedTemplate:
+          errorMessage: "StatefulSet deployments do not support ontoserver.deployment.persistence.dbfiles.existingVolume. Each replica needs its own volume; use dynamic provisioning via storageClass or a Deployment for single-instance prebound volumes."
+
+  - it: fails when certmanager is enabled with ALB ingress
+    set:
+      ontoserver.certmanager.enabled: true
+      ontoserver.ingress.enabled: true
+      ontoserver.ingress.className: alb
+      ontoserver.serverName: localhost
+      ontoserver.hostNames:
+        - localhost
+    asserts:
+      - failedTemplate:
+          errorPattern: "certmanager is not compatible with ALB ingress"
+
+  - it: passes when imagePullSecret both keys are set
+    set:
+      ontoserver.externalSecret.imagePullSecret.data.username.key: quay-creds
+      ontoserver.externalSecret.imagePullSecret.data.password.key: quay-creds
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when only username key is set
+    set:
+      ontoserver.externalSecret.imagePullSecret.data.username.key: quay-creds
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.externalSecret.imagePullSecret: both data.username.key and data.password.key must be set together"
+
+  - it: fails when only password key is set
+    set:
+      ontoserver.externalSecret.imagePullSecret.data.password.key: quay-creds
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.externalSecret.imagePullSecret: both data.username.key and data.password.key must be set together"
+
+  # ── Plaintext Gateway guard ────────────────────────────────────────────────
+  # Gateway API rejects an HTTPS listener that carries no certificateRefs, so with TLS off
+  # the chart must render an HTTP listener. Serving a terminology server over plaintext has
+  # to be a deliberate choice, hence the explicit opt-in.
+  - it: fails when gateway is enabled without TLS and without allowPlaintext
+    set:
+      ontoserver.gateway.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.gateway.enabled with ontoserver.tls.enabled=false would expose Ontoserver over plaintext HTTP. Set ontoserver.tls.enabled=true and provide ontoserver.tls.certRef (optionally with certmanager.enabled), or set ontoserver.gateway.allowPlaintext=true to accept a plaintext listener."
+
+  - it: passes when gateway is enabled with TLS
+    set:
+      ontoserver.gateway.enabled: true
+      ontoserver.tls.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: passes when gateway is enabled without TLS but plaintext is opted into
+    set:
+      ontoserver.gateway.enabled: true
+      ontoserver.gateway.allowPlaintext: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when certmanager is enabled without TLS
+    set:
+      ontoserver.gateway.enabled: true
+      ontoserver.certmanager.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "ontoserver.certmanager.enabled requires ontoserver.tls.enabled: cert-manager fills the Secret referenced by ontoserver.tls.certRef and cannot attach TLS to a listener that does not request it."
+
+  - it: reports the ALB incompatibility ahead of the certmanager TLS requirement
+    set:
+      ontoserver.ingress.enabled: true
+      ontoserver.ingress.className: alb
+      ontoserver.certmanager.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "certmanager is not compatible with ALB ingress: ALB only supports TLS via ACM certificate ARNs, not Kubernetes TLS secrets. Use alb.ingress.kubernetes.io/certificate-arn instead, or switch to nginx ingress."
+
+  # Resource-name length. The obvious premise — that the release name appearing twice in a
+  # volumeClaimTemplate PVC name breaks the 63-character limit — is wrong, and was checked on a
+  # cluster: PVC names are DNS subdomains, and a 108-character one was created and Bound fine.
+  # What actually bites is Service names, which are DNS labels and hard-capped at 63. Helm's own
+  # 53-character release-name cap is not low enough to keep them legal.
+  - it: rejects a release name too long for the chart's Service names
+    release:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa   # 34
+    asserts:
+      - failedTemplate:
+          errorPattern: "is 34 characters; this chart allows at most 33"
+
+  # 33 produces a clustering Service name of exactly 63, so the boundary is inclusive.
+  - it: accepts a release name at the Service-name limit
+    release:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa    # 33
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # StatefulSets add their own, looser limit: "<release>-statefulset" must also fit in 63. It is
+  # looser than the Service limit, so it only ever fires if the Service names are shortened.
+  - it: accepts a StatefulSet release name within both limits
+    release:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa    # 33
+    values:
+      - fixtures/scaled-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: applies the length limit to Deployments too, not just StatefulSets
+    release:
+      name: verylongreleasename-for-testing-limits
+    asserts:
+      - failedTemplate:
+          errorPattern: "is 38 characters; this chart allows at most 33"

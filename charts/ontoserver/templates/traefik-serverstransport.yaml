@@ -1,0 +1,29 @@
+{{- if and .Values.traefik.ingressRoute.enabled .Values.traefik.ingressRoute.serversTransport.enabled }}
+# Traefik ServersTransport — configures how Traefik connects to the backend (OntoServer)
+# service. Required when the backend exposes HTTPS/TLS so Traefik can explicitly trust
+# the backend certificate. Without this, Traefik will reject self-signed backend certs.
+#
+# This resource must be in the same namespace as the IngressRoute that references it.
+# Requires Traefik CRDs installed in the cluster. API group traefik.io/v1alpha1 (Traefik v3);
+# for Traefik v2 change the apiVersion to traefik.containo.us/v1alpha1.
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: {{ .Release.Name }}-ontoserver-serverstransport
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+spec:
+  # insecureSkipVerify skips backend TLS certificate validation.
+  # Use true for self-signed certificates, false when rootCAsSecrets are provided.
+  insecureSkipVerify: {{ .Values.traefik.ingressRoute.serversTransport.insecureSkipVerify }}
+  {{- if .Values.traefik.ingressRoute.serversTransport.rootCAsSecrets }}
+  # Secrets containing root CA certificates used to validate the backend TLS certificate.
+  rootCAsSecrets:
+    {{- toYaml .Values.traefik.ingressRoute.serversTransport.rootCAsSecrets | nindent 4 }}
+  {{- end }}
+  {{- if .Values.traefik.ingressRoute.serversTransport.certificatesSecrets }}
+  # Secrets containing client certificates for mutual TLS with the backend.
+  certificatesSecrets:
+    {{- toYaml .Values.traefik.ingressRoute.serversTransport.certificatesSecrets | nindent 4 }}
+  {{- end }}
+{{- end }}

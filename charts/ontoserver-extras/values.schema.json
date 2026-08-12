@@ -1,0 +1,338 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "ontoserver-extras",
+  "description": "Optional infrastructure components for Ontoserver (Varnish cache, OTel Collector, PV)",
+  "type": "object",
+  "properties": {
+    "global": {
+      "type": "object",
+      "description": "Global values passed by umbrella charts. Accepted but not used by this chart."
+    },
+    "varnish": {
+      "type": "object",
+      "description": "Varnish caching proxy configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the Varnish caching proxy"
+        },
+        "backendServiceName": {
+          "type": "string",
+          "default": "",
+          "description": "Override the Kubernetes service name Varnish proxies to. Defaults to RELEASE-ontoserver-service (the ontoserver chart's service). Only needed when the extras chart and ontoserver chart have different release names."
+        },
+        "closureBackend": {
+          "type": "string",
+          "default": "",
+          "description": "Kubernetes hostname for the $closure operation backend. The $closure FHIR operation is stateful — set to a stable pod hostname (e.g. RELEASE-statefulset-0.RELEASE-ontoserver-headless) for scaled deployments. Empty string disables dedicated $closure routing."
+        },
+        "metrics": {
+          "type": "object",
+          "description": "Prometheus metrics exporter sidecar",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable the Prometheus metrics exporter sidecar container"
+            },
+            "interval": {
+              "type": "string",
+              "default": "60s",
+              "description": "Prometheus scrape interval (e.g. 60s, 1m)"
+            },
+            "scrapeTimeout": {
+              "type": "string",
+              "default": "55s",
+              "description": "Prometheus scrape timeout — must be less than interval (e.g. 55s)"
+            }
+          },
+          "required": ["enabled"],
+          "additionalProperties": false
+        },
+        "opentelemetry": {
+          "type": "object",
+          "description": "OpenTelemetry tracing integration for Varnish",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable VCL with tracing spans and sidecar containers (true) or plain caching VCL (false)"
+            },
+            "collectorEndpoint": {
+              "type": "string",
+              "default": "",
+              "description": "Zipkin collector endpoint for trace forwarding (e.g. http://RELEASE-collector:9411). Required when opentelemetry is enabled."
+            }
+          },
+          "required": ["enabled"],
+          "additionalProperties": false,
+          "if": {
+            "properties": { "enabled": { "const": true } }
+          },
+          "then": {
+            "required": ["enabled", "collectorEndpoint"],
+            "properties": {
+              "collectorEndpoint": {
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "replicas": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 0,
+          "description": "Number of Varnish pod replicas"
+        },
+        "graceSeconds": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 0,
+          "description": "Seconds to serve stale cached content when the backend is unavailable"
+        },
+        "podSecurityContext": {
+          "type": "object",
+          "description": "Pod-level securityContext for the Varnish pod, passed through as-is. Empty means unset."
+        },
+        "containerSecurityContext": {
+          "type": "object",
+          "description": "Container-level securityContext applied to every container in the Varnish pod, passed through as-is. Empty means unset."
+        },
+        "automountServiceAccountToken": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Mount the ServiceAccount token into the Varnish pod. Null leaves it to the cluster default."
+        },
+        "probes": {
+          "type": "object",
+          "description": "Readiness and liveness probes for the varnish container. tcpSocket on the http port.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Add readiness and liveness probes to the varnish container"
+            },
+            "readiness": { "$ref": "#/$defs/varnishProbe" },
+            "liveness": { "$ref": "#/$defs/varnishProbe" }
+          },
+          "additionalProperties": false
+        },
+        "image": {
+          "type": "string",
+          "default": "varnish:7.7.1",
+          "description": "Varnish container image"
+        },
+        "exporterImage": {
+          "type": "string",
+          "default": "ghcr.io/aehrc/varnish-exporter:7.7-1",
+          "description": "Varnish Prometheus exporter container image"
+        },
+        "traceForwarderImage": {
+          "type": "string",
+          "default": "curlimages/curl:8.14.1",
+          "description": "Trace forwarder container image. Must include curl and sh. Only used when varnish.opentelemetry.enabled is true."
+        },
+        "resources": {
+          "type": "object",
+          "description": "Resource requests and limits for Varnish containers",
+          "properties": {
+            "varnish": {
+              "$ref": "#/$defs/resourceRequirements",
+              "description": "Resources for the main Varnish container",
+              "default": {
+                "requests": { "cpu": "200m", "memory": "256Mi" },
+                "limits": { "cpu": "500m", "memory": "1024Mi" }
+              }
+            },
+            "exporter": {
+              "$ref": "#/$defs/resourceRequirements",
+              "description": "Resources for the Prometheus exporter sidecar",
+              "default": {
+                "requests": { "cpu": "50m", "memory": "64Mi" },
+                "limits": { "cpu": "100m", "memory": "128Mi" }
+              }
+            },
+            "traceConverter": {
+              "$ref": "#/$defs/resourceRequirements",
+              "description": "Resources for the trace converter sidecar (only used when opentelemetry is enabled)",
+              "default": {
+                "requests": { "cpu": "25m", "memory": "25Mi" },
+                "limits": { "cpu": "50m", "memory": "50Mi" }
+              }
+            },
+            "traceForwarder": {
+              "$ref": "#/$defs/resourceRequirements",
+              "description": "Resources for the trace forwarder sidecar (only used when opentelemetry is enabled)",
+              "default": {
+                "requests": { "cpu": "25m", "memory": "32Mi" },
+                "limits": { "cpu": "50m", "memory": "64Mi" }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "tolerations": {
+          "type": "array",
+          "default": [],
+          "description": "Pod tolerations for the Varnish deployment",
+          "items": { "$ref": "#/$defs/toleration" }
+        },
+        "cache": {
+          "type": "object",
+          "description": "Cache TTL and behaviour settings",
+          "properties": {
+            "time200": {
+              "type": "string",
+              "default": "10m",
+              "description": "Cache TTL for HTTP 200 responses (Varnish duration syntax, e.g. 10m, 1h, 30s)"
+            },
+            "time404": {
+              "type": "string",
+              "default": "1m",
+              "description": "Cache TTL for HTTP 404 responses (Varnish duration syntax)"
+            },
+            "timeExpand": {
+              "type": "string",
+              "default": "",
+              "description": "Cache TTL for $expand responses. Defaults to time200 if empty."
+            },
+            "passAuthHeaderRequests": {
+              "type": "boolean",
+              "default": true,
+              "description": "When true, requests with an Authorization header bypass the cache (pass). When false, authorized requests are cached like any other."
+            },
+            "memorySize": {
+              "type": "string",
+              "default": "800m",
+              "description": "Varnish malloc storage pool size passed to -s malloc,<size> (e.g. 800m, 1g, 2g). Should be less than resources.varnish.limits.memory.",
+              "pattern": "^[0-9]+(k|m|g|K|M|G)?$"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["enabled"],
+      "additionalProperties": false
+    },
+    "collector": {
+      "type": "object",
+      "description": "OpenTelemetry Collector (OpenTelemetryCollector CRD)",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Deploy an OpenTelemetryCollector custom resource"
+        },
+        "otlpEndpoint": {
+          "type": "string",
+          "default": "",
+          "description": "OTLP gRPC endpoint for trace export (e.g. tempo:4317). Optional — omit if using zipkinEndpoint only."
+        },
+        "zipkinEndpoint": {
+          "type": "string",
+          "default": "",
+          "description": "Zipkin endpoint for trace export (e.g. http://tempo:9411). Optional — omit if using otlpEndpoint only."
+        },
+        "tolerations": {
+          "type": "array",
+          "default": [],
+          "description": "Pod tolerations for the OpenTelemetryCollector",
+          "items": { "$ref": "#/$defs/toleration" }
+        },
+        "debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug exporter with detailed verbosity. Not suitable for production."
+        },
+        "podSecurityContext": {
+          "type": "object",
+          "description": "Pod-level securityContext, passed to the OpenTelemetryCollector CR's spec.podSecurityContext. Empty means unset."
+        },
+        "containerSecurityContext": {
+          "type": "object",
+          "description": "Container-level securityContext, passed to the OpenTelemetryCollector CR's spec.securityContext. Empty means unset."
+        },
+        "batch": {
+          "type": "object",
+          "description": "Batch processor settings for the traces pipeline",
+          "properties": {
+            "sendBatchSize": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1000,
+              "description": "Spans per batch before the processor flushes"
+            },
+            "timeout": {
+              "type": "string",
+              "pattern": "^[0-9]+(ns|us|ms|s|m|h)$",
+              "default": "5s",
+              "description": "Maximum time a span waits before being flushed regardless of batch size. A zero value is rejected at render time — it disables the flush timer."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["enabled"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "resourceRequirements": {
+      "type": "object",
+      "description": "Kubernetes resource requests and limits",
+      "properties": {
+        "requests": {
+          "$ref": "#/$defs/resourceList"
+        },
+        "limits": {
+          "$ref": "#/$defs/resourceList"
+        }
+      },
+      "additionalProperties": false
+    },
+    "toleration": {
+      "type": "object",
+      "description": "Kubernetes pod toleration",
+      "properties": {
+        "key":               { "type": "string" },
+        "operator":          { "type": "string", "enum": ["Exists", "Equal"] },
+        "value":             { "type": "string" },
+        "effect":            { "type": "string", "enum": ["NoSchedule", "PreferNoSchedule", "NoExecute"] },
+        "tolerationSeconds": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "resourceList": {
+      "type": "object",
+      "description": "CPU and memory resource quantities",
+      "properties": {
+        "cpu": {
+          "type": "string",
+          "description": "CPU resource quantity (e.g. 100m, 0.5, 1)",
+          "pattern": "^[0-9]+(\\.[0-9]+)?(m)?$"
+        },
+        "memory": {
+          "type": "string",
+          "description": "Memory resource quantity (e.g. 64Mi, 1Gi)",
+          "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "varnishProbe": {
+      "type": "object",
+      "description": "Timing for one of the varnish container's tcpSocket probes",
+      "properties": {
+        "initialDelaySeconds": { "type": "integer", "minimum": 0 },
+        "periodSeconds": { "type": "integer", "minimum": 1 },
+        "timeoutSeconds": { "type": "integer", "minimum": 1 },
+        "failureThreshold": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

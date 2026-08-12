@@ -1,0 +1,102 @@
+# aks/scaled-rw-envoy-experimental.yaml
+# Scaled read-write Ontoserver on Azure Kubernetes Service (AKS).
+# Networking: Gateway API with Envoy Gateway.
+#
+# !! EXPERIMENTAL — NOT RECOMMENDED FOR PRODUCTION !!
+#
+# This topology is untested and has a fundamental architectural limitation:
+# Lucene does not support concurrent writes from multiple instances to the
+# same logical index. Each pod maintains a local index cache, but write
+# operations on one pod are not immediately reflected in other pods' indexes,
+# creating an inconsistency window beyond what Infinispan cache invalidation
+# can reliably resolve.
+#
+# For a stable multi-instance deployment, use scaled-ro-envoy.yaml with a
+# separate single read-write instance to ingest content, then promote to
+# the read-only cluster.
+#
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+#   - External PostgreSQL (Azure Database for PostgreSQL Flexible Server)
+#   - Envoy Gateway installed
+#   - Azure Disk CSI driver enabled (default on AKS)
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver -f aks/scaled-rw-envoy-experimental.yaml \
+#     --set ontoserver.imageCredentials.username=<quay-username> \
+#     --set ontoserver.imageCredentials.password=<quay-password>
+
+ontoserver:
+  serverName: ontoserver.example.com
+  hostNames:
+    - ontoserver.example.com
+
+  deployment:
+    # Image pull auth:
+    # - preferred for production: create a docker-registry Secret and reference it here
+    # - alternative: pass ontoserver.imageCredentials.username/password via --set at install time
+    imagePullSecrets:
+      - name: ontoserver-quay-pull-secret
+    kind: StatefulSet
+    type: scaled
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 2    # keep small given experimental status
+    isReadOnly: false   # ← read-write across multiple instances (experimental)
+    # The chart blocks scaled read-write by default. CI has since demonstrated the failure
+    # concretely on a scaled install: $expand and $validate-code return HTTP 500 on the
+    # replica that did not serve the write. This flag opts in anyway.
+    allowScaledReadWrite: true
+
+    clusterName: "ontoserver-rw"
+
+    db:
+      enabled: false   # external PostgreSQL required
+
+    persistence:
+      # Azure Disk (Premium_LRS) — ReadWriteOnce per pod via StatefulSet
+      # volumeClaimTemplates. Each pod has its own dedicated disk.
+      files:
+        accessMode: ReadWriteOnce
+        storageSize: 50G
+        storageClass:
+          provided:
+            enabled: true
+            storageProvisioner: disk.csi.azure.com
+            reclaimPolicy: Retain
+            allowVolumeExpansion: true
+            storageParameters:
+              skuName: Premium_LRS
+              kind: Managed
+
+  config:
+    spring.datasource.url: "jdbc:postgresql://your-pg-server.postgres.database.azure.com:5432/ontoserver"
+    spring.datasource.username: "ontoserver"
+
+  gateway:
+    enabled: true
+    className: envoy-gateway-class
+
+  # ── TLS ───────────────────────────────────────────────────────────────────
+  # Ontoserver must not be served over plaintext HTTP. Supply the certificate as a
+  # Kubernetes TLS Secret named by certRef, or uncomment certmanager below to have
+  # cert-manager issue and populate that Secret for you.
+  tls:
+    enabled: true
+    certRef: ontoserver-tls
+  # certmanager:
+  #   enabled: true
+  #   clusterIssuerName: letsencrypt-prod
+  #   email: your-email@example.com
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2
+        memory: 4G
+      limits:
+        cpu: 4
+        memory: 8G
+      initialHeapSize: 6000m
+      maxHeapSize: 6000m
+
+  # secretConfig:
+  #   spring.datasource.password: "your-password"

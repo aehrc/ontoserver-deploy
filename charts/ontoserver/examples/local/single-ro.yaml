@@ -1,0 +1,88 @@
+# local/single-ro.yaml
+# Universal single read-only Ontoserver — no ingress, no cloud credentials.
+# Works on k3d, k3s, minikube, kind, or any other local cluster.
+#
+# A read-only server cannot accept FHIR write operations. Content is loaded
+# at startup via an Atom preload feed — the typical setup for serving released
+# terminology content (SNOMED CT, LOINC, FHIR resources) without allowing
+# modifications. See aks/ and eks/ for production cloud deployments.
+#
+# Access the server via port-forwarding (no ingress required):
+#   kubectl port-forward svc/<release>-ontoserver 8080:80
+#   curl http://localhost:8080/fhir/metadata
+#
+# For k3d with Traefik or Envoy Gateway see local/k3d/.
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver -f local/single-ro.yaml \
+#     --set ontoserver.imageCredentials.username=<quay-username> \
+#     --set ontoserver.imageCredentials.password=<quay-password>
+
+ontoserver:
+  serverName: localhost
+  hostNames:
+    - localhost
+
+  deployment:
+    # Image pull auth:
+    # - preferred for production: create a docker-registry Secret and reference it here
+    # - alternative: pass ontoserver.imageCredentials.username/password via --set at install time
+    imagePullSecrets:
+      - name: ontoserver-quay-pull-secret
+    kind: Deployment
+    type: single
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 1
+    isReadOnly: true
+
+    db:
+      enabled: true
+      postgresVersion: 16
+
+    persistence:
+      enabledForDeployment: true
+      mode: split
+      # No chart-managed StorageClass — uses the cluster default.
+      # k3d/k3s: local-path   minikube: standard   kind: local-path-provisioner
+      files:
+        accessMode: ReadWriteOnce
+        storageSize: 10G
+        storageClass:
+          provided:
+            enabled: false
+          name: ""
+      dbfiles:
+        accessMode: ReadWriteOnce
+        storageSize: 5G
+        storageClass:
+          provided:
+            enabled: false
+          name: ""
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 1
+        memory: 3G
+      limits:
+        cpu: 2
+        memory: 4G
+      initialHeapSize: 2400m
+      maxHeapSize: 2400m
+    db:
+      requests:
+        cpu: 500m
+        memory: 512M
+      limits:
+        cpu: 1
+        memory: 1G
+
+  # ── Preload (optional) ────────────────────────────────────────────────────
+  # Read-only servers are typically pre-populated via an Atom preload feed on
+  # startup. Mount a preload.xml Atom feed file into the pod and configure:
+  #
+  # config:
+  #   atom.preload.feedLocation: "file:///data/preload.xml"
+  #
+  # Use healthCheckOption: -s to keep the pod unready until preload completes:
+  # healthCheckOption: -s

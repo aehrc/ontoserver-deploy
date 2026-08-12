@@ -1,0 +1,162 @@
+
+## @section Image parameters
+
+image:
+## @param image.repository Container image repository for the Ontoserver indexer
+  repository: quay.io/aehrc/ontoserver
+## @param image.tag Container image tag
+  tag: ctsa-6
+## @param image.imagePullSecrets [array] List of pre-existing imagePullSecret names to attach to the pod
+  imagePullSecrets: []      # list of {name: ...} objects; merged with the chart-managed secret when credentials are set
+  credentials:
+## @param image.credentials.registry Registry hostname for the chart-managed pull secret
+    registry: quay.io
+## @param image.credentials.username Registry username; required to pull from quay.io/aehrc/ontoserver — chart creates an imagePullSecret automatically
+    username: ""
+## @param image.credentials.password Registry password; set via --set or populate via External Secrets
+    password: ""
+
+
+## @section Job parameters
+
+job:
+## @param job.name Override for the Kubernetes Job name; defaults to the release name suffixed with the release revision
+  name: ""                  # leave empty for <release name>-<release revision>, which changes on each upgrade
+## @param job.activeDeadlineSeconds Maximum duration in seconds before the Job is forcibly terminated
+  activeDeadlineSeconds: 7200
+## @param job.ttlSecondsAfterFinished Seconds after Job completion before it is automatically deleted
+  ttlSecondsAfterFinished: 3600
+  ## Security context. All three default to unset, so nothing changes for existing users. See the
+  ## chart README ("Security context") for a verified hardened configuration.
+  ## Note the indexer writes its output to the mounted output PVC, so a hardened context needs an
+  ## fsGroup that can write it — the Job fails outright rather than degrading if it cannot.
+## @param job.podSecurityContext Pod-level securityContext for the indexer Job pod, passed through as-is (e.g. runAsNonRoot, runAsUser, fsGroup, seccompProfile)
+  podSecurityContext: {}
+## @param job.containerSecurityContext Container-level securityContext for the indexer container, passed through as-is (e.g. allowPrivilegeEscalation, capabilities, readOnlyRootFilesystem)
+  containerSecurityContext: {}
+## @param job.automountServiceAccountToken Mount the ServiceAccount token into the Job pod. The indexer does not call the Kubernetes API, so false is safe. Leave unset (null) for the cluster default.
+  automountServiceAccountToken: ~
+  ## Arbitrary extra volumes and mounts for the indexer container. Both default to empty, so
+  ## nothing changes for existing users. Rendered verbatim and appended after the chart's own
+  ## output-volume / input-volume entries, so those always win a name collision.
+  ## The primary use is `readOnlyRootFilesystem: true`, which needs a writable /tmp — the indexer
+  ## runs the same Spring Boot image as the server and writes /tmp/spring.log unconditionally.
+## @param job.extraVolumes Extra pod volumes, e.g. `[{name: tmp, emptyDir: {}}]`
+  extraVolumes: []
+## @param job.extraVolumeMounts Extra mounts for the indexer container, e.g. `[{name: tmp, mountPath: /tmp}]`
+  extraVolumeMounts: []
+
+
+## @section Resources parameters
+
+resources:
+## @param resources.memoryGb Memory in GiB for the indexer pod; sets the Kubernetes memory request and limit
+  memoryGb: 20              # GiB (integer) — Kubernetes memory request and limit
+## @param resources.heapGb JVM max heap in GiB (-Xmx); defaults to memoryGb minus 2 GiB, leaving headroom for non-heap JVM memory
+  heapGb: ~                 # leave unset to use memoryGb - 2; must be less than memoryGb
+## @param resources.cpu CPU units for the indexer pod; sets both the Kubernetes request and limit
+  cpu: 4                    # CPU request and limit
+
+
+## @section Code system parameters
+
+codeSystem:
+## @param codeSystem.url FHIR CodeSystem URL to index (e.g. http://snomed.info/sct/32506021000036107 for SNOMED CT AU, or http://loinc.org for LOINC)
+  url: ""                   # e.g. http://snomed.info/sct/32506021000036107
+## @param codeSystem.version Version URI of the code system (SNOMED CT: full version URI; LOINC: plain version number e.g. 2.76)
+  version: ""               # e.g. http://snomed.info/sct/32506021000036107/version/20231130
+
+
+## @section RF2 source parameters
+
+rf2:
+## @param rf2.kind RF2 release type for SNOMED CT — FULL or SNAPSHOT; ignored for LOINC
+  kind: FULL                # FULL | SNAPSHOT — ignored for LOINC (http://loinc.org)
+## @param rf2.files List of source file URLs — HTTPS or file:// URIs — for RF2 ZIPs (SNOMED CT) or the LOINC distribution ZIP
+  files: ~                  # list of source file URLs (RF2 ZIPs for SNOMED CT; LOINC distribution ZIP for LOINC)
+
+
+## @section Syndication parameters
+
+syndication:
+## @param syndication.endpoint Base URL of the syndication server to publish the index to; required unless output.path is set
+  endpoint: ""              # syndication server base URL
+## @param syndication.tokenEndpoint OAuth2 token endpoint URL for authenticating with the syndication server
+  tokenEndpoint: ""         # OAuth token URL
+## @param syndication.feed Feed identifier on the syndication server; required when syndication.endpoint is set
+  feed: ""                  # feed identifier
+## @param syndication.entryTitle Human-readable title of the entry created in the syndication feed; required when syndication.endpoint is set
+  entryTitle: ""            # entry title in the feed
+## @param syndication.entryFileName Custom filename for the syndication entry archive; defaults to index-[version].zip if omitted
+  entryFileName: ""         # optional — custom output filename (defaults to index-[version].zip)
+## @param syndication.securityLabels [array] Ontoserver permission labels controlling read/write access to this entry (e.g. restricted.read)
+  securityLabels: []        # optional — list of permission labels
+
+
+## @section Output parameters
+
+output:
+## @param output.pvcName Name of an existing PersistentVolumeClaim to mount at /output for writing the index archive locally
+  pvcName: ""               # optional — existing PVC name; mounted at /output inside the container
+## @param output.path Container path for the -o flag to write the index archive locally (e.g. /output/snomed-au-20231130.zip); required unless syndication.endpoint is set
+  path: ""                  # e.g. /output/snomed-au-20231130.zip
+
+
+## @section Input parameters
+
+input:
+## @param input.pvcName Name of an existing PersistentVolumeClaim containing source RF2 or LOINC files; mounted read-only at input.mountPath
+  pvcName: ""               # optional — existing PVC name; use file:// URIs in rf2.files to reference files within it
+## @param input.mountPath Container path at which to mount the input PVC
+  mountPath: "/input"       # mount path for the input PVC
+
+
+## @section Auth parameters
+
+auth:
+  # OAuth2 client credentials — mutually exclusive with basic
+  oauth2:
+## @param auth.oauth2.secretRef Name of an existing Secret with keys clientId and clientSecret for OAuth2 authentication
+    secretRef: ""           # name of existing Secret (keys: clientId, clientSecret)
+## @param auth.oauth2.clientId OAuth2 client ID; chart creates a Secret — mutually exclusive with auth.oauth2.secretRef
+    clientId: ""            # OR provide directly — chart creates a Secret
+## @param auth.oauth2.clientSecret OAuth2 client secret; required when auth.oauth2.clientId is set
+    clientSecret: ""
+  # Basic auth — mutually exclusive with oauth2
+  basic:
+## @param auth.basic.secretRef Name of an existing Secret with keys username and password for basic authentication
+    secretRef: ""           # name of existing Secret (keys: username, password)
+## @param auth.basic.username Basic auth username; chart creates a Secret — mutually exclusive with auth.basic.secretRef
+    username: ""            # OR provide directly — chart creates a Secret
+## @param auth.basic.password Basic auth password; required when auth.basic.username is set
+    password: ""
+  # All empty = no auth (valid)
+
+
+## @section SNOMED CT language refsets
+
+languageRefsets:
+## @param languageRefsets.forModule [object] Map of SNOMED CT module ID to comma-separated language refset IDs used for display name selection
+  forModule: {}             # map of moduleId -> comma-separated refset IDs
+                            # e.g. "32506021000036107": "32570271000036106,900000000000509007"
+
+## @section Scheduling
+
+## @param tolerations [array] Pod tolerations for scheduling on tainted nodes such as Azure spot instances
+tolerations: []             # optional — e.g. to schedule on spot/preemptible nodes
+
+## @section SNOMED CT advanced
+
+## @param resolveSkew SNOMED CT edition date used to resolve skew between module versions (e.g. 20231130)
+resolveSkew: ""             # optional — e.g. "20231130"
+
+
+## @section Sentry parameters
+
+sentry:                     # all fields ignored unless sentry.dsn is non-empty
+## @param sentry.dsn Sentry DSN for error reporting; leave empty to disable Sentry integration
+  dsn: ""
+## @param sentry.environment Sentry environment tag attached to error reports
+  environment: "Indexer"
+## @param sentry.serverName Sentry server name tag attached to error reports
+  serverName: ""

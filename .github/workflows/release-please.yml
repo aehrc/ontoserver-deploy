@@ -1,0 +1,162 @@
+name: Release Please
+
+# Release Please maintains one open "release PR" per chart. Merging a chart's PR stamps its
+# changelog, bumps its Chart.yaml, tags `<chart>-vX.Y.Z` and creates the GitHub Release — then the
+# publish job below packages that one chart and pushes it to the Helm repo index and GHCR.
+#
+# Per-chart releases fall out of `packages` in release-please-config.json: Release Please decides
+# what to bump from the FILE PATHS a commit touches, not from the commit scope. A commit touching
+# only charts/ontoserver-indexer opens a release PR for the indexer alone. `separate-pull-requests`
+# keeps them independent so one chart can be released without dragging the others along.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# Shares a group with the tag-triggered release.yml: both rewrite index.yaml on gh-pages, and two
+# concurrent runs would clobber each other's entry.
+concurrency:
+  group: release-charts
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Maintain release PRs
+    runs-on: ubuntu-latest
+    outputs:
+      # `paths_released` is a JSON array of the package paths released by this run — the switch the
+      # publish job fans out over.
+      paths_released: ${{ steps.release.outputs.paths_released }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish:
+    name: Publish ${{ matrix.path }}
+    needs: release-please
+    if: needs.release-please.outputs.paths_released != '[]' && needs.release-please.outputs.paths_released != ''
+    runs-on: ubuntu-latest
+    strategy:
+      # Serial on purpose: every chart's publish rewrites the same gh-pages index.yaml.
+      max-parallel: 1
+      matrix:
+        path: ${{ fromJson(needs.release-please.outputs.paths_released) }}
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Publishing happens here rather than in the tag-triggered release.yml because a tag created
+      # with GITHUB_TOKEN does NOT trigger other workflows. release.yml would simply never run for a
+      # Release Please tag, and the chart would be tagged and released on GitHub but never appear in
+      # the Helm repo index or GHCR — a silent half-release.
+      - name: Resolve chart and version
+        id: chart
+        env:
+          PKG_PATH: ${{ matrix.path }}
+        run: |
+          set -euo pipefail
+          chart="$(basename "$PKG_PATH")"
+          version="$(python3 -c "import json,sys; print(json.load(open('.release-please-manifest.json'))['$PKG_PATH'])")"
+          echo "chart=$chart" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=${chart}-v${version}" >> "$GITHUB_OUTPUT"
+          echo "Publishing $chart $version"
+
+      # Same gate as release.yml: never publish a chart whose commit did not pass the suites. Here
+      # the tests run against the release-PR merge commit in parallel with this workflow, so this
+      # almost always waits a few minutes rather than finding a finished run.
+      - name: Require successful Unit and Integration test runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          query() {
+            gh api "repos/${REPO}/actions/runs?head_sha=${SHA}&per_page=100" \
+              --jq "[.workflow_runs[] | select(.name == \"$1\")] | sort_by(.created_at) | last
+                    | if . == null then \"none none\" else \"\(.status) \(.conclusion // \"pending\")\" end"
+          }
+          for wf in "Unit Tests" "Integration Tests"; do
+            status=""; conclusion=""
+            for attempt in $(seq 1 40); do
+              read -r status conclusion <<<"$(query "$wf")"
+              [[ "$status" == "completed" ]] && break
+              echo "'${wf}' is ${status}; waiting (attempt ${attempt}/40)..."
+              sleep 30
+            done
+            if [[ "$status" != "completed" || "$conclusion" != "success" ]]; then
+              echo "::error::'${wf}' for ${SHA} is ${status}/${conclusion}. Refusing to publish. Re-run this workflow once the suites are green."
+              exit 1
+            fi
+            echo "'${wf}': success"
+          done
+
+      - name: Install Helm
+        uses: azure/setup-helm@v5.0.1
+        with:
+          version: v3.18.4
+
+      - name: Package chart
+        run: |
+          set -euo pipefail
+          helm dependency build "charts/${{ steps.chart.outputs.chart }}"
+          mkdir -p .cr-release-packages
+          helm package "charts/${{ steps.chart.outputs.chart }}" -d .cr-release-packages
+
+      - name: Attach the package to the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ steps.chart.outputs.tag }}" \
+            ".cr-release-packages/${{ steps.chart.outputs.chart }}-${{ steps.chart.outputs.version }}.tgz" \
+            --clobber
+
+      - name: Push to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
+            --username "${{ github.actor }}" --password-stdin
+          helm push \
+            ".cr-release-packages/${{ steps.chart.outputs.chart }}-${{ steps.chart.outputs.version }}.tgz" \
+            "oci://ghcr.io/aehrc/${{ steps.chart.outputs.chart }}-helm"
+
+      # --merge, not a fresh index: index.yaml carries every previously released chart and version,
+      # and regenerating it from this one package would delete all of them.
+      - name: Update the gh-pages Helm repo index
+        env:
+          CHART: ${{ steps.chart.outputs.chart }}
+          VERSION: ${{ steps.chart.outputs.version }}
+          TAG: ${{ steps.chart.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+          git fetch origin gh-pages
+          git worktree add gh-pages origin/gh-pages
+
+          helm repo index .cr-release-packages \
+            --url "https://github.com/${{ github.repository }}/releases/download/${TAG}" \
+            --merge gh-pages/index.yaml
+          mv .cr-release-packages/index.yaml gh-pages/index.yaml
+
+          cp artifacthub-repo.yml gh-pages/artifacthub-repo.yml
+          if [ -f gh-pages/index.html ]; then
+            sed -i "s|data-chart=\"${CHART}\">[0-9][0-9.]*<|data-chart=\"${CHART}\">${VERSION}<|g" gh-pages/index.html
+          fi
+
+          cd gh-pages
+          git add index.yaml artifacthub-repo.yml
+          [ -f index.html ] && git add index.html
+          git diff --staged --quiet || git commit -m "Release ${CHART} ${VERSION} [skip ci]"
+          git push origin HEAD:gh-pages

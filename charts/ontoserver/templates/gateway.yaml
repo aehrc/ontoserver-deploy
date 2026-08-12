@@ -1,0 +1,164 @@
+{{- if .Values.ontoserver.gateway.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Release.Name }}-gw
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+{{- if or (gt (len .Values.ontoserver.gateway.annotations) 0) .Values.ontoserver.certmanager.enabled }}
+  annotations:
+    {{- with .Values.ontoserver.gateway.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if .Values.ontoserver.certmanager.enabled }}
+    cert-manager.io/issuer:          "{{ .Values.ontoserver.certmanager.clusterIssuerName }}-{{ .Release.Name }}"
+    cert-manager.io/issue-temporary-certificate: "true"
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    {{- end }}
+{{- end }}
+spec:
+  gatewayClassName: {{ required "ontoserver.gateway.className is required" .Values.ontoserver.gateway.className }}
+  {{- if gt (len .Values.ontoserver.gateway.infrastructureAnnotations) 0 }}
+  infrastructure:
+    annotations: {{ toJson .Values.ontoserver.gateway.infrastructureAnnotations }}
+  {{- end }}
+  listeners:
+  {{- if .Values.ontoserver.certmanager.enabled }}
+  # Cert Manager Listener
+    - name: public-http
+      protocol: HTTP
+      port: 80 # This should be always port 80 as per https://cert-manager.io/docs/configuration/acme/http01/#configuring-the-http-01-gateway-api-solver
+      allowedRoutes:
+        namespaces:
+          from: Same
+  {{- end }}
+  {{- if eq (len .Values.ontoserver.hostNames) 0 }}
+    {{- fail "Minimum one entry is required in ontoserver.hostNames" }}
+  {{- end }}
+  {{- /* Gateway API requires a tls block for protocol HTTPS and forbids one for HTTP, so the
+       protocol has to follow ontoserver.tls.enabled. Emitting HTTPS without certificateRefs
+       produces a listener the API server rejects. The listener name stays websecure-N in
+       both cases because the HTTPRoutes below bind to it by sectionName. */ -}}
+  {{- range $i, $host := .Values.ontoserver.hostNames }}
+    - name: websecure-{{ $i }}
+      hostname: {{ $host | quote }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+      {{- if $.Values.ontoserver.tls.enabled }}
+      port: {{ required "ontoserver.gateway.listenerPortSecure is required" $.Values.ontoserver.gateway.listenerPortSecure }}
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $.Values.ontoserver.tls.certRef }}
+      {{- else }}
+      port: {{ required "ontoserver.gateway.listenerPortPlain is required" $.Values.ontoserver.gateway.listenerPortPlain }}
+      protocol: HTTP
+      {{- end }}
+  {{- end }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Release.Name }}-route
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+spec:
+  hostnames:
+    {{- range .Values.ontoserver.hostNames }}
+    - {{ . | quote }}
+    {{- end }}
+  parentRefs:
+  {{- range $i := until (len .Values.ontoserver.hostNames) }}
+    - group: gateway.networking.k8s.io
+      sectionName: websecure-{{ $i }}
+      kind: Gateway
+      name: {{ $.Release.Name }}-gw
+  {{- end }}
+  rules:
+    - backendRefs:
+        - group: ''
+          kind: Service
+          name: {{ .Values.ontoserver.gateway.backendServiceNameOverride | default (printf "%s-ontoserver-service" .Release.Name) }}
+          port: 80
+          weight: 1
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+      {{- if .Values.ontoserver.gateway.requestTimeout }}
+      timeouts:
+        request: "{{ .Values.ontoserver.gateway.requestTimeout }}"
+        backendRequest: "{{ .Values.ontoserver.gateway.requestTimeout }}"
+      {{- end }}
+{{- if and (eq .Values.ontoserver.deployment.kind "StatefulSet") (eq .Values.ontoserver.deployment.type "scaled") }}
+---
+# Dedicated HTTPRoute for $closure — this FHIR operation is stateful and requires all
+# requests to always hit the same Ontoserver instance.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Release.Name }}-closure-route
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+spec:
+  hostnames:
+    {{- range .Values.ontoserver.hostNames }}
+    - {{ . | quote }}
+    {{- end }}
+  parentRefs:
+  {{- range $i := until (len .Values.ontoserver.hostNames) }}
+    - group: gateway.networking.k8s.io
+      sectionName: websecure-{{ $i }}
+      kind: Gateway
+      name: {{ $.Release.Name }}-gw
+  {{- end }}
+  rules:
+    - backendRefs:
+        - group: ''
+          kind: Service
+          name: {{ .Values.ontoserver.gateway.backendServiceNameOverride | default (printf "%s-ontoserver-pod0-service" .Release.Name) }}
+          port: 80
+          weight: 1
+      matches:
+        - path:
+            type: PathPrefix
+            value: /fhir/$closure
+      {{- /* This route had no timeouts block, so it inherited the Gateway implementation's
+           default — typically shorter than the chart's own requestTimeout. $closure builds a
+           transitive closure table and is the longest-running operation the chart routes, so it
+           is the one that least tolerates an implicit timeout. Falls back to requestTimeout. */}}
+      {{- $closureTimeout := .Values.ontoserver.gateway.closureRequestTimeout | default .Values.ontoserver.gateway.requestTimeout }}
+      {{- if $closureTimeout }}
+      timeouts:
+        request: "{{ $closureTimeout }}"
+        backendRequest: "{{ $closureTimeout }}"
+      {{- end }}
+{{- end }}
+{{- if .Values.ontoserver.certmanager.enabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ .Values.ontoserver.certmanager.clusterIssuerName }}-{{ .Release.Name }}
+  labels:
+    {{- include "ontoserver.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-key
+    email: {{ required "ontoserver.certmanager.email required" .Values.ontoserver.certmanager.email }}
+    solvers:
+      - http01:
+          gatewayHTTPRoute:
+            parentRefs:
+              - name: {{ .Release.Name }}-gw
+                namespace: {{ .Release.Namespace }}
+                kind: Gateway
+{{- end }}
+{{- end }}

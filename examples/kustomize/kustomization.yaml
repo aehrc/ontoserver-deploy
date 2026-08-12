@@ -1,0 +1,46 @@
+# kustomization.yaml
+# Example showing how to use Kustomize to add a priorityClassName to Ontoserver.
+#
+# Since priorityClassName is not currently a direct value in the Helm chart,
+# Kustomize is an excellent tool for post-processing the Helm output.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# helmGlobals.chartHome defines the base directory for local Helm charts.
+# This avoids path resolution bugs in some Kustomize versions when name contains slashes.
+helmGlobals:
+  chartHome: ../../charts
+
+# This block enables Kustomize to inflate the Helm chart directly.
+# Requires 'kubectl kustomize . --enable-helm --load-restrictor LoadRestrictionsNone'
+helmCharts:
+  - name: ontoserver
+    releaseName: ontoserver
+    # Explicitly providing a values file avoids a Kustomize bug with local charts
+    valuesFile: values.yaml
+
+# target.labelSelector matches a resource's own metadata labels, not the pod template or
+# selector labels. The chart stamps app.kubernetes.io/name on every resource it creates, so
+# this selector is stable regardless of the releaseName above — unlike the release-scoped
+# 'app: <release>-ontoserver' label, which changes if you rename the release.
+#
+# Only one of these two patches matches any given render: the chart produces a Deployment or a
+# StatefulSet depending on ontoserver.deployment.kind. A patch that matches nothing is not an
+# error in Kustomize, so verify the result rather than assuming it applied:
+#   kubectl kustomize . --enable-helm --load-restrictor LoadRestrictionsNone | grep priorityClassName
+patches:
+  - target:
+      kind: Deployment
+      labelSelector: "app.kubernetes.io/name=ontoserver"
+    patch: |
+      - op: add
+        path: /spec/template/spec/priorityClassName
+        value: system-cluster-critical
+  - target:
+      kind: StatefulSet
+      labelSelector: "app.kubernetes.io/name=ontoserver"
+    patch: |
+      - op: add
+        path: /spec/template/spec/priorityClassName
+        value: system-cluster-critical

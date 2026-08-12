@@ -1,0 +1,113 @@
+{{- if .Values.collector.enabled }}
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: {{ .Release.Name }}-otel-collector
+  labels:
+    {{- include "ontoserver-extras.labels" . | nindent 4 }}
+    app: opentelemetry
+    component: otel-operator
+spec:
+  {{- if .Values.collector.tolerations }}
+  tolerations: {{ toJson .Values.collector.tolerations }}
+  {{- end }}
+  {{- /* The Operator builds the collector Deployment from this CR, so these are CR fields rather
+       than pod-spec fields: spec.podSecurityContext and spec.securityContext (the latter is the
+       *container* context, despite the name). Both verified present on the v1beta1 CRD shipped
+       with operator 0.156.0, each carrying the full Kubernetes type. */}}
+  {{- with .Values.collector.podSecurityContext }}
+  podSecurityContext:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.collector.containerSecurityContext }}
+  securityContext:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  config:
+    receivers:
+      zipkin:
+        endpoint: 0.0.0.0:9411
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 15
+      filter/health_checks:
+        {{- /* Several conditions below call IsMatch() on an attribute that may be absent. The
+             filter processor's default error_mode is `propagate`, which fails the whole batch —
+             so one span missing http.url would discard every span batched with it. `ignore` logs
+             and skips the offending condition instead. The nil guards make the intent explicit;
+             this is the safety net for conditions added later without one. */}}
+        error_mode: ignore
+        traces:
+          span:
+            - attributes["http.url"] != nil and IsMatch(attributes["http.url"], ".*/fhir/metadata.*")
+            - attributes["http.target"] == "/fhir/metadata"
+            - attributes["http.url"] == "/fhir/metadata"
+            - name == "/fhir/metadata"
+            - attributes["http.url"] != nil and IsMatch(attributes["http.url"], ".*/actuator/health.*")
+            - attributes["http.url"] == "/actuator/prometheus"
+            - attributes["http.target"] != nil and IsMatch(attributes["http.target"], ".*/actuator/health.*")
+            - attributes["http.target"] == "/actuator/prometheus"
+            - name != nil and IsMatch(name, ".*/actuator/health.*")
+            - name == "/actuator/prometheus"
+            - name == "get /actuator/prometheus"
+            - attributes["http.route"] == "/actuator/prometheus"
+            - attributes["db.system"] == "postgresql" and attributes["db.statement"] == ""
+            - attributes["otel.scope.name"] == "io.opentelemetry.jdbc" and attributes["db.statement"] == ""
+            {{- /* Guarded on http.url the same way the conditions above are: these fire on the
+                 Varnish cache_lookup spans, and a span without that attribute would otherwise
+                 make IsMatch error. */}}
+            - name == "cache_lookup" and attributes["http.url"] != nil and IsMatch(attributes["http.url"], "/fhir/metadata")
+            - name == "cache_lookup" and attributes["http.url"] != nil and IsMatch(attributes["http.url"], "/actuator/health")
+            - name == "cache_lookup" and attributes["http.url"] == "/actuator/prometheus"
+      batch:
+        send_batch_size: {{ .Values.collector.batch.sendBatchSize }}
+        {{- /* Never 0s: that disables the flush timer, so spans are held until send_batch_size
+             accumulates. On a quiet server — which a terminology server usually is — traces then
+             effectively never ship, and the symptom is "tracing is enabled but nothing arrives". */}}
+        timeout: {{ .Values.collector.batch.timeout | quote }}
+    exporters:
+      {{- if .Values.collector.debug }}
+      debug:
+        verbosity: detailed
+      {{- end }}
+      {{- if .Values.collector.otlpEndpoint }}
+      otlp:
+        endpoint: {{ .Values.collector.otlpEndpoint | quote }}
+        tls:
+          insecure: true
+      {{- end }}
+      {{- if .Values.collector.zipkinEndpoint }}
+      zipkin:
+        endpoint: {{ .Values.collector.zipkinEndpoint | quote }}
+        tls:
+          insecure: true
+      {{- end }}
+    service:
+      pipelines:
+        traces:
+          receivers:
+            - otlp
+            - zipkin
+          processors:
+            - memory_limiter
+            - filter/health_checks
+            - batch
+          exporters:
+            {{- if .Values.collector.debug }}
+            - debug
+            {{- end }}
+            {{- if .Values.collector.otlpEndpoint }}
+            - otlp
+            {{- end }}
+            {{- if .Values.collector.zipkinEndpoint }}
+            - zipkin
+            {{- end }}
+{{- end }}

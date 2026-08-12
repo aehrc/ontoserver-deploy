@@ -1,0 +1,183 @@
+suite: Deployment template tests
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: renders a Deployment by default
+    asserts:
+      - isKind:
+          of: Deployment
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ontoserver-deployment
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  - it: sets replicas from values
+    set:
+      ontoserver.deployment.replicas: 0
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 0
+
+  - it: sets image from values
+    set:
+      ontoserver.deployment.image: quay.io/aehrc/ontoserver:test
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: quay.io/aehrc/ontoserver:test
+
+  - it: renders nothing when kind is StatefulSet
+    set:
+      ontoserver.deployment.kind: StatefulSet
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: sets ontoserver.deployment.readOnly env var to true when isReadOnly true
+    set:
+      ontoserver.deployment.isReadOnly: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ontoserver.deployment.readOnly
+            value: "true"
+
+  - it: sets ontoserver.deployment.readOnly env var to false when isReadOnly false
+    set:
+      ontoserver.deployment.isReadOnly: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ontoserver.deployment.readOnly
+            value: "false"
+
+  - it: fails for scaled deployment with replicas=1
+    set:
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 1
+    asserts:
+      - failedTemplate:
+          errorMessage: "scaled deployments require ontoserver.deployment.replicas should be greater or equal to 2 or 0"
+
+  - it: renders scaled deployment with replicas=2
+    set:
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: false
+    values:
+      - fixtures/external-db-values.yaml
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+
+  - it: fails for single deployment with replicas=2
+    set:
+      ontoserver.deployment.type: single
+      ontoserver.deployment.replicas: 2
+    asserts:
+      - failedTemplate:
+          errorMessage: "single deployments require ontoserver.deployment.replicas < 2"
+
+  - it: fails for unrecognised deployment type
+    set:
+      ontoserver.deployment.type: invalid
+    asserts:
+      - failedTemplate:
+          errorPattern: "ontoserver.deployment.type must be one of the following"
+
+  - it: fails for scaled deployment with sidecar DB enabled
+    set:
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 2
+      ontoserver.deployment.db.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "Scaled deployments require shared database and cannot have the default sidecar database. Set ontoserver.deployment.db.enabled to false and set spring.datasource.url in ontoserver.config to an external db jdbc URL."
+
+  - it: renders scaled deployment with replicas=0 (scale-down)
+    set:
+      ontoserver.deployment.type: scaled
+      ontoserver.deployment.replicas: 0
+      ontoserver.deployment.db.enabled: false
+    values:
+      - fixtures/external-db-values.yaml
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 0
+
+  - it: includes external pull secret in imagePullSecrets when imagePullSecret keys set
+    set:
+      ontoserver.externalSecret.imagePullSecret.data.username.key: quay-creds
+      ontoserver.externalSecret.imagePullSecret.data.password.key: quay-creds
+      ontoserver.externalSecret.secretStoreRef.name: my-store
+    asserts:
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: RELEASE-NAME-ontoserver-pull-secret-external
+
+  # ── Labels ─────────────────────────────────────────────────────────────────
+  - it: stamps the standard labels on the Deployment
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: ontoserver
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: RELEASE-NAME
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm
+      - equal:
+          path: metadata.labels["app.kubernetes.io/part-of"]
+          value: ontoserver
+      - equal:
+          path: metadata.labels["app.kubernetes.io/version"]
+          value: ctsa-6
+      - matchRegex:
+          path: metadata.labels["helm.sh/chart"]
+          pattern: ^ontoserver-[0-9]+\.[0-9]+\.[0-9]+$
+
+  # The selector is baked into existing Deployments and is immutable, so any change here
+  # breaks `helm upgrade` on every already-installed release. It must stay exactly this.
+  - it: keeps the workload selector limited to the release-scoped app label
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app: RELEASE-NAME-ontoserver
+
+  - it: carries both selector and standard labels on the pod template
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["app"]
+          value: RELEASE-NAME-ontoserver
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/name"]
+          value: ontoserver
+
+  - it: still honours user-supplied deployment labels and podLabels
+    set:
+      ontoserver.deployment.labels:
+        my-label: my-value
+      ontoserver.deployment.podLabels:
+        my-pod-label: my-pod-value
+    asserts:
+      - equal:
+          path: metadata.labels["my-label"]
+          value: my-value
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: ontoserver
+      - equal:
+          path: spec.template.metadata.labels["my-pod-label"]
+          value: my-pod-value

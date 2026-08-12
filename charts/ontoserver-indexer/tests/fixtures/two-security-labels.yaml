@@ -1,0 +1,14 @@
+codeSystem:
+  url: http://snomed.info/sct/32506021000036107
+  version: http://snomed.info/sct/32506021000036107/version/20231130
+rf2:
+  files:
+    - https://example.com/snomed.zip
+syndication:
+  endpoint: https://synd.example.com
+  tokenEndpoint: https://auth.example.com/token
+  feed: my-feed
+  entryTitle: My Entry
+  securityLabels:
+    - restricted.read
+    - community.read

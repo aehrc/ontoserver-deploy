@@ -1,0 +1,176 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ontoserver-indexer.jobName" . }}
+  labels:
+    app: {{ include "ontoserver-indexer.jobName" . }}
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ .Values.job.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "ontoserver-indexer.jobName" . }}
+    spec:
+      restartPolicy: Never
+      {{- with .Values.job.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- /* Tri-state: an explicit false must not be treated as unset, so `with` is wrong here. */}}
+      {{- if not (kindIs "invalid" .Values.job.automountServiceAccountToken) }}
+      automountServiceAccountToken: {{ .Values.job.automountServiceAccountToken }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations: {{ toJson .Values.tolerations }}
+      {{- end }}
+      {{- $pullSecrets := .Values.image.imagePullSecrets | default list }}
+      {{- if and .Values.image.credentials.username .Values.image.credentials.password }}
+        {{- $pullSecrets = append $pullSecrets (dict "name" (printf "%s-indexer-pull-secret" .Release.Name)) }}
+      {{- end }}
+      {{- if $pullSecrets }}
+      imagePullSecrets: {{ toJson $pullSecrets }}
+      {{- end }}
+      {{- if or .Values.output.pvcName .Values.input.pvcName .Values.job.extraVolumes }}
+      volumes:
+        {{- if .Values.output.pvcName }}
+        - name: output-volume
+          persistentVolumeClaim:
+            claimName: {{ .Values.output.pvcName }}
+        {{- end }}
+        {{- if .Values.input.pvcName }}
+        - name: input-volume
+          persistentVolumeClaim:
+            claimName: {{ .Values.input.pvcName }}
+            readOnly: true
+        {{- end }}
+        {{- /* Appended last so a caller cannot shadow a chart-managed volume name. */}}
+        {{- with .Values.job.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: indexer
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          {{- with .Values.job.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command: ["/run.sh"]
+          args:
+            - indexCodeSystemDebug
+            - -s
+            - {{ .Values.codeSystem.url | quote }}
+            - -v
+            - {{ .Values.codeSystem.version | quote }}
+            {{- range .Values.rf2.files }}
+            - -f
+            - {{ . | quote }}
+            {{- end }}
+            {{- if ne .Values.codeSystem.url "http://loinc.org" }}
+            - -k
+            - {{ .Values.rf2.kind | lower | quote }}
+            {{- end }}
+            {{- if .Values.syndication.endpoint }}
+            - -synd
+            - {{ .Values.syndication.endpoint | quote }}
+            - -feed
+            - {{ .Values.syndication.feed | quote }}
+            {{- if .Values.syndication.entryFileName }}
+            - -file
+            - {{ .Values.syndication.entryFileName | quote }}
+            {{- end }}
+            - -t
+            - {{ .Values.syndication.entryTitle | quote }}
+            {{- range .Values.syndication.securityLabels }}
+            - -perms
+            - {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.output.path }}
+            - -o
+            - {{ .Values.output.path | quote }}
+            {{- end }}
+          {{- if or .Values.output.pvcName .Values.input.pvcName .Values.job.extraVolumeMounts }}
+          volumeMounts:
+            {{- if .Values.output.pvcName }}
+            - name: output-volume
+              mountPath: /output
+            {{- end }}
+            {{- if .Values.input.pvcName }}
+            - name: input-volume
+              mountPath: {{ .Values.input.mountPath }}
+              readOnly: true
+            {{- end }}
+            {{- /* Appended last so a caller cannot shadow a chart-managed mount path. */}}
+            {{- with .Values.job.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          env:
+            # The JVM max heap is deliberately smaller than the container memory limit.
+            # -Xmx bounds the Java heap only; metaspace, code cache, thread stacks, GC
+            # structures and direct buffers all live outside it and still count towards
+            # the cgroup limit. Setting -Xmx equal to the limit therefore guarantees an
+            # eventual OOMKill. Note the units differ on purpose: -Xmx...g and the limit's
+            # Gi suffix are both powers of two, so the reserve below is a true 2 GiB.
+            - name: JAVA_OPTS
+              value: "-Xmx{{ .Values.resources.heapGb | default (sub .Values.resources.memoryGb 2) }}g"
+            {{- $oauth2SecretName := include "ontoserver-indexer.oauth2SecretName" . }}
+            {{- if $oauth2SecretName }}
+            - name: authentication.oauth.endpoint.0
+              value: {{ .Values.syndication.endpoint | quote }}
+            - name: authentication.oauth.endpoint.token_endpoint.0
+              value: {{ .Values.syndication.tokenEndpoint | quote }}
+            - name: authentication.oauth.endpoint.strategy.0
+              value: body
+            - name: authentication.oauth.endpoint.client_id.0
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $oauth2SecretName }}
+                  key: clientId
+            - name: authentication.oauth.endpoint.client_secret.0
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $oauth2SecretName }}
+                  key: clientSecret
+            {{- end }}
+            {{- $basicSecretName := include "ontoserver-indexer.basicSecretName" . }}
+            {{- if $basicSecretName }}
+            - name: authentication.basic.endpoint.0
+              value: {{ .Values.syndication.endpoint | quote }}
+            - name: authentication.basic.endpoint.user.0
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $basicSecretName }}
+                  key: username
+            - name: authentication.basic.endpoint.password.0
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $basicSecretName }}
+                  key: password
+            {{- end }}
+            {{- range $moduleId, $refsetIds := .Values.languageRefsets.forModule }}
+            - name: language.refset.{{ $moduleId }}
+              value: {{ $refsetIds | quote }}
+            {{- end }}
+            {{- if .Values.resolveSkew }}
+            - name: snomed.editions.resolveSkew
+              value: {{ .Values.resolveSkew | quote }}
+            {{- end }}
+            {{- if .Values.sentry.dsn }}
+            - name: sentry.dsn
+              value: {{ .Values.sentry.dsn | quote }}
+            - name: sentry.environment
+              value: {{ .Values.sentry.environment | quote }}
+            - name: sentry.servername
+              value: {{ .Values.sentry.serverName | quote }}
+            {{- end }}
+          resources:
+            requests:
+              memory: {{ .Values.resources.memoryGb }}Gi
+              cpu: {{ .Values.resources.cpu }}
+            limits:
+              memory: {{ .Values.resources.memoryGb }}Gi
+              cpu: {{ .Values.resources.cpu }}

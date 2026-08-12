@@ -1,0 +1,243 @@
+suite: OpenTelemetry Collector tests
+templates:
+  - templates/otel-collector.yaml
+tests:
+  - it: renders nothing when collector disabled (default)
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders an OpenTelemetryCollector when collector enabled with otlpEndpoint
+    set:
+      collector.enabled: true
+      collector.otlpEndpoint: "http://otel-collector:4317"
+    asserts:
+      - isKind:
+          of: OpenTelemetryCollector
+      - hasDocuments:
+          count: 1
+
+  - it: names the collector correctly
+    set:
+      collector.enabled: true
+      collector.otlpEndpoint: "http://otel-collector:4317"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-otel-collector
+
+  - it: includes otlp exporter when otlpEndpoint set
+    set:
+      collector.enabled: true
+      collector.otlpEndpoint: "http://otel-collector:4317"
+    asserts:
+      - isNotNull:
+          path: spec.config.exporters.otlp
+
+  - it: sets otlp exporter endpoint
+    set:
+      collector.enabled: true
+      collector.otlpEndpoint: "http://otel-collector:4317"
+    asserts:
+      - equal:
+          path: spec.config.exporters.otlp.endpoint
+          value: "http://otel-collector:4317"
+
+  - it: includes zipkin exporter when zipkinEndpoint set
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - isNotNull:
+          path: spec.config.exporters.zipkin
+
+  - it: sets zipkin exporter endpoint
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - equal:
+          path: spec.config.exporters.zipkin.endpoint
+          value: "http://zipkin:9411/api/v2/spans"
+
+  - it: omits otlp exporter when otlpEndpoint not set
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - isNull:
+          path: spec.config.exporters.otlp
+
+  - it: omits zipkin exporter when zipkinEndpoint not set
+    set:
+      collector.enabled: true
+      collector.otlpEndpoint: "http://otel-collector:4317"
+    asserts:
+      - isNull:
+          path: spec.config.exporters.zipkin
+
+  - it: includes debug exporter when debug enabled
+    set:
+      collector.enabled: true
+      collector.otlpEndpoint: "http://otel-collector:4317"
+      collector.debug: true
+    asserts:
+      - isNotNull:
+          path: spec.config.exporters.debug
+
+  - it: omits debug exporter when debug disabled
+    set:
+      collector.enabled: true
+      collector.otlpEndpoint: "http://otel-collector:4317"
+    asserts:
+      - isNull:
+          path: spec.config.exporters.debug
+
+  - it: sets tolerations when provided
+    set:
+      collector.enabled: true
+      collector.otlpEndpoint: "http://otel-collector:4317"
+      collector.tolerations:
+        - key: "dedicated"
+          operator: "Equal"
+          value: "otel"
+          effect: "NoSchedule"
+    asserts:
+      - equal:
+          path: spec.tolerations[0].key
+          value: "dedicated"
+
+  - it: includes both otlp and zipkin in pipeline exporters when both endpoints set
+    set:
+      collector.enabled: true
+      collector.otlpEndpoint: "http://otel-collector:4317"
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - contains:
+          path: spec.config.service.pipelines.traces.exporters
+          content: otlp
+      - contains:
+          path: spec.config.service.pipelines.traces.exporters
+          content: zipkin
+
+  # Regression test. `timeout: 0s` does not mean "flush immediately" — it disables the flush timer,
+  # so spans are held until send_batch_size accumulates. A terminology server is usually quiet, so
+  # 1000 spans could take a very long time and the symptom is "tracing is on but nothing arrives".
+  - it: sets a non-zero batch flush timeout
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - equal:
+          path: spec.config.processors.batch.timeout
+          value: "5s"
+      - notEqual:
+          path: spec.config.processors.batch.timeout
+          value: "0s"
+      - equal:
+          path: spec.config.processors.batch.send_batch_size
+          value: 1000
+
+  - it: allows the batch settings to be overridden
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+      collector.batch.timeout: 200ms
+      collector.batch.sendBatchSize: 50
+    asserts:
+      - equal:
+          path: spec.config.processors.batch.timeout
+          value: "200ms"
+      - equal:
+          path: spec.config.processors.batch.send_batch_size
+          value: 50
+
+  # The filter processor's default error_mode is `propagate`, which fails the entire batch on a
+  # single condition error — so one span missing http.url would discard every span batched with it.
+  - it: sets error_mode ignore on the filter processor
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - equal:
+          path: spec.config.processors["filter/health_checks"].error_mode
+          value: ignore
+
+  # Every IsMatch() call must be nil-guarded. error_mode: ignore is the safety net, but a condition
+  # that errors is still a condition that never matches, so the span it should have dropped gets
+  # exported instead — the guards are what make the filter actually work.
+  - it: nil-guards every IsMatch condition
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - contains:
+          path: spec.config.processors["filter/health_checks"].traces.span
+          content: 'name == "cache_lookup" and attributes["http.url"] != nil and IsMatch(attributes["http.url"], "/fhir/metadata")'
+      - contains:
+          path: spec.config.processors["filter/health_checks"].traces.span
+          content: 'name == "cache_lookup" and attributes["http.url"] != nil and IsMatch(attributes["http.url"], "/actuator/health")'
+      - notContains:
+          path: spec.config.processors["filter/health_checks"].traces.span
+          content: 'name == "cache_lookup" and IsMatch(attributes["http.url"], "/fhir/metadata")'
+
+  # The collector pod is built by the OpenTelemetry Operator from this CR, so hardening it means
+  # setting CR fields, not pod-spec fields. Both names were verified against the v1beta1 CRD
+  # shipped with operator 0.156.0: `spec.podSecurityContext` and `spec.securityContext` — the
+  # latter being the *container* context despite the name. `spec.containerSecurityContext`, the
+  # obvious guess, is not a field on the CRD at all.
+  - it: sets no security context by default
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+    asserts:
+      - isNull:
+          path: spec.podSecurityContext
+      - isNull:
+          path: spec.securityContext
+
+  - it: passes the pod security context to the CR
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+      collector.podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+    asserts:
+      - equal:
+          path: spec.podSecurityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.podSecurityContext.runAsUser
+          value: 10001
+      - equal:
+          path: spec.podSecurityContext.seccompProfile.type
+          value: RuntimeDefault
+
+  - it: passes the container security context to the CR's spec.securityContext
+    set:
+      collector.enabled: true
+      collector.zipkinEndpoint: "http://zipkin:9411/api/v2/spans"
+      collector.containerSecurityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+    asserts:
+      - equal:
+          path: spec.securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.securityContext.capabilities.drop
+          value:
+            - ALL
+      # The name the CRD does NOT define. Asserted so a future rename to the "obvious" spelling
+      # fails here rather than silently producing a CR the Operator ignores.
+      - isNull:
+          path: spec.containerSecurityContext

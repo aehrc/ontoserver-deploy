@@ -1,0 +1,61 @@
+# examples/loinc.yaml
+# Index LOINC and publish to a syndication feed.
+#
+# Usage:
+#   helm install loinc-index ./charts/ontoserver-indexer \
+#     -f charts/ontoserver-indexer/examples/loinc.yaml \
+#     --set auth.oauth2.secretRef=your-secret
+#
+# Note: LOINC requires registration at https://loinc.org/downloads/
+# to obtain the distribution ZIP.
+
+image:
+  repository: quay.io/aehrc/ontoserver
+  tag: ctsa-6
+
+job:
+  activeDeadlineSeconds: 3600   # 1 hour
+
+resources:
+  memoryGb: 8
+
+codeSystem:
+  url: http://loinc.org
+  version: "2.76"   # version number only (not a URL like SNOMED CT)
+
+rf2:
+  # rf2.kind is not used for LOINC and will be ignored
+  files:
+    - https://your-storage/Loinc_2.76.zip   # LOINC distribution ZIP
+
+syndication:
+  endpoint: https://your-syndication-server
+  tokenEndpoint: https://your-auth-server/oauth/token
+  feed: loinc-syndication
+  entryTitle: "LOINC 2.76"
+  entryFileName: loinc-2.76.zip
+  # securityLabels:
+  #   - restricted.read   # restrict read access to users with grouping/restricted.read scope
+  #   - restricted.write  # restrict write access to users with grouping/restricted.write scope
+  # Labels use codes from http://ontoserver.csiro.au/CodeSystem/ontoserver-permissions
+  # Requires ontoserver.security.enabled=fine
+  # See: https://ontoserver.csiro.au/docs/6.24.1/security-model.html
+
+# Provide credentials via an existing Secret with keys: clientId, clientSecret
+# Create it with:
+#   kubectl create secret generic loinc-indexer-oauth \
+#     --from-literal=clientId=YOUR_CLIENT_ID \
+#     --from-literal=clientSecret=YOUR_CLIENT_SECRET
+auth:
+  oauth2:
+    secretRef: loinc-indexer-oauth
+
+# tolerations:
+#   - key: "kubernetes.azure.com/scalesetpriority"
+#     operator: "Equal"
+#     value: "spot"
+#     effect: "NoSchedule"
+
+# sentry:
+#   dsn: ""
+#   environment: "Indexer"

@@ -1,0 +1,171 @@
+{{- /* Validate serverName is in hostNames */ -}}
+{{- $sn := .Values.ontoserver.serverName }}
+{{- $found := false }}
+{{- range .Values.ontoserver.hostNames }}
+  {{- if eq . $sn }}
+    {{- $found = true }}
+  {{- end }}
+{{- end }}
+{{- if not $found }}
+  {{- fail (printf "ontoserver.serverName '%s' must be one of hostNames: %v" $sn .Values.ontoserver.hostNames) }}
+{{- end }}
+
+{{- if and .Values.ontoserver.ingress.enabled .Values.ontoserver.gateway.enabled }}
+  {{- fail "You must choose between Ingress, Gateway API, or IngressRoute!" }}
+{{- end }}
+
+{{- if and .Values.traefik.ingressRoute.enabled .Values.ontoserver.ingress.enabled }}
+  {{- fail "You must choose between Ingress, Gateway API, or IngressRoute!" }}
+{{- end }}
+
+{{- if and .Values.traefik.ingressRoute.enabled .Values.ontoserver.gateway.enabled }}
+  {{- fail "You must choose between Ingress, Gateway API, or IngressRoute!" }}
+{{- end }}
+
+{{- if and .Values.traefik.ingressRoute.serversTransport.enabled (not .Values.traefik.ingressRoute.enabled) }}
+  {{- fail "traefik.ingressRoute.serversTransport.enabled requires traefik.ingressRoute.enabled" }}
+{{- end }}
+
+{{- /* Migration guard for the removed nginx-ingress subchart (chart 0.4.0).
+
+     This has to fail rather than warn. Nothing at the top level of values.schema.json sets
+     additionalProperties: false, so a leftover `nginx-ingress:` block is accepted silently — and
+     the consequence is that `helm upgrade` quietly stops deploying the ingress controller the
+     release depends on, taking the service offline with no error anywhere. Failing here is the
+     only way the operator finds out before the traffic does. */}}
+{{- if hasKey .Values "nginx-ingress" }}
+  {{- fail "the bundled nginx-ingress subchart was removed in ontoserver chart 0.4.0, but `nginx-ingress:` is still set in your values. It is no longer installed by this chart, and leaving the key would silently drop your ingress controller on upgrade. Install a controller separately (e.g. `helm install nginx-ingress nginx-stable/nginx-ingress`), point `ontoserver.ingress.className` at its IngressClass, and remove the `nginx-ingress:` block. See the chart README, 'Ingress'." }}
+{{- end }}
+
+{{- if and (not .Values.ontoserver.deployment.db.enabled) (empty (index .Values.ontoserver.config "spring.datasource.url")) }}
+  {{- fail "If not using sidecar PostgreSQL container ontoserver.deployment.db.enabled=false you must specify ontoserver.config.spring.datasource.url" }}
+{{- end }}
+
+{{- if and (index .Values.ontoserver.config "spring.datasource.url") (and (empty (index .Values.ontoserver.config "spring.datasource.username")) (empty (index .Values.ontoserver.secretConfig "spring.datasource.username"))) }}
+  {{- fail "If using external database and ontoserver.config.spring.datasource.url is specified you also need to specify ontoserver.config.spring.datasource.username" }}
+{{- end }}
+
+{{- if and .Values.ontoserver.metrics.serviceMonitor.enabled (not .Values.ontoserver.managementService.enabled) }}
+  {{- fail "serviceMonitor requires managementService.enabled" }}
+{{- end }}
+
+
+{{- if and .Values.envoygateway.createGatewayClass (not .Values.ontoserver.gateway.enabled) }}
+  {{- fail "envoygateway.createGatewayClass requires ontoserver.gateway.enabled" }}
+{{- end }}
+
+{{- if and .Values.envoygateway.gatewayServiceMonitor.enabled (not .Values.ontoserver.gateway.enabled) }}
+  {{- fail "envoygateway.gatewayServiceMonitor requires ontoserver.gateway.enabled" }}
+{{- end }}
+
+{{- if and .Values.envoygateway.clientTrafficPolicy.enabled (not .Values.ontoserver.gateway.enabled) }}
+  {{- fail "clientTrafficPolicy requires gateway.enabled" }}
+{{- end }}
+
+{{- if and .Values.envoygateway.backendTrafficPolicy.enabled (not .Values.ontoserver.gateway.enabled) }}
+  {{- fail "backendTrafficPolicy requires gateway.enabled" }}
+{{- end }}
+
+{{- if and .Values.envoygateway.securityPolicy.enabled (not .Values.ontoserver.gateway.enabled) }}
+  {{- fail "securityPolicy requires gateway.enabled" }}
+{{- end }}
+
+{{- if and .Values.ontoserver.opentelemetry.instrumentation.enabled (empty .Values.ontoserver.opentelemetry.instrumentation.exporter.endpoint) }}
+  {{- fail "exporter.endpoint required when instrumentation enabled" }}
+{{- end }}
+
+{{- if and .Values.ontoserver.externalSecret.enabled (empty .Values.ontoserver.externalSecret.secretStoreRef.name) }}
+  {{- fail "ontoserver.externalSecret.secretStoreRef.name is required when externalSecret.enabled" }}
+{{- end }}
+
+{{- if and .Values.ontoserver.externalSecret.enabled (empty .Values.ontoserver.externalSecret.data) (empty .Values.ontoserver.externalSecret.dataFrom) }}
+  {{- fail "ontoserver.externalSecret.data or ontoserver.externalSecret.dataFrom must be specified when externalSecret.enabled" }}
+{{- end }}
+
+{{- /* cert-manager issues a Kubernetes TLS secret, but ALB only supports TLS termination via ACM
+     certificate ARNs — it cannot read Kubernetes TLS secrets. Enabling cert-manager with ALB
+     ingress will issue a cert that is never used, and HTTPS will not work. Use ACM instead, or
+     switch to nginx ingress which supports Kubernetes TLS secrets. */ -}}
+{{- if and .Values.ontoserver.certmanager.enabled .Values.ontoserver.ingress.enabled (eq .Values.ontoserver.ingress.className "alb") }}
+  {{- fail "certmanager is not compatible with ALB ingress: ALB only supports TLS via ACM certificate ARNs, not Kubernetes TLS secrets. Use alb.ingress.kubernetes.io/certificate-arn instead, or switch to nginx ingress." }}
+{{- end }}
+
+{{- /* cert-manager's Gateway API integration populates the Secret named by an existing
+     listener certificateRef; it cannot add TLS to a listener that has none. The same applies
+     to the Ingress path, where the tls block is only rendered when tls.enabled. Checked after
+     the ALB rule above so that the more specific ALB diagnosis wins for that combination. */ -}}
+{{- if and .Values.ontoserver.certmanager.enabled (not .Values.ontoserver.tls.enabled) }}
+  {{- fail "ontoserver.certmanager.enabled requires ontoserver.tls.enabled: cert-manager fills the Secret referenced by ontoserver.tls.certRef and cannot attach TLS to a listener that does not request it." }}
+{{- end }}
+
+{{- /* A Gateway with TLS disabled serves plaintext HTTP. That is a valid choice for local
+     development or when TLS terminates upstream, but it must never happen by accident on a
+     public terminology server, so it has to be opted into explicitly. Checked last of the
+     TLS rules so the ALB and cert-manager diagnoses above win when they apply. */ -}}
+{{- if and .Values.ontoserver.gateway.enabled (not .Values.ontoserver.tls.enabled) (not .Values.ontoserver.gateway.allowPlaintext) }}
+  {{- fail "ontoserver.gateway.enabled with ontoserver.tls.enabled=false would expose Ontoserver over plaintext HTTP. Set ontoserver.tls.enabled=true and provide ontoserver.tls.certRef (optionally with certmanager.enabled), or set ontoserver.gateway.allowPlaintext=true to accept a plaintext listener." }}
+{{- end }}
+
+{{- /* Scaled deployments must use StatefulSet. A scaled Deployment with persistence enabled
+     would share a single PVC across all replicas — Lucene cannot handle concurrent index
+     writes from multiple instances and this would cause index corruption. StatefulSet
+     volumeClaimTemplates provision a dedicated ReadWriteOnce volume per pod instead. */ -}}
+{{- if and (eq .Values.ontoserver.deployment.type "scaled") (eq .Values.ontoserver.deployment.kind "Deployment") .Values.ontoserver.deployment.persistence.enabledForDeployment }}
+  {{- fail "Scaled deployments with persistence must use kind: StatefulSet, not Deployment. A scaled Deployment shares a single PVC across all replicas causing Lucene index corruption. StatefulSet volumeClaimTemplates provision a dedicated ReadWriteOnce volume per pod." }}
+{{- end }}
+
+{{- /* Scaled deployments are read-only. Each replica keeps its own Lucene index on its own
+     volumeClaimTemplates PVC, so a write served by one replica is invisible to the index of
+     every other replica — reads that round-robin to a different pod then fail on
+     index-backed operations ($expand, $validate-code) even though the row is in the shared
+     database. $closure is the one stateful operation that remains available, which is why it
+     is pinned to pod-0 via <release>-ontoserver-pod0-service. */ -}}
+{{- if and (eq .Values.ontoserver.deployment.type "scaled") (not .Values.ontoserver.deployment.isReadOnly) (not .Values.ontoserver.deployment.allowScaledReadWrite) }}
+  {{- fail "Scaled deployments must set ontoserver.deployment.isReadOnly: true. Read-write is not supported when scaled: each replica has its own Lucene index, so content written through the round-robin Service is only indexed on the replica that served the write and $expand/$validate-code fail on the others. Load content with a single-instance read-write deployment, then serve it scaled and read-only. Set ontoserver.deployment.allowScaledReadWrite=true to opt in to the experimental topology anyway." }}
+{{- end }}
+
+{{- if and (eq .Values.ontoserver.deployment.kind "StatefulSet") .Values.ontoserver.deployment.persistence.files.existingVolume.enabled }}
+  {{- fail "StatefulSet deployments do not support ontoserver.deployment.persistence.files.existingVolume. Each replica needs its own volume; use dynamic provisioning via storageClass or a Deployment for single-instance prebound volumes." }}
+{{- end }}
+
+{{- if and (eq .Values.ontoserver.deployment.kind "StatefulSet") .Values.ontoserver.deployment.persistence.dbfiles.existingVolume.enabled }}
+  {{- fail "StatefulSet deployments do not support ontoserver.deployment.persistence.dbfiles.existingVolume. Each replica needs its own volume; use dynamic provisioning via storageClass or a Deployment for single-instance prebound volumes." }}
+{{- end }}
+
+{{- $ipsUsername := .Values.ontoserver.externalSecret.imagePullSecret.data.username.key }}
+{{- $ipsPassword := .Values.ontoserver.externalSecret.imagePullSecret.data.password.key }}
+{{- if or $ipsUsername $ipsPassword }}
+  {{- if not (and $ipsUsername $ipsPassword) }}
+    {{- fail "ontoserver.externalSecret.imagePullSecret: both data.username.key and data.password.key must be set together" }}
+  {{- end }}
+{{- end }}
+
+{{- /* Resource names must fit within Kubernetes' limits, and the release name is a prefix on
+     every one of them. Helm caps a release name at 53 characters, which is NOT low enough to keep
+     the chart's longest names legal, so the gap has to be checked here.
+
+     Verified on a cluster rather than assumed, because the obvious guess is wrong:
+       - Service names are DNS *labels*, hard-capped at 63. "<release>-ontoserver-clustering-service"
+         adds 30, so a release name over 33 produces a Service the API server rejects.
+       - StatefulSet names are also capped at 63; "<release>-statefulset" adds 12, so the limit
+         there is 51.
+       - PVC names are NOT capped at 63 — they are DNS subdomains (253). A 108-character
+         volumeClaimTemplate PVC name was created and Bound successfully, so the release name
+         appearing twice in it is harmless.
+       - Deployment names are likewise not capped at 63; a 120-character one was accepted.
+
+     Failing here matters because the partial-apply is the bad outcome: Helm creates what it can
+     and rejects one Service, leaving a half-installed release. */}}
+{{- $r := len .Release.Name }}
+{{- /* The longest Service name the chart can emit. Both the clustering and management Services
+     add 30 characters; keep this in step if a longer Service name is ever added. */}}
+{{- $svcMax := sub 63 (len "-ontoserver-clustering-service") }}
+{{- if gt $r $svcMax }}
+  {{- fail (printf "release name '%s' is %d characters; this chart allows at most %d. Service names are limited to 63 characters and the chart appends up to %d ('<release>-ontoserver-clustering-service'), so a longer release name produces a Service the API server rejects — leaving a partially installed release. Use a shorter release name." .Release.Name $r $svcMax (len "-ontoserver-clustering-service")) }}
+{{- end }}
+{{- if eq .Values.ontoserver.deployment.kind "StatefulSet" }}
+  {{- $stsMax := sub 63 (len "-statefulset") }}
+  {{- if gt $r $stsMax }}
+    {{- fail (printf "release name '%s' is %d characters; a StatefulSet deployment allows at most %d, because the StatefulSet is named '<release>-statefulset' and that is limited to 63 characters. Use a shorter release name." .Release.Name $r $stsMax) }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,264 @@
+suite: validate-values tests
+templates:
+  - templates/validate-values.yaml
+
+tests:
+  # The `set` block below is anchored as *snomed and reused by the tests that follow.
+  # It must stay on the first test: a YAML anchor has to be defined before it is aliased,
+  # and helm-unittest rejects unknown top-level keys, so it cannot live outside `tests`.
+  - it: passes with all required SNOMED values set
+    set: &snomed
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      rf2.kind: FULL
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: passes with all required LOINC values set
+    set:
+      codeSystem.url: http://loinc.org
+      codeSystem.version: "2.76"
+      rf2.files[0]: https://example.com/Loinc_2.76.zip
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: loinc
+      syndication.entryTitle: LOINC 2.76
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: rf2.kind validation is skipped for LOINC
+    set:
+      codeSystem.url: http://loinc.org
+      codeSystem.version: "2.76"
+      rf2.files[0]: https://example.com/Loinc_2.76.zip
+      rf2.kind: INVALID
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: loinc
+      syndication.entryTitle: LOINC 2.76
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when codeSystem.url is empty
+    set:
+      <<: *snomed
+      codeSystem.url: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "codeSystem.url is required"
+
+  - it: fails when codeSystem.version is empty
+    set:
+      <<: *snomed
+      codeSystem.version: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "codeSystem.version is required"
+
+  - it: fails when rf2.files is empty
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.kind: FULL
+      syndication.endpoint: https://synd.example.com
+      syndication.tokenEndpoint: https://auth.example.com/token
+      syndication.feed: my-feed
+      syndication.entryTitle: My Entry
+    asserts:
+      - failedTemplate:
+          errorMessage: "rf2.files must contain at least one URL"
+
+  - it: fails when rf2.kind is invalid for SNOMED
+    set:
+      <<: *snomed
+      rf2.kind: INVALID
+    asserts:
+      - failedTemplate:
+          errorMessage: "rf2.kind must be one of: FULL, SNAPSHOT"
+
+  - it: fails when rf2.kind is DELTA for SNOMED
+    set:
+      <<: *snomed
+      rf2.kind: DELTA
+    asserts:
+      - failedTemplate:
+          errorMessage: "rf2.kind must be one of: FULL, SNAPSHOT"
+
+  - it: fails when neither syndication.endpoint nor output.path is set
+    set:
+      <<: *snomed
+      syndication.endpoint: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "either syndication.endpoint or output.path must be set"
+
+  - it: passes with output.path only (no syndication.endpoint)
+    set:
+      codeSystem.url: http://snomed.info/sct/32506021000036107
+      codeSystem.version: http://snomed.info/sct/32506021000036107/version/20231130
+      rf2.files[0]: https://example.com/snomed.zip
+      rf2.kind: FULL
+      output.path: /output/snomed-au-20231130.zip
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: passes with both syndication.endpoint and output.path set
+    set:
+      <<: *snomed
+      output.path: /output/snomed-au-20231130.zip
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when syndication.endpoint set but syndication.feed is empty
+    set:
+      <<: *snomed
+      syndication.feed: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "syndication.feed is required when syndication.endpoint is set"
+
+  - it: fails when syndication.endpoint set but syndication.entryTitle is empty
+    set:
+      <<: *snomed
+      syndication.entryTitle: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "syndication.entryTitle is required when syndication.endpoint is set"
+
+  - it: fails when output.pvcName set but output.path is empty
+    set:
+      <<: *snomed
+      output.pvcName: my-pvc
+    asserts:
+      - failedTemplate:
+          errorMessage: "output.path is required when output.pvcName is set"
+
+  - it: passes when output.pvcName and output.path are both set
+    set:
+      <<: *snomed
+      output.pvcName: my-pvc
+      output.path: /output/snomed-au-20231130.zip
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when oauth2 configured but syndication.tokenEndpoint is empty
+    set:
+      <<: *snomed
+      syndication.tokenEndpoint: ""
+      auth.oauth2.secretRef: my-secret
+    asserts:
+      - failedTemplate:
+          errorMessage: "syndication.tokenEndpoint is required when oauth2 auth is configured"
+
+  - it: passes when syndication.tokenEndpoint empty with basic auth
+    set:
+      <<: *snomed
+      syndication.tokenEndpoint: ""
+      auth.basic.secretRef: my-secret
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when both oauth2 and basic auth configured
+    set:
+      <<: *snomed
+      auth.oauth2.clientId: my-client
+      auth.basic.username: my-user
+    asserts:
+      - failedTemplate:
+          errorMessage: "auth.oauth2 and auth.basic are mutually exclusive"
+
+  - it: fails when oauth2 secretRef and clientId both set
+    set:
+      <<: *snomed
+      auth.oauth2.secretRef: my-secret
+      auth.oauth2.clientId: my-client
+    asserts:
+      - failedTemplate:
+          errorMessage: "auth.oauth2.secretRef and auth.oauth2.clientId are mutually exclusive"
+
+  - it: fails when basic secretRef and username both set
+    set:
+      <<: *snomed
+      auth.basic.secretRef: my-secret
+      auth.basic.username: my-user
+    asserts:
+      - failedTemplate:
+          errorMessage: "auth.basic.secretRef and auth.basic.username are mutually exclusive"
+
+  - it: passes with no auth configured
+    set:
+      <<: *snomed
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when oauth2 clientId set but clientSecret missing
+    set:
+      <<: *snomed
+      auth.oauth2.clientId: my-client
+    asserts:
+      - failedTemplate:
+          errorMessage: "auth.oauth2.clientSecret is required when auth.oauth2.clientId is set"
+
+  - it: fails when basic username set but password missing
+    set:
+      <<: *snomed
+      auth.basic.username: my-user
+    asserts:
+      - failedTemplate:
+          errorMessage: "auth.basic.password is required when auth.basic.username is set"
+
+  - it: fails when memoryGb is too small to leave a non-heap reserve
+    set:
+      <<: *snomed
+      resources.memoryGb: 2
+    asserts:
+      - failedTemplate:
+          errorMessage: "resources.memoryGb must be at least 3 to leave a 2Gi non-heap reserve (got 2). Set resources.heapGb explicitly to override the default heap sizing."
+
+  - it: fails when heapGb equals memoryGb
+    set:
+      <<: *snomed
+      resources.memoryGb: 20
+      resources.heapGb: 20
+    asserts:
+      - failedTemplate:
+          errorMessage: "resources.heapGb (20) must be less than resources.memoryGb (20): the JVM heap cannot fill the entire container memory limit"
+
+  - it: fails when heapGb exceeds memoryGb
+    set:
+      <<: *snomed
+      resources.memoryGb: 8
+      resources.heapGb: 12
+    asserts:
+      - failedTemplate:
+          errorMessage: "resources.heapGb (12) must be less than resources.memoryGb (8): the JVM heap cannot fill the entire container memory limit"
+
+  - it: passes when heapGb leaves headroom below memoryGb
+    set:
+      <<: *snomed
+      resources.memoryGb: 32
+      resources.heapGb: 26
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: passes at the minimum viable memoryGb
+    set:
+      <<: *snomed
+      resources.memoryGb: 3
+    asserts:
+      - hasDocuments:
+          count: 0

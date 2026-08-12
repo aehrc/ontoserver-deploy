@@ -1,7 +1,0 @@
-certissuer:
-  name:  letsencrypt
-  tls:
-    key:
-  email: support@example.com
-  ingress:
-    class: nginx

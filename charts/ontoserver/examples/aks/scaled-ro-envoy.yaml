@@ -1,0 +1,140 @@
+# aks/scaled-ro-envoy.yaml
+# Scaled read-only Ontoserver on Azure Kubernetes Service (AKS).
+# Networking: Gateway API with Envoy Gateway.
+#
+# Runs multiple read-only instances behind a shared PostgreSQL database.
+# Each instance maintains its own local Lucene index cache on dedicated
+# Azure Disk storage — indexes are NOT shared between instances. Infinispan
+# handles cache invalidation across the cluster so all instances stay
+# consistent after content updates.
+#
+# This is the recommended topology for high-availability production servers
+# where downtime is unacceptable, for example: tx.ontoserver.csiro.au/fhir
+#
+# ── How it works ──────────────────────────────────────────────────────────────
+#   - PostgreSQL is the single source of truth for all FHIR resources.
+#   - Each pod builds and caches Lucene indexes locally on its own Azure Disk.
+#     Ontoserver checks at startup whether indexes exist and builds any missing.
+#   - Infinispan cluster communication (via headless DNS service) propagates
+#     cache invalidation so instances evict stale indexes after a write.
+#   - New pods experience a warm-up period while indexes are built on first use.
+#   - Pre-attaching a disk with existing indexes (e.g. from a snapshot) avoids
+#     the warm-up delay on pod replacement.
+#
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+#   - External PostgreSQL (Azure Database for PostgreSQL Flexible Server)
+#   - Envoy Gateway installed:
+#       kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/v1.3.1/install.yaml
+#   - Azure Disk CSI driver enabled (default on AKS)
+#   - cert-manager installed (optional, for TLS)
+#
+# Usage:
+#   helm install my-ontoserver ./charts/ontoserver -f aks/scaled-ro-envoy.yaml \
+#     --set ontoserver.imageCredentials.username=<quay-username> \
+#     --set ontoserver.imageCredentials.password=<quay-password>
+
+ontoserver:
+  serverName: ontoserver.example.com
+  hostNames:
+    - ontoserver.example.com
+
+  deployment:
+    # Image pull auth:
+    # - preferred for production: create a docker-registry Secret and reference it here
+    # - alternative: pass ontoserver.imageCredentials.username/password via --set at install time
+    imagePullSecrets:
+      - name: ontoserver-quay-pull-secret
+    kind: StatefulSet
+    type: scaled
+    image: quay.io/aehrc/ontoserver:ctsa-6
+    replicas: 2
+    isReadOnly: true
+
+    # clusterName scopes Infinispan discovery to this deployment.
+    # Change this if running multiple Ontoserver StatefulSets in the same namespace.
+    clusterName: "ontoserver-prod"
+
+    db:
+      enabled: false   # external PostgreSQL required — sidecar not supported for scaled
+
+    persistence:
+      # Azure Disk (Premium_LRS) — ReadWriteOnce per pod. StatefulSet
+      # volumeClaimTemplates provision a dedicated disk for each pod so
+      # Lucene indexes are never shared between instances.
+      files:
+        accessMode: ReadWriteOnce
+        storageSize: 50G   # per-pod disk for Lucene indexes — size for your terminology set
+        storageClass:
+          provided:
+            enabled: true
+            storageProvisioner: disk.csi.azure.com
+            reclaimPolicy: Retain
+            allowVolumeExpansion: true
+            storageParameters:
+              skuName: Premium_LRS
+              kind: Managed
+
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1   # keep at least 1 instance available during updates
+
+  config:
+    # External PostgreSQL connection — replace with your server details.
+    spring.datasource.url: "jdbc:postgresql://your-pg-server.postgres.database.azure.com:5432/ontoserver"
+    spring.datasource.username: "ontoserver"
+    # spring.datasource.password — set via secretConfig or externalSecret below
+
+  gateway:
+    enabled: true
+    className: envoy-gateway-class
+
+  tls:
+    enabled: true
+    certRef: ontoserver-tls
+  certmanager:
+    enabled: true
+    clusterIssuerName: letsencrypt-prod
+    email: your-email@example.com
+
+  resources:
+    ontoserver:
+      requests:
+        cpu: 2
+        memory: 4G
+      limits:
+        cpu: 4
+        memory: 8G
+      initialHeapSize: 6000m
+      maxHeapSize: 6000m
+
+  # ── Database password ─────────────────────────────────────────────────────
+  # Option A: inline secret (not recommended for production)
+  # secretConfig:
+  #   spring.datasource.password: "your-password"
+  #
+  # Option B: External Secrets Operator (recommended)
+  # externalSecret:
+  #   enabled: true
+  #   secretStoreRef:
+  #     name: azure-keyvault-store
+  #     kind: ClusterSecretStore
+  #   data:
+  #     - secretKey: spring.datasource.password
+  #       remoteRef:
+  #         key: ontoserver-db-password
+
+# ── Envoy Gateway traffic policies (optional) ─────────────────────────────
+# envoygateway:
+#   clientTrafficPolicy:
+#     enabled: true
+#     idleTimeout: 300s
+#   backendTrafficPolicy:
+#     enabled: true
+#     requestBufferLimit: 1Gi
+#     rateLimit:
+#       requests: 100
+#       unit: Second
+#   securityPolicy:
+#     enabled: true
+#     defaultAction: Allow
+#     deniedCIDRs: []
