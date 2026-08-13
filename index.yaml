@@ -3,6 +3,7 @@ entries:
   ontoserver:
   - annotations:
       artifacthub.io/category: integration-delivery
+      artifacthub.io/verified: "true"
       artifacthub.io/changes: |
         - kind: added
           description: Opt-in pod and container securityContext values (unset by default, so upgrades roll no pods)
@@ -46,6 +47,7 @@ entries:
     version: 0.4.0
   - annotations:
       artifacthub.io/category: integration-delivery
+      artifacthub.io/verified: "true"
       artifacthub.io/changes: |
         - kind: added
           description: Initial public release
@@ -82,6 +84,7 @@ entries:
     version: 0.3.0
   - annotations:
       artifacthub.io/category: integration-delivery
+      artifacthub.io/verified: "true"
       artifacthub.io/changes: |
         - kind: added
           description: Initial public release
@@ -117,6 +120,7 @@ entries:
   ontoserver-extras:
   - annotations:
       artifacthub.io/category: integration-delivery
+      artifacthub.io/verified: "true"
       artifacthub.io/changes: |
         - kind: fixed
           description: Varnish now restarts when the VCL changes (checksum/config pod annotation)
@@ -155,6 +159,7 @@ entries:
     version: 0.1.1
   - annotations:
       artifacthub.io/category: integration-delivery
+      artifacthub.io/verified: "true"
       artifacthub.io/changes: |
         - kind: added
           description: Initial public release
@@ -186,6 +191,7 @@ entries:
   ontoserver-indexer:
   - annotations:
       artifacthub.io/category: integration-delivery
+      artifacthub.io/verified: "true"
       artifacthub.io/changes: |
         - kind: added
           description: resources.heapGb to size the JVM heap independently of the container memory limit
@@ -220,6 +226,7 @@ entries:
     version: 0.2.0
   - annotations:
       artifacthub.io/category: integration-delivery
+      artifacthub.io/verified: "true"
       artifacthub.io/changes: |
         - kind: added
           description: Initial public release
