@@ -74,15 +74,26 @@ The chart supports four deployment combinations controlled by `ontoserver.deploy
 
 |  | `single` | `scaled` |
 |---|---|---|
-| **`Deployment`** | One-replica Deployment | Multi-replica Deployment |
-| **`StatefulSet`** | One-replica StatefulSet (per-pod PVCs) | Multi-replica StatefulSet (per-pod PVCs) |
+| **`Deployment`** | One-replica Deployment | Multi-replica Deployment (read-only) |
+| **`StatefulSet`** | One-replica StatefulSet (per-pod PVCs) | Multi-replica StatefulSet (per-pod PVCs, read-only) |
+
+> ### ⚠️ Scaled deployments are read-only. Scaled read-write is not supported.
+>
+> This is not a chart limitation and there is no flag to override it. **Ontoserver forces read-only
+> on any scaled deployment**: setting `ontoserver.deployment.scaled` makes the server reject writes
+> regardless of what else is configured, so a scaled read-write server is not a topology that exists.
+> The chart therefore refuses to render `type: scaled` with `isReadOnly: false` rather than deploy
+> something that cannot work.
+>
+> Load content with a **single-instance read-write** deployment, then publish it to a syndication
+> server and serve it from a **scaled read-only** cluster. See
+> [Production recommendations](#production-recommendations).
 
 **Constraints:**
 - `scaled` requires `replicas` ≥ 2 (or 0 to scale to zero). `single` requires `replicas` < 2.
 - `scaled` deployments cannot use the Postgres sidecar — an external database is required.
-- `isReadOnly: true` is **required** for all scaled deployments — the chart refuses to render otherwise. Each replica maintains its own Lucene index on its own PVC, so content written through the round-robin Service is indexed only on the replica that served the write; requests that land on any other replica then fail. Integration tests confirm this on a scaled install: `ValueSet/$expand` and `CodeSystem/$validate-code` return HTTP 500 while the resources are present in the shared database and `$lookup` and `$translate` succeed. To ingest content, use a single-instance read-write deployment, then serve it scaled and read-only.
+- `isReadOnly: true` is **required** for all scaled deployments — the chart refuses to render otherwise, and there is no opt-out. Ontoserver itself forces read-only whenever the deployment is scaled, so a scaled read-write server does not exist to configure. Each replica also maintains its own Lucene index on its own PVC, so content written through the round-robin Service is indexed only on the replica that served the write; requests that land on any other replica then fail. Integration tests confirm this on a scaled install: `ValueSet/$expand` and `CodeSystem/$validate-code` return HTTP 500 while the resources are present in the shared database and `$lookup` and `$translate` succeed. To ingest content, use a single-instance read-write deployment, then serve it scaled and read-only.
 - `$closure` remains available in scaled read-only mode. It is a stateful operation, so it must always be routed to one specific pod — the chart provisions `<release>-ontoserver-pod0-service` for that and the `$closure` integration test verifies the routing.
-- Scaled read-write can be opted into with `allowScaledReadWrite: true`, as the `scaled-rw-envoy-experimental.yaml` examples do. It is untested, known-broken per the above, and **must not be used in production**.
 - `clusterName` sets `ontoserver.cluster.name` for auto-discovery, allowing independent scaled clusters on the same network. Defaults to `ontoserver` (the application default) when unset.
 - `StatefulSet` kind always provisions PVCs via `volumeClaimTemplates`. `Deployment` kind requires `persistence.enabledForDeployment: true` to use PVCs.
 - The `PodDisruptionBudget` is rendered **only for `scaled`** deployments. A single instance owns its Lucene index on a ReadWriteOnce PVC and must be replaced rather than kept available during a disruption, so a PDB there would block node drains without protecting anything. Set exactly one of `minAvailable` or `maxUnavailable` — both accept a whole number or a percentage string (`"25%"`), and the chart fails if both or neither are set. `minAvailable: 1` is the default, so clear it (`minAvailable: null`) when you want `maxUnavailable`.
@@ -129,6 +140,7 @@ ontoserver:
 
 | `kind` | `type` | Database | Storage | Reason |
 |---|---|---|---|---|
+| *any* | `scaled` | *any* | *any* | **Read-write is not supported when scaled.** Hard rejected by the chart, and Ontoserver forces read-only on a scaled deployment regardless. There is no opt-in flag |
 | `Deployment` | `scaled` | Sidecar | — | Hard rejected by the chart — scaled deployments require an external database |
 | `Deployment` | `scaled` | External | `ReadWriteOnce` | All pods share one PVC; only one pod can mount it |
 | `Deployment` | `scaled` | External | `ReadWriteMany` | All pods share the same directory; Lucene `write.lock` conflicts corrupt indexes |
@@ -1177,8 +1189,7 @@ Requires the [External Secrets Operator](https://external-secrets.io/) installed
 | `ontoserver.deployment.containerPort`                                                       | Container port Ontoserver listens on. Use 8080 for HTTP (ONTOSERVER_INSECURE=true) or 8443 for HTTPS (ONTOSERVER_INSECURE=false).                                                                                                                                                                                                                                                      | `8080`                            |
 | `ontoserver.deployment.lifecycle`                                                           | Container lifecycle hooks (postStart / preStop). Passed through as-is to the container spec.                                                                                                                                                                                                                                                                                           | `{}`                              |
 | `ontoserver.deployment.imagePullSecrets`                                                    | Additional pre-created image pull secrets to attach to the pod (merged with the chart-managed pull secret when imageCredentials are set)                                                                                                                                                                                                                                               | `[]`                              |
-| `ontoserver.deployment.isReadOnly`                                                          | Ontoserver in read‑only mode. Required to be true when type is scaled; see allowScaledReadWrite.                                                                                                                                                                                                                                                                                       | `true`                            |
-| `ontoserver.deployment.allowScaledReadWrite`                                                | Opt in to the unsupported scaled read-write topology. Each replica has its own Lucene index, so content written through the round-robin Service is only indexed on the replica that served the write and $expand / $validate-code fail on the others. Load content with a single-instance read-write deployment instead, then serve it scaled and read-only.                           | `false`                           |
+| `ontoserver.deployment.isReadOnly`                                                          | Ontoserver in read‑only mode. Must be true when type is scaled — Ontoserver forces read-only on a scaled deployment regardless of this setting.                                                                                                                                                                                                                                        | `true`                            |
 | `ontoserver.deployment.replicas`                                                            | Number of replicas - min 2 for scaled deployment - can be set to 0                                                                                                                                                                                                                                                                                                                     | `1`                               |
 | `ontoserver.deployment.podManagementPolicy`                                                 | StatefulSet pod management policy (Parallel or OrderedReady); ignored when kind is Deployment. Parallel starts and replaces pods without waiting for Ready, so a multi-replica rolling update can leave the Service with no ready endpoint; OrderedReady waits for each pod to become Ready first. Immutable on a live StatefulSet - see the README for the --cascade=orphan recreate. | `Parallel`                        |
 | `ontoserver.deployment.clusterName`                                                         | Cluster name for auto-discovery in scaled deployments (overrides the default "ontoserver" set in application.properties); ignored for single deployments                                                                                                                                                                                                                               | `""`                              |

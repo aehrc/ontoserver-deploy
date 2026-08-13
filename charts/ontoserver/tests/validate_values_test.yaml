@@ -184,7 +184,7 @@ tests:
       ontoserver.deployment.isReadOnly: false
     asserts:
       - failedTemplate:
-          errorMessage: "Scaled deployments must set ontoserver.deployment.isReadOnly: true. Read-write is not supported when scaled: each replica has its own Lucene index, so content written through the round-robin Service is only indexed on the replica that served the write and $expand/$validate-code fail on the others. Load content with a single-instance read-write deployment, then serve it scaled and read-only. Set ontoserver.deployment.allowScaledReadWrite=true to opt in to the experimental topology anyway."
+          errorMessage: "Scaled deployments must set ontoserver.deployment.isReadOnly: true. Ontoserver forces read-only on a scaled deployment, and each replica has its own Lucene index, so content written through the round-robin Service is only indexed on the replica that served the write and $expand/$validate-code fail on the others. Load content with a single-instance read-write deployment, then serve it scaled and read-only."
 
   - it: allows a scaled deployment that is read-only
     values:
@@ -192,17 +192,17 @@ tests:
     asserts:
       - notFailedTemplate: {}
 
-  # The two shipped scaled-rw-envoy-experimental.yaml examples rely on this opt-out, and CI
-  # renders every tracked example, so removing it would fail the render sweep rather than
-  # silently drop coverage.
-  - it: allows a scaled read-write deployment when explicitly opted in
+  # Scaled read-write has no opt-out: Ontoserver forces read-only whenever
+  # ontoserver.deployment.scaled is set, so the chart refuses to render the topology at all.
+  - it: fails a scaled read-write deployment even with an unknown opt-in value set
     values:
       - fixtures/scaled-values.yaml
     set:
       ontoserver.deployment.isReadOnly: false
       ontoserver.deployment.allowScaledReadWrite: true
     asserts:
-      - notFailedTemplate: {}
+      - failedTemplate:
+          errorMessage: "Scaled deployments must set ontoserver.deployment.isReadOnly: true. Ontoserver forces read-only on a scaled deployment, and each replica has its own Lucene index, so content written through the round-robin Service is only indexed on the replica that served the write and $expand/$validate-code fail on the others. Load content with a single-instance read-write deployment, then serve it scaled and read-only."
 
   # A single-instance deployment is the supported way to load content, so read-write there
   # must stay legal — the guard has to key on `type`, not on isReadOnly alone.
