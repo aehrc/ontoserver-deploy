@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1](https://github.com/aehrc/ontoserver-deploy/compare/ontoserver-0.4.0...ontoserver-v0.4.1) (2026-08-13)
+
+
+### Fixed
+
+* exclude changelog.md by name instead of a helmignore negation ([38cc427](https://github.com/aehrc/ontoserver-deploy/commit/38cc427ba61bcc68407c49bb5976c3662bcce163))
+* unignore README.md in helm packages ([1bdcd4e](https://github.com/aehrc/ontoserver-deploy/commit/1bdcd4e1545925206aa56b97ed521edfd356cfe3))
+
 ## [0.4.0] - 2026-08-12
 
 ### Removed
