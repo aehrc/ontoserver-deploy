@@ -201,7 +201,7 @@ ontoserver:
   ## @param ontoserver.serverName                          Server hostname - must match a hostName at ontoserver.hostNames
   serverName: localhost
   ## @param ontoserver.serverPort                          Non-standard port exposed to clients (e.g. 8080 when port-forwarding or k3d maps 8080:80). Leave empty for standard ports (80/443).
-  serverPort: "8080"
+  serverPort: ""
   ## @param ontoserver.hostNames                           Hostnames for ingress/gateway
   hostNames:
     - localhost
