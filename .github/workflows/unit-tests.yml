@@ -15,8 +15,38 @@ env:
   # Must match the version the helm-readme-generator skill uses, or the drift check below
   # will disagree with locally generated tables.
   README_GENERATOR_VERSION: 2.7.2
+  # Pinned so a new ct release cannot introduce yamllint/yamale rules that fail CI on
+  # unchanged charts. Bump deliberately, and re-run `ct lint --config ct.yaml` locally first.
+  CT_VERSION: 3.14.0
 
 jobs:
+  # chart-testing adds what `helm lint` alone does not: yamllint over Chart.yaml/values.yaml,
+  # yamale schema validation of Chart.yaml, and a check that each maintainer resolves to a real
+  # GitHub account. Config lives in ct.yaml at the repo root so a local run matches this job.
+  chart-testing:
+    name: chart-testing (ct lint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # ct resolves target-branch from git history; a shallow clone has none.
+          fetch-depth: 0
+
+      - name: Install Helm
+        uses: azure/setup-helm@v5.0.1
+        with:
+          version: v3.18.4
+
+      # Also installs the yamllint and yamale that ct shells out to, into a uv-managed venv,
+      # so no separate actions/setup-python step is needed.
+      - name: Install chart-testing
+        uses: helm/chart-testing-action@v2.8.0
+        with:
+          version: ${{ env.CT_VERSION }}
+
+      - name: Run ct lint
+        run: ct lint --config ct.yaml
+
   unit-tests:
     name: Lint and Unit Tests
     runs-on: ubuntu-latest
