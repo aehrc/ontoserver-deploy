@@ -4,6 +4,35 @@ entries:
   - annotations:
       artifacthub.io/category: integration-delivery
       artifacthub.io/changes: |
+        - kind: fixed
+          description: README.md is now included in the packaged chart, so it renders on Artifact Hub
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    appVersion: ctsa-6
+    created: "2026-08-13T05:19:57.343330135Z"
+    description: Ontoserver FHIR terminology server helm chart with various deployment
+      configurations
+    digest: a1bfb28b27f3f77d6668731dba8e588c50ad6fde24ea3948b5b1296bdb85af25
+    home: https://ontoserver.csiro.au
+    icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/master/icons/ontoserver.png
+    keywords:
+    - fhir
+    - terminology
+    - ontoserver
+    - hl7
+    maintainers:
+    - email: ontoserver-support@csiro.au
+      name: CSIRO
+    name: ontoserver
+    sources:
+    - https://github.com/aehrc/ontoserver-deploy
+    type: application
+    urls:
+    - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-v0.4.1/ontoserver-0.4.1.tgz
+    version: 0.4.1
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/changes: |
         - kind: added
           description: Opt-in pod and container securityContext values (unset by default, so upgrades roll no pods)
         - kind: added
@@ -315,4 +344,4 @@ entries:
     urls:
     - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-indexer-0.1.0/ontoserver-indexer-0.1.0.tgz
     version: 0.1.0
-generated: "2026-08-13T05:15:06.3365343Z"
+generated: "2026-08-13T05:19:57.339257327Z"
