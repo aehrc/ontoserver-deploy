@@ -22,6 +22,9 @@
 
 ontoserver:
   serverName: localhost
+  # Matches the port-forward above, so the CapabilityStatement and canonical URLs
+  # advertise http://localhost:8080/... Remove this when serving on port 80/443.
+  serverPort: "8080"
   hostNames:
     - localhost
 

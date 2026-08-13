@@ -28,6 +28,8 @@ ontoserver:
     allowScaledReadWrite: false
     ## @param ontoserver.deployment.replicas            Number of replicas - min 2 for scaled deployment - can be set to 0
     replicas: 1
+    ## @param ontoserver.deployment.podManagementPolicy StatefulSet pod management policy (Parallel or OrderedReady); ignored when kind is Deployment. Parallel starts and replaces pods without waiting for Ready, so a multi-replica rolling update can leave the Service with no ready endpoint; OrderedReady waits for each pod to become Ready first. Immutable on a live StatefulSet - see the README for the --cascade=orphan recreate.
+    podManagementPolicy: Parallel
     ## @param ontoserver.deployment.clusterName         Cluster name for auto-discovery in scaled deployments (overrides the default "ontoserver" set in application.properties); ignored for single deployments
     clusterName: ""
     ## @param ontoserver.deployment.annotations         Deployment/Statefulset manifest annotations
@@ -199,7 +201,7 @@ ontoserver:
   ## @param ontoserver.serverName                          Server hostname - must match a hostName at ontoserver.hostNames
   serverName: localhost
   ## @param ontoserver.serverPort                          Non-standard port exposed to clients (e.g. 8080 when port-forwarding or k3d maps 8080:80). Leave empty for standard ports (80/443).
-  serverPort: "8080"
+  serverPort: ""
   ## @param ontoserver.hostNames                           Hostnames for ingress/gateway
   hostNames:
     - localhost
@@ -318,8 +320,12 @@ ontoserver:
       propagators: "tracecontext,baggage,b3multi"
       ## @param ontoserver.opentelemetry.instrumentation.excludedClasses   Classes to exclude from instrumentation
       excludedClasses: "ca.uhn.fhir.*Interceptor*"
+      ## @param ontoserver.opentelemetry.instrumentation.metricsExporter   OTEL_METRICS_EXPORTER for the Java agent (e.g. otlp for JVM heap and GC metrics, or none to disable)
+      metricsExporter: "none"
+      ## @param ontoserver.opentelemetry.instrumentation.logsExporter      OTEL_LOGS_EXPORTER for the Java agent (e.g. otlp, or none to disable)
+      logsExporter: "none"
       exporter:
-        ## @param ontoserver.opentelemetry.instrumentation.exporter.type       Exporter type (zipkin, otlp, etc.)
+        ## @param ontoserver.opentelemetry.instrumentation.exporter.type       Trace exporter type (OTEL_TRACES_EXPORTER - zipkin, otlp, etc.)
         type: zipkin
         ## @param ontoserver.opentelemetry.instrumentation.exporter.endpoint   Exporter endpoint URL (required when enabled)
         endpoint: ""

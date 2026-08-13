@@ -64,6 +64,36 @@ tests:
       - equal:
           path: spec.exporter.endpoint
           value: "http://jaeger:4317"
+      - contains:
+          path: spec.java.env
+          content:
+            name: OTEL_METRICS_EXPORTER
+            value: "none"
+      - contains:
+          path: spec.java.env
+          content:
+            name: OTEL_LOGS_EXPORTER
+            value: "none"
+
+  - it: honours metricsExporter and logsExporter overrides
+    templates:
+      - templates/opentelemetry-instrumentation.yaml
+    set:
+      ontoserver.opentelemetry.instrumentation.enabled: true
+      ontoserver.opentelemetry.instrumentation.exporter.endpoint: "http://collector:4317"
+      ontoserver.opentelemetry.instrumentation.metricsExporter: otlp
+      ontoserver.opentelemetry.instrumentation.logsExporter: otlp
+    asserts:
+      - contains:
+          path: spec.java.env
+          content:
+            name: OTEL_METRICS_EXPORTER
+            value: "otlp"
+      - contains:
+          path: spec.java.env
+          content:
+            name: OTEL_LOGS_EXPORTER
+            value: "otlp"
 
   - it: renders no Envoy policies by default
     templates:

@@ -25,6 +25,15 @@ tests:
           path: spec.podManagementPolicy
           value: Parallel
 
+  - it: honours a podManagementPolicy override
+    set:
+      ontoserver.deployment.kind: StatefulSet
+      ontoserver.deployment.podManagementPolicy: OrderedReady
+    asserts:
+      - equal:
+          path: spec.podManagementPolicy
+          value: OrderedReady
+
   - it: sets serviceName to headless service
     set:
       ontoserver.deployment.kind: StatefulSet

@@ -53,6 +53,14 @@
               "type": "integer",
               "minimum": 0
             },
+            "podManagementPolicy": {
+              "type": "string",
+              "enum": [
+                "Parallel",
+                "OrderedReady"
+              ],
+              "description": "StatefulSet pod management policy. Parallel does not wait for Ready before replacing the next pod; OrderedReady does. Immutable on a live StatefulSet."
+            },
             "clusterName": {
               "type": "string"
             },
@@ -652,6 +660,14 @@
                 },
                 "excludedClasses": {
                   "type": "string"
+                },
+                "metricsExporter": {
+                  "type": "string",
+                  "description": "OTEL_METRICS_EXPORTER for the Java agent (e.g. otlp, prometheus, none)."
+                },
+                "logsExporter": {
+                  "type": "string",
+                  "description": "OTEL_LOGS_EXPORTER for the Java agent (e.g. otlp, none)."
                 },
                 "exporter": {
                   "type": "object",

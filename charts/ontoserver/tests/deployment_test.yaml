@@ -15,6 +15,34 @@ tests:
           path: spec.replicas
           value: 1
 
+  - it: omits a port from the published base URLs by default
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ontoserver.fhir.base
+            value: http://localhost/fhir
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ontoserver.synd.base
+            value: http://localhost/synd
+
+  - it: appends serverPort to the published base URLs when set
+    set:
+      ontoserver.serverPort: "8080"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ontoserver.fhir.base
+            value: http://localhost:8080/fhir
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ontoserver.formats.html.base
+            value: http://localhost:8080/static
+
   - it: sets replicas from values
     set:
       ontoserver.deployment.replicas: 0

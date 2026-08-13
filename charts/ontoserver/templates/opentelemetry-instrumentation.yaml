@@ -20,9 +20,9 @@ spec:
         value: {{ .Values.ontoserver.opentelemetry.instrumentation.exporter.endpoint | quote }}
       {{- end }}
       - name: OTEL_METRICS_EXPORTER
-        value: "none"
+        value: {{ .Values.ontoserver.opentelemetry.instrumentation.metricsExporter | quote }}
       - name: OTEL_LOGS_EXPORTER
-        value: "none"
+        value: {{ .Values.ontoserver.opentelemetry.instrumentation.logsExporter | quote }}
       - name: OTEL_PROPAGATORS
         value: {{ .Values.ontoserver.opentelemetry.instrumentation.propagators | quote }}
       - name: OTEL_INSTRUMENTATION_COMMON_ENDUSER_ENABLED
