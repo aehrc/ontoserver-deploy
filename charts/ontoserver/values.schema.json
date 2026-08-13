@@ -53,6 +53,14 @@
               "type": "integer",
               "minimum": 0
             },
+            "podManagementPolicy": {
+              "type": "string",
+              "enum": [
+                "Parallel",
+                "OrderedReady"
+              ],
+              "description": "StatefulSet pod management policy. Parallel does not wait for Ready before replacing the next pod; OrderedReady does. Immutable on a live StatefulSet."
+            },
             "clusterName": {
               "type": "string"
             },

@@ -28,6 +28,8 @@ ontoserver:
     allowScaledReadWrite: false
     ## @param ontoserver.deployment.replicas            Number of replicas - min 2 for scaled deployment - can be set to 0
     replicas: 1
+    ## @param ontoserver.deployment.podManagementPolicy StatefulSet pod management policy (Parallel or OrderedReady); ignored when kind is Deployment. Parallel starts and replaces pods without waiting for Ready, so a multi-replica rolling update can leave the Service with no ready endpoint; OrderedReady waits for each pod to become Ready first. Immutable on a live StatefulSet - see the README for the --cascade=orphan recreate.
+    podManagementPolicy: Parallel
     ## @param ontoserver.deployment.clusterName         Cluster name for auto-discovery in scaled deployments (overrides the default "ontoserver" set in application.properties); ignored for single deployments
     clusterName: ""
     ## @param ontoserver.deployment.annotations         Deployment/Statefulset manifest annotations
