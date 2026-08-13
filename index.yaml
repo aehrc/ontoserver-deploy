@@ -4,6 +4,37 @@ entries:
   - annotations:
       artifacthub.io/category: integration-delivery
       artifacthub.io/changes: |
+        - kind: removed
+          description: 'Scaled read-write is NOT supported and there is no opt-in. Removes ontoserver.deployment.allowScaledReadWrite and the two scaled read-write example values files that used it. A values file setting that flag with type scaled and isReadOnly false now fails to render'
+        - kind: changed
+          description: 'Documentation now states up front that scaled deployments are read-only and that scaled read-write is unsupported, instead of presenting it as an opt-in topology'
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    appVersion: ctsa-6
+    created: "2026-08-13T23:55:22.974988269Z"
+    description: Ontoserver FHIR terminology server helm chart with various deployment
+      configurations
+    digest: c78dd7fc07b2388baaaf058c91750801feb8a04b98f05481c0333c87e1c76c6d
+    home: https://ontoserver.csiro.au
+    icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/master/icons/ontoserver.png
+    keywords:
+    - fhir
+    - terminology
+    - ontoserver
+    - hl7
+    maintainers:
+    - email: ontoserver-support@csiro.au
+      name: CSIRO
+    name: ontoserver
+    sources:
+    - https://github.com/aehrc/ontoserver-deploy
+    type: application
+    urls:
+    - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-v0.5.1/ontoserver-0.5.1.tgz
+    version: 0.5.1
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/changes: |
         - kind: added
           description: ontoserver.deployment.podManagementPolicy exposes the StatefulSet pod management policy (default Parallel, unchanged); set OrderedReady to keep a ready endpoint through a multi-replica rolling update
         - kind: added
@@ -377,4 +408,4 @@ entries:
     urls:
     - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-indexer-0.1.0/ontoserver-indexer-0.1.0.tgz
     version: 0.1.0
-generated: "2026-08-13T11:54:47.736007593Z"
+generated: "2026-08-13T23:55:22.972290426Z"
