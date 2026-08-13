@@ -50,7 +50,7 @@ The traps, in short:
   without it Release Please rewrites a release branch only when the generated *release notes*
   change, so a straggler keeps a stale base and conflicts. Don't remove that flag.
 
-Current releases: `ontoserver` 0.5.0, `ontoserver-extras` 0.1.2, `ontoserver-indexer` 0.2.1.
+Current releases: `ontoserver` 0.5.1, `ontoserver-extras` 0.1.2, `ontoserver-indexer` 0.2.1.
 
 ## Editing a chart
 
