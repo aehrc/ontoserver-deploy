@@ -3,7 +3,7 @@ name: ontoserver
 description: Ontoserver FHIR terminology server helm chart with various
   deployment configurations
 type: application
-version: 0.5.0
+version: 0.5.1
 appVersion: "ctsa-6"
 home: https://ontoserver.csiro.au
 icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/master/icons/ontoserver.png
