@@ -1,0 +1,28 @@
+# chart-testing (ct) configuration.
+#
+# Kept at the repo root so a local `ct lint` behaves exactly like the CI job in
+# .github/workflows/unit-tests.yml. Run it as:
+#
+#   ct lint --config ct.yaml --all
+#
+chart-dirs:
+  - charts
+
+target-branch: master
+
+# Lint every chart, not just the ones changed against target-branch. There are only three
+# charts, and a shared-template edit in one can break the render of another, which a
+# changed-charts-only run would miss.
+all: true
+
+# Release Please owns every chart `version:`, and under that flow Chart.yaml holds the LAST
+# RELEASED version — it is bumped by the release PR, not by the PR making the change. So a
+# normal feature PR legitimately leaves `version:` untouched and ct's increment check would
+# fail every one of them. See RELEASE.md.
+check-version-increment: false
+
+# `helm lint --strict` is run separately in the same workflow; keep ct's own helm lint strict
+# too so the two cannot disagree about what passes.
+helm-lint-extra-args: --strict
+
+validate-maintainers: true
