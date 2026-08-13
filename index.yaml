@@ -222,6 +222,36 @@ entries:
   - annotations:
       artifacthub.io/category: integration-delivery
       artifacthub.io/changes: |
+        - kind: fixed
+          description: README.md is now included in the packaged chart, so it renders on Artifact Hub
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    appVersion: ctsa-6
+    created: "2026-08-13T05:15:06.337348056Z"
+    description: Runs a Kubernetes Job to index a SNOMED CT (or other) code system
+      and publish to a syndication server
+    digest: b42cfef717194a7f310115517052fc033bef6b93d88f2d9472a28f5a6aeb3281
+    home: https://ontoserver.csiro.au
+    icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/master/icons/ontoserver-indexer.png
+    keywords:
+    - ontoserver
+    - fhir
+    - terminology
+    - snomed
+    - indexer
+    maintainers:
+    - email: ontoserver-support@csiro.au
+      name: CSIRO
+    name: ontoserver-indexer
+    sources:
+    - https://github.com/aehrc/ontoserver-deploy
+    type: application
+    urls:
+    - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-indexer-v0.2.1/ontoserver-indexer-0.2.1.tgz
+    version: 0.2.1
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/changes: |
         - kind: added
           description: resources.heapGb to size the JVM heap independently of the container memory limit
         - kind: fixed
@@ -285,4 +315,4 @@ entries:
     urls:
     - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-indexer-0.1.0/ontoserver-indexer-0.1.0.tgz
     version: 0.1.0
-generated: "2026-08-13T04:44:12.846003028Z"
+generated: "2026-08-13T05:15:06.3365343Z"
