@@ -86,6 +86,31 @@ The chart supports four deployment combinations controlled by `ontoserver.deploy
 - `clusterName` sets `ontoserver.cluster.name` for auto-discovery, allowing independent scaled clusters on the same network. Defaults to `ontoserver` (the application default) when unset.
 - `StatefulSet` kind always provisions PVCs via `volumeClaimTemplates`. `Deployment` kind requires `persistence.enabledForDeployment: true` to use PVCs.
 - The `PodDisruptionBudget` is rendered **only for `scaled`** deployments. A single instance owns its Lucene index on a ReadWriteOnce PVC and must be replaced rather than kept available during a disruption, so a PDB there would block node drains without protecting anything. Set exactly one of `minAvailable` or `maxUnavailable` — both accept a whole number or a percentage string (`"25%"`), and the chart fails if both or neither are set. `minAvailable: 1` is the default, so clear it (`minAvailable: null`) when you want `maxUnavailable`.
+- `podManagementPolicy` (StatefulSet only) defaults to `Parallel`. See [StatefulSet rolling updates and `podManagementPolicy`](#statefulset-rolling-updates-and-podmanagementpolicy) — `Parallel` can leave a multi-replica install with no ready endpoint mid-update.
+
+### StatefulSet rolling updates and `podManagementPolicy`
+
+`ontoserver.deployment.podManagementPolicy` defaults to `Parallel`, which is what makes an initial scale-up fast: all replicas start at once rather than waiting for each pod's Lucene index preload in turn. The cost is that during a *rolling update* the controller also does not wait for a replacement pod to become Ready before replacing the next one. On a multi-replica install every pod can therefore be terminated within seconds of each other, and the Service is left with no ready endpoint until the first replacement passes its readiness probe — long enough with `healthCheckOption: -s` to return 503s to clients. A `PodDisruptionBudget` does not prevent this: a PDB only gates the Eviction API (node drains, `kubectl drain`), not StatefulSet-controller-driven pod replacement.
+
+Set `podManagementPolicy: OrderedReady` to make the controller wait for each pod to be Ready before moving to the next, which keeps at least one ready endpoint throughout the update. The trade-off is that startup and scale-up are serialized too, so a cluster whose pods need a long index preload takes proportionally longer to come up.
+
+```yaml
+ontoserver:
+  deployment:
+    kind: StatefulSet
+    type: scaled
+    replicas: 3
+    podManagementPolicy: OrderedReady
+```
+
+> **`podManagementPolicy` is immutable on an existing StatefulSet.** `helm upgrade` against a live release will fail with a field-is-immutable error. To adopt it on an already-deployed release, delete the StatefulSet while leaving the pods (and their PVCs) running, then upgrade so the chart recreates it:
+>
+> ```sh
+> kubectl delete statefulset <release>-statefulset --cascade=orphan
+> helm upgrade <release> ... --set ontoserver.deployment.podManagementPolicy=OrderedReady
+> ```
+>
+> The orphaned pods keep serving traffic and are adopted by the recreated StatefulSet, which matches them by selector and ordinal name. Because only `podManagementPolicy` changes and the pod template does not, the adopted pods should be treated as current and left running — watch `kubectl get pods -w` through the upgrade to confirm. The first rolling update after this is the one that honours the new policy.
 
 ### Supported configurations
 
@@ -689,6 +714,8 @@ kubectl rollout status deployment/my-ontoserver-ontoserver
 ```
 
 > **Port mapping note:** When the load balancer port differs from the standard HTTP/HTTPS port (as with `8080:80` above), set `ontoserver.serverPort: "8080"` in your values file. The chart uses this to construct the Spring Boot base URLs (`ontoserver.fhir.base`, `ontoserver.formats.html.base`, `ontoserver.synd.base`) that Ontoserver embeds in responses. Without it, Ontoserver would advertise `http://localhost/fhir` instead of `http://localhost:8080/fhir`. The `k3d-traefik-values.yaml` example already sets this.
+>
+> `serverPort` defaults to empty, which is correct for anything served on 80/443. Chart versions 0.4.0 and 0.4.1 shipped a default of `"8080"`, so installs on those versions that never set `serverPort` published `host:8080` in their CapabilityStatement and canonical URLs. Upgrading past 0.4.1 restores the empty default and the port disappears from those URLs — set `serverPort: "8080"` explicitly if you were relying on it.
 
 See [`examples/k3d-traefik-values.yaml`](examples/k3d-traefik-values.yaml) for the complete quick-start values file and [`examples/local-values.yaml`](examples/local-values.yaml) for a general local cluster reference.
 
@@ -1153,6 +1180,7 @@ Requires the [External Secrets Operator](https://external-secrets.io/) installed
 | `ontoserver.deployment.isReadOnly`                                                          | Ontoserver in read‑only mode. Required to be true when type is scaled; see allowScaledReadWrite.                                                                                                                                                                                                                                                             | `true`                            |
 | `ontoserver.deployment.allowScaledReadWrite`                                                | Opt in to the unsupported scaled read-write topology. Each replica has its own Lucene index, so content written through the round-robin Service is only indexed on the replica that served the write and $expand / $validate-code fail on the others. Load content with a single-instance read-write deployment instead, then serve it scaled and read-only. | `false`                           |
 | `ontoserver.deployment.replicas`                                                            | Number of replicas - min 2 for scaled deployment - can be set to 0                                                                                                                                                                                                                                                                                           | `1`                               |
+| `ontoserver.deployment.podManagementPolicy`                                                 | StatefulSet pod management policy (Parallel or OrderedReady); ignored when kind is Deployment. Parallel starts and replaces pods without waiting for Ready, so a multi-replica rolling update can leave the Service with no ready endpoint; OrderedReady waits for each pod to become Ready first. Immutable on a live StatefulSet - see the note below.        | `Parallel`                        |
 | `ontoserver.deployment.clusterName`                                                         | Cluster name for auto-discovery in scaled deployments (overrides the default "ontoserver" set in application.properties); ignored for single deployments                                                                                                                                                                                                     | `""`                              |
 | `ontoserver.deployment.annotations`                                                         | Deployment/Statefulset manifest annotations                                                                                                                                                                                                                                                                                                                  | `{}`                              |
 | `ontoserver.deployment.labels`                                                              | Deployment/Statefulset manifest labels                                                                                                                                                                                                                                                                                                                       | `{}`                              |
@@ -1229,7 +1257,7 @@ Requires the [External Secrets Operator](https://external-secrets.io/) installed
 | Name                    | Description                                                                                                                         | Value           |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------- |
 | `ontoserver.serverName` | Server hostname - must match a hostName at ontoserver.hostNames                                                                     | `localhost`     |
-| `ontoserver.serverPort` | Non-standard port exposed to clients (e.g. 8080 when port-forwarding or k3d maps 8080:80). Leave empty for standard ports (80/443). | `8080`          |
+| `ontoserver.serverPort` | Non-standard port exposed to clients (e.g. 8080 when port-forwarding or k3d maps 8080:80). Leave empty for standard ports (80/443). | `""`            |
 | `ontoserver.hostNames`  | Hostnames for ingress/gateway                                                                                                       | `["localhost"]` |
 | `ontoserver.timeZone`   | Server time zone                                                                                                                    | `UTC`           |
 | `ontoserver.language`   | Locale/language                                                                                                                     | `en_US`         |
@@ -1290,7 +1318,9 @@ Requires the [External Secrets Operator](https://external-secrets.io/) installed
 | `ontoserver.opentelemetry.instrumentation.serviceName`       | OTel service name (defaults to releaseName/releaseName-ontoserver)                                                                                            | `""`                                   |
 | `ontoserver.opentelemetry.instrumentation.propagators`       | Trace context propagators                                                                                                                                     | `tracecontext,baggage,b3multi`         |
 | `ontoserver.opentelemetry.instrumentation.excludedClasses`   | Classes to exclude from instrumentation                                                                                                                       | `ca.uhn.fhir.*Interceptor*`            |
-| `ontoserver.opentelemetry.instrumentation.exporter.type`     | Exporter type (zipkin, otlp, etc.)                                                                                                                            | `zipkin`                               |
+| `ontoserver.opentelemetry.instrumentation.metricsExporter`   | OTEL_METRICS_EXPORTER for the Java agent (e.g. otlp for JVM heap and GC metrics, or none to disable)                                                           | `none`                                 |
+| `ontoserver.opentelemetry.instrumentation.logsExporter`      | OTEL_LOGS_EXPORTER for the Java agent (e.g. otlp, or none to disable)                                                                                          | `none`                                 |
+| `ontoserver.opentelemetry.instrumentation.exporter.type`     | Trace exporter type (OTEL_TRACES_EXPORTER - zipkin, otlp, etc.)                                                                                               | `zipkin`                               |
 | `ontoserver.opentelemetry.instrumentation.exporter.endpoint` | Exporter endpoint URL (required when enabled)                                                                                                                 | `""`                                   |
 
 ### Miscellaneous
