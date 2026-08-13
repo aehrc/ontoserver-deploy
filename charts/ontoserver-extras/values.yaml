@@ -150,4 +150,3 @@ collector:
     sendBatchSize: 1000
     ## @param collector.batch.timeout                             Maximum time a span waits before being flushed regardless of batch size. Must not be 0s — that disables the timer entirely, so on a quiet server spans wait indefinitely for the batch to fill.
     timeout: 5s
-
