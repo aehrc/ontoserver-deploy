@@ -3,4 +3,5 @@
 examples/
 .claude/
 *.md
+!README.md
 icon.png
