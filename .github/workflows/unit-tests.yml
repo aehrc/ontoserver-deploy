@@ -12,8 +12,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   # Pinned so a new plugin release cannot change test-suite parsing behaviour underneath CI.
   HELM_UNITTEST_VERSION: 0.8.0
-  # Must match the version the helm-readme-generator skill uses, or the drift check below
-  # will disagree with locally generated tables.
+  # Pinned so a new generator release cannot reflow the tables underneath CI. Whatever you
+  # regenerate with locally must use this same version or the drift check will disagree.
   README_GENERATOR_VERSION: 2.7.2
   # Pinned so a new ct release cannot introduce yamllint/yamale rules that fail CI on
   # unchanged charts. Bump deliberately, and re-run `ct lint --config ct.yaml` locally first.
@@ -109,8 +109,9 @@ jobs:
           done
           if ! git diff --exit-code -- 'charts/*/README.md'; then
             echo "::error::README parameter tables are out of date with values.yaml."
-            echo "Regenerate them and commit the result:"
-            echo '  SKILL_DIR="$HOME/.claude/skills/helm-readme-generator"'
-            echo '  TABLE_ONLY=1 bash "$SKILL_DIR/scripts/bitnami-helm-readme.sh" charts/<chart>'
+            echo "Regenerate them and commit the result, from the chart directory:"
+            echo "  cd charts/<chart>"
+            echo "  npx --yes @bitnami/readme-generator-for-helm@${README_GENERATOR_VERSION} -v values.yaml -r README.md"
+            echo "This edits README.md in place, replacing only the generated parameter tables."
             exit 1
           fi

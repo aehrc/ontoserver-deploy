@@ -55,15 +55,19 @@ Current releases: `ontoserver` 0.5.0, `ontoserver-extras` 0.1.2, `ontoserver-ind
 ## Editing a chart
 
 - **The README parameter tables are generated, and CI fails if they drift from `values.yaml`.** Do not
-  hand-write or hand-pad a row; add the `## @param` comment in `values.yaml` and regenerate:
+  hand-write or hand-pad a row; add the `## @param` comment in `values.yaml` and regenerate with the
+  same generator and version CI pins in `README_GENERATOR_VERSION`:
 
   ```sh
-  SKILL_DIR="$HOME/.claude/skills/helm-readme-generator"
-  TABLE_ONLY=1 bash "$SKILL_DIR/scripts/bitnami-helm-readme.sh" charts/<chart>
+  cd charts/<chart>
+  npx --yes @bitnami/readme-generator-for-helm@2.7.2 -v values.yaml -r README.md
   ```
 
-  `TABLE_ONLY=1` rewrites only the tables and leaves hand-written prose sections alone. Expect it to
-  reflow padding across the whole table, so commit it separately from the change it documents.
+  It edits `README.md` in place and replaces only the generated tables, leaving hand-written prose
+  sections alone. Expect it to reflow padding across the whole table, so commit it separately from the
+  change it documents. A different version reflows differently and CI will reject it. (There is a
+  `helm-readme-generator` skill wrapping this, but it is a personal skill other contributors do not
+  have — keep the `npx` command as the documented route.)
 - **A new value needs four edits, not one:** `values.yaml` (with its `## @param` line), the matching
   `values.schema.json` entry (with an `enum` where the field is closed, which is what turns a typo
   into a render-time error), a `helm unittest` assertion on the rendered output, and the regenerated
