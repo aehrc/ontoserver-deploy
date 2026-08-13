@@ -34,6 +34,11 @@ jobs:
     timeout-minutes: 40
     strategy:
       fail-fast: false
+      # Five jobs starting at once means five k3d clusters pulling the same large Ontoserver image
+      # simultaneously, from the shared IP range GitHub-hosted runners use — which registries rate
+      # limit against. Staggering trades wall-clock for a much smaller burst. Suspected (not proven)
+      # cause of the 2026-08-13 install stalls; the diagnostics added alongside this will say.
+      max-parallel: 2
       matrix:
         mode:
           - name: read-only

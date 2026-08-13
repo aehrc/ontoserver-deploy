@@ -7,6 +7,7 @@ normal path; everything else in this document is fallback and recovery.
 - [How the three charts stay separate](#how-the-three-charts-stay-separate)
 - [What lands where](#what-lands-where)
 - [Conventions you must not break](#conventions-you-must-not-break)
+- [Release PRs and workflow approval (GitHub App token)](#release-prs-and-workflow-approval-github-app-token)
 - [Manual release (`release.sh`)](#manual-release-releasesh)
 - [Recovery](#recovery)
 - [Artifact Hub](#artifact-hub)
@@ -60,6 +61,10 @@ scope.** This is the single most important thing to understand:
 
 Practical consequence: **keep a commit to one chart** where you can. A commit that sweeps all three
 charts forces all three to release together.
+
+- `always-update: true` keeps the open release PRs rebased on `master` as each one merges. All three
+  edit the shared `.release-please-manifest.json`, so without it merging one leaves the rest
+  conflicting — see [Recovery](#a-release-pr-conflicts-after-another-one-merged).
 
 Configuration lives in `release-please-config.json` (what the packages are) and
 `.release-please-manifest.json` (what version each is currently at).
@@ -137,6 +142,29 @@ succeeded. The test workflows trigger on `branches: ['**']`, which excludes tags
 up the runs by commit SHA and polls for up to 10 minutes if one is still in flight.
 
 If the gate reports *no run found*, the commit was never pushed to a branch. Push it before tagging.
+
+## Release PRs and workflow approval (GitHub App token)
+
+A PR opened with the default `GITHUB_TOKEN` cannot trigger workflow runs — GitHub's recursion guard.
+On a release PR that shows up two ways:
+
+- its `pull_request` checks queue at **action_required** until a human clicks approve;
+- **Integration Tests never runs on a release PR at all**, because it triggers on `push` only and
+  the bot's push is suppressed. The suite only runs after the merge, against master.
+
+`release-please.yml` will author its PRs as a GitHub App when one is configured, which makes both
+events fire normally. It is optional: with the variable unset the step is skipped and the action
+falls back to `GITHUB_TOKEN`, behaving exactly as before. To switch over — no workflow edit needed:
+
+1. Create a GitHub App under the **aehrc** org (Settings → Developer settings → GitHub Apps).
+   Permissions: **Contents: Read and write**, **Pull requests: Read and write**,
+   **Issues: Read and write** (Release Please labels its PRs, and labels are the issues API).
+2. Install it on `aehrc/ontoserver-deploy`, and generate a private key.
+3. Add repo **variable** `RELEASE_PLEASE_APP_ID` (the numeric App ID) and repo **secret**
+   `RELEASE_PLEASE_APP_PRIVATE_KEY` (the whole PEM, `BEGIN`/`END` lines included).
+
+Verify by pushing a chart change: the release PR's author becomes the App, and its checks — now
+including Integration Tests — start without an approval prompt.
 
 ## Manual release (`release.sh`)
 
@@ -221,14 +249,24 @@ git push origin gh-pages
 
 ### A release PR conflicts after another one merged
 
-Every release PR edits `.release-please-manifest.json`, so merging one leaves the others
-`CONFLICTING`. **Release Please does not fix this for you** — it rewrites a release branch only when
-the *generated release content* changes, and a straggler's content has not changed, so both the
-post-merge run and an explicit `workflow_dispatch` leave the stale branch alone (observed
-2026-08-13).
+Every release PR edits `.release-please-manifest.json`, so merging one used to leave the others
+`CONFLICTING`. **`always-update: true` in `release-please-config.json` fixes this** — it is the
+supported option for exactly this case:
 
-Rebase it by hand. The resolution is always the union: each chart's own new version, plus whatever
-the merged release just published.
+> if true, always update existing pull requests when changes are added, instead of only when the
+> release notes change. […] can be useful if pull requests must not be out-of-date with the base
+> branch.
+
+The default is `false`, which only rewrites a release branch when the *generated release notes*
+change. Merging extras changes the shared manifest but not the indexer's notes, so the straggler was
+left pointing at a stale base — and neither the post-merge run nor an explicit `workflow_dispatch`
+repaired it (observed 2026-08-13, before the option was set). It costs extra API calls per run,
+which is irrelevant at three charts.
+
+Requires release-please ≥ 16.15.0; `release-please-action@v4` depends on `^17.6.1`, so it is live.
+
+If you ever hit a conflict anyway, rebase by hand. The resolution is always the union: each chart's
+own new version, plus whatever the merged release just published.
 
 ```bash
 BR=release-please--branches--master--components--<chart>

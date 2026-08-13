@@ -25,9 +25,9 @@ The traps, in short:
 - **`artifacthub.io/changes` in `Chart.yaml` is hand-maintained** and Release Please does not update
   it, so it goes stale silently after a release.
 
-- **Merging one release PR conflicts the others.** All three edit `.release-please-manifest.json`,
-  and Release Please will *not* rebase them for you — it only rewrites a release branch when the
-  generated release content changes. Rebase by hand; the resolution is always the union of the
-  versions. See the recovery section in `RELEASE.md`.
+- **Merging one release PR used to conflict the others**, because all three edit
+  `.release-please-manifest.json`. Fixed by `always-update: true` in `release-please-config.json`;
+  without it Release Please rewrites a release branch only when the generated *release notes*
+  change, so a straggler keeps a stale base and conflicts. Don't remove that flag.
 
 Current releases: `ontoserver` 0.4.1, `ontoserver-extras` 0.1.2, `ontoserver-indexer` 0.2.1.

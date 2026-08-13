@@ -32,9 +32,26 @@ jobs:
       # publish job fans out over.
       paths_released: ${{ steps.release.outputs.paths_released }}
     steps:
+      # A PR opened with the default GITHUB_TOKEN cannot start workflow runs (GitHub's recursion
+      # guard). The visible cost on a release PR: its `pull_request` checks sit at action_required
+      # waiting for a human to approve them, and Integration Tests — which triggers on `push` only —
+      # never runs against a release PR at all. Authoring the PR as a GitHub App instead makes both
+      # events fire normally.
+      #
+      # Optional by design: with the variable unset this step is skipped and the action falls back to
+      # GITHUB_TOKEN, exactly as before. Set the repo variable RELEASE_PLEASE_APP_ID and the secret
+      # RELEASE_PLEASE_APP_PRIVATE_KEY to switch over — no workflow edit needed. See RELEASE.md.
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        if: vars.RELEASE_PLEASE_APP_ID != ''
+        with:
+          app-id: ${{ vars.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+
       - uses: googleapis/release-please-action@v4
         id: release
         with:
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
