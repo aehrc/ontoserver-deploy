@@ -23,9 +23,5 @@ annotations:
   # Describes the version in `version:` above — the last released version. Release Please bumps
   # `version:` but does NOT touch this list; update it in the release PR before merging.
   artifacthub.io/changes: |
-    - kind: added
-      description: resources.heapGb to size the JVM heap independently of the container memory limit
     - kind: fixed
-      description: Registry credentials containing a quote or backslash no longer corrupt the image pull secret
-    - kind: added
-      description: Opt-in pod and container securityContext values for the indexer Job (unset by default)
+      description: README.md is now included in the packaged chart, so it renders on Artifact Hub

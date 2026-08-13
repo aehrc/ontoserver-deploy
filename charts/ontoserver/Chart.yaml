@@ -23,19 +23,5 @@ annotations:
   # Please, not an in-development one. Release Please bumps `version:` but does NOT touch this list,
   # so update it in the release PR before merging or it will silently describe the previous release.
   artifacthub.io/changes: |
-    - kind: added
-      description: Opt-in pod and container securityContext values (unset by default, so upgrades roll no pods)
-    - kind: added
-      description: extraVolumes and extraVolumeMounts, which make readOnlyRootFilesystem usable
-    - kind: added
-      description: allowScaledReadWrite, to opt in to the unsupported scaled read-write topology
     - kind: fixed
-      description: Deployments with a ReadWriteOnce volume now use the Recreate strategy, which RollingUpdate deadlocks against
-    - kind: fixed
-      description: podDisruptionBudget now accepts percentages, and rejects configurations that would produce an unevictable workload
-    - kind: fixed
-      description: secretConfig no longer fails to render on a numeric or boolean value
-    - kind: fixed
-      description: Configuration changes now roll the pods (checksum annotations on the pod template)
-    - kind: fixed
-      description: Registry credentials containing a quote or backslash no longer corrupt the image pull secret
+      description: README.md is now included in the packaged chart, so it renders on Artifact Hub

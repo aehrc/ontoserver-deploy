@@ -2,5 +2,4 @@
 /tests/
 examples/
 .claude/
-*.md
-!README.md
+changelog.md

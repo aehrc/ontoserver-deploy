@@ -24,12 +24,4 @@ annotations:
   # `version:` but does NOT touch this list; update it in the release PR before merging.
   artifacthub.io/changes: |
     - kind: fixed
-      description: Varnish now restarts when the VCL changes (checksum/config pod annotation)
-    - kind: fixed
-      description: Traces now ship on a quiet server; the batch processor had a zero flush timeout
-    - kind: added
-      description: Opt-in pod and container securityContext values for the Varnish pod (unset by default)
-    - kind: added
-      description: Readiness and liveness probes on the varnish container
-    - kind: added
-      description: securityContext passthrough for the OpenTelemetry Collector CR
+      description: README.md is now included in the packaged chart, so it renders on Artifact Hub
