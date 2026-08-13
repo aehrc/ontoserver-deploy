@@ -4,6 +4,39 @@ entries:
   - annotations:
       artifacthub.io/category: integration-delivery
       artifacthub.io/changes: |
+        - kind: added
+          description: ontoserver.deployment.podManagementPolicy exposes the StatefulSet pod management policy (default Parallel, unchanged); set OrderedReady to keep a ready endpoint through a multi-replica rolling update
+        - kind: added
+          description: ontoserver.opentelemetry.instrumentation.metricsExporter and logsExporter set OTEL_METRICS_EXPORTER and OTEL_LOGS_EXPORTER (both default none, unchanged); use otlp for JVM heap and GC metrics
+        - kind: changed
+          description: 'ontoserver.serverPort now defaults to empty again, as it did before 0.4.0. Installs on 0.4.0 or 0.4.1 that never set it inherited "8080" and published host:8080 in the CapabilityStatement and canonical URLs; set serverPort explicitly if you relied on that'
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    appVersion: ctsa-6
+    created: "2026-08-13T11:54:47.738050937Z"
+    description: Ontoserver FHIR terminology server helm chart with various deployment
+      configurations
+    digest: 7bcaf0da0026652b76f34c77d8f19fe8d5342cc7489f2b6f3b984250e1d2fa46
+    home: https://ontoserver.csiro.au
+    icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/master/icons/ontoserver.png
+    keywords:
+    - fhir
+    - terminology
+    - ontoserver
+    - hl7
+    maintainers:
+    - email: ontoserver-support@csiro.au
+      name: CSIRO
+    name: ontoserver
+    sources:
+    - https://github.com/aehrc/ontoserver-deploy
+    type: application
+    urls:
+    - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-v0.5.0/ontoserver-0.5.0.tgz
+    version: 0.5.0
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/changes: |
         - kind: fixed
           description: README.md is now included in the packaged chart, so it renders on Artifact Hub
       artifacthub.io/license: Apache-2.0
@@ -344,4 +377,4 @@ entries:
     urls:
     - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-indexer-0.1.0/ontoserver-indexer-0.1.0.tgz
     version: 0.1.0
-generated: "2026-08-13T05:19:57.339257327Z"
+generated: "2026-08-13T11:54:47.736007593Z"
