@@ -3,7 +3,6 @@ entries:
   ontoserver:
   - annotations:
       artifacthub.io/category: integration-delivery
-      artifacthub.io/verified: "true"
       artifacthub.io/changes: |
         - kind: added
           description: Opt-in pod and container securityContext values (unset by default, so upgrades roll no pods)
@@ -22,6 +21,7 @@ entries:
         - kind: fixed
           description: Registry credentials containing a quote or backslash no longer corrupt the image pull secret
       artifacthub.io/license: Apache-2.0
+      artifacthub.io/verified: "true"
     apiVersion: v2
     appVersion: ctsa-6
     created: "2026-08-12T08:19:05.083348875Z"
@@ -47,13 +47,13 @@ entries:
     version: 0.4.0
   - annotations:
       artifacthub.io/category: integration-delivery
-      artifacthub.io/verified: "true"
       artifacthub.io/changes: |
         - kind: added
           description: Initial public release
         - kind: added
           description: "existingSecretConfig: reference a pre-existing Secret as envFrom instead of having the chart create one"
       artifacthub.io/license: Apache-2.0
+      artifacthub.io/verified: "true"
     apiVersion: v2
     appVersion: ctsa-6
     created: "2026-04-02T00:04:02.033783+10:00"
@@ -84,11 +84,11 @@ entries:
     version: 0.3.0
   - annotations:
       artifacthub.io/category: integration-delivery
-      artifacthub.io/verified: "true"
       artifacthub.io/changes: |
         - kind: added
           description: Initial public release
       artifacthub.io/license: Apache-2.0
+      artifacthub.io/verified: "true"
     apiVersion: v2
     appVersion: ctsa-6
     created: "2026-03-24T04:02:30.279734489Z"
@@ -120,7 +120,36 @@ entries:
   ontoserver-extras:
   - annotations:
       artifacthub.io/category: integration-delivery
-      artifacthub.io/verified: "true"
+      artifacthub.io/changes: |
+        - kind: fixed
+          description: README.md is now included in the packaged chart, so it renders on Artifact Hub
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    appVersion: ctsa-6
+    created: "2026-08-13T04:44:12.847421257Z"
+    description: Optional infrastructure components for Ontoserver (Varnish cache,
+      OpenTelemetry Collector)
+    digest: 24c7d44800b0f802dffb346d1bc568b64c683142d021a38f704bc60440962b78
+    home: https://ontoserver.csiro.au
+    icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/master/icons/ontoserver-extras.png
+    keywords:
+    - fhir
+    - terminology
+    - ontoserver
+    - varnish
+    - opentelemetry
+    maintainers:
+    - email: ontoserver-support@csiro.au
+      name: CSIRO
+    name: ontoserver-extras
+    sources:
+    - https://github.com/aehrc/ontoserver-deploy
+    type: application
+    urls:
+    - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-extras-v0.1.2/ontoserver-extras-0.1.2.tgz
+    version: 0.1.2
+  - annotations:
+      artifacthub.io/category: integration-delivery
       artifacthub.io/changes: |
         - kind: fixed
           description: Varnish now restarts when the VCL changes (checksum/config pod annotation)
@@ -133,6 +162,7 @@ entries:
         - kind: added
           description: securityContext passthrough for the OpenTelemetry Collector CR
       artifacthub.io/license: Apache-2.0
+      artifacthub.io/verified: "true"
     apiVersion: v2
     appVersion: ctsa-6
     created: "2026-08-12T08:19:05.186843495Z"
@@ -159,11 +189,11 @@ entries:
     version: 0.1.1
   - annotations:
       artifacthub.io/category: integration-delivery
-      artifacthub.io/verified: "true"
       artifacthub.io/changes: |
         - kind: added
           description: Initial public release
       artifacthub.io/license: Apache-2.0
+      artifacthub.io/verified: "true"
     apiVersion: v2
     appVersion: ctsa-6
     created: "2026-03-24T04:02:30.420663224Z"
@@ -191,7 +221,6 @@ entries:
   ontoserver-indexer:
   - annotations:
       artifacthub.io/category: integration-delivery
-      artifacthub.io/verified: "true"
       artifacthub.io/changes: |
         - kind: added
           description: resources.heapGb to size the JVM heap independently of the container memory limit
@@ -200,6 +229,7 @@ entries:
         - kind: added
           description: Opt-in pod and container securityContext values for the indexer Job (unset by default)
       artifacthub.io/license: Apache-2.0
+      artifacthub.io/verified: "true"
     apiVersion: v2
     appVersion: ctsa-6
     created: "2026-08-12T08:19:05.321979421Z"
@@ -226,11 +256,11 @@ entries:
     version: 0.2.0
   - annotations:
       artifacthub.io/category: integration-delivery
-      artifacthub.io/verified: "true"
       artifacthub.io/changes: |
         - kind: added
           description: Initial public release
       artifacthub.io/license: Apache-2.0
+      artifacthub.io/verified: "true"
     apiVersion: v2
     appVersion: ctsa-6
     created: "2026-03-24T04:02:30.547495683Z"
@@ -255,4 +285,4 @@ entries:
     urls:
     - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-indexer-0.1.0/ontoserver-indexer-0.1.0.tgz
     version: 0.1.0
-generated: "2026-08-12T08:19:05.322000822Z"
+generated: "2026-08-13T04:44:12.846003028Z"
