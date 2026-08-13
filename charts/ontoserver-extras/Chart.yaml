@@ -1,8 +1,9 @@
 apiVersion: v2
 name: ontoserver-extras
-description: Optional infrastructure components for Ontoserver (Varnish cache, OpenTelemetry Collector)
+description: Optional infrastructure components for Ontoserver (Varnish cache,
+  OpenTelemetry Collector)
 type: application
-version: 0.1.1
+version: 0.1.2
 appVersion: "ctsa-6"
 home: https://ontoserver.csiro.au
 icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/master/icons/ontoserver-extras.png
