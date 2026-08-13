@@ -661,6 +661,14 @@
                 "excludedClasses": {
                   "type": "string"
                 },
+                "metricsExporter": {
+                  "type": "string",
+                  "description": "OTEL_METRICS_EXPORTER for the Java agent (e.g. otlp, prometheus, none)."
+                },
+                "logsExporter": {
+                  "type": "string",
+                  "description": "OTEL_LOGS_EXPORTER for the Java agent (e.g. otlp, none)."
+                },
                 "exporter": {
                   "type": "object",
                   "properties": {

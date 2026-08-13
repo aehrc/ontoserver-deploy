@@ -320,8 +320,12 @@ ontoserver:
       propagators: "tracecontext,baggage,b3multi"
       ## @param ontoserver.opentelemetry.instrumentation.excludedClasses   Classes to exclude from instrumentation
       excludedClasses: "ca.uhn.fhir.*Interceptor*"
+      ## @param ontoserver.opentelemetry.instrumentation.metricsExporter   OTEL_METRICS_EXPORTER for the Java agent (e.g. otlp for JVM heap and GC metrics, or none to disable)
+      metricsExporter: "none"
+      ## @param ontoserver.opentelemetry.instrumentation.logsExporter      OTEL_LOGS_EXPORTER for the Java agent (e.g. otlp, or none to disable)
+      logsExporter: "none"
       exporter:
-        ## @param ontoserver.opentelemetry.instrumentation.exporter.type       Exporter type (zipkin, otlp, etc.)
+        ## @param ontoserver.opentelemetry.instrumentation.exporter.type       Trace exporter type (OTEL_TRACES_EXPORTER - zipkin, otlp, etc.)
         type: zipkin
         ## @param ontoserver.opentelemetry.instrumentation.exporter.endpoint   Exporter endpoint URL (required when enabled)
         endpoint: ""
