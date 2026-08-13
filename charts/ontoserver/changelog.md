@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/aehrc/ontoserver-deploy/compare/ontoserver-v0.4.1...ontoserver-v0.5.0) (2026-08-13)
+
+
+### Added
+
+* **ontoserver:** expose OTel metrics and logs exporters ([46a37e2](https://github.com/aehrc/ontoserver-deploy/commit/46a37e21ba3faf09355c3ac1479712bbfd586631))
+* **ontoserver:** expose StatefulSet podManagementPolicy ([f960874](https://github.com/aehrc/ontoserver-deploy/commit/f960874038aabbc4319fb72cf0d247ccb38a05ae))
+
+
+### Fixed
+
+* **ontoserver:** expose podManagementPolicy and OTel exporters, restore empty serverPort default ([7cdff43](https://github.com/aehrc/ontoserver-deploy/commit/7cdff43e931ff0469ce26eb12193a5ce30fce6bf))
+* **ontoserver:** restore empty serverPort default ([d76637a](https://github.com/aehrc/ontoserver-deploy/commit/d76637af84f55a396b62df90157d31c5745f189d))
+
+
+### Documentation
+
+* **ontoserver:** document podManagementPolicy, exporters and serverPort ([95b54f4](https://github.com/aehrc/ontoserver-deploy/commit/95b54f42490e56f0838562ea888dc4b1384e908c))
+* **ontoserver:** regenerate README parameter tables ([12f9c78](https://github.com/aehrc/ontoserver-deploy/commit/12f9c78daafa2ca6562a89cc2ab3990a916efd91))
+
 ## [0.4.1](https://github.com/aehrc/ontoserver-deploy/compare/ontoserver-0.4.0...ontoserver-v0.4.1) (2026-08-13)
 
 
