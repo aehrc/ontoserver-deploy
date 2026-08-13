@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1](https://github.com/aehrc/ontoserver-deploy/compare/ontoserver-v0.5.0...ontoserver-v0.5.1) (2026-08-13)
+
+
+### Fixed
+
+* **ontoserver:** remove allowScaledReadWrite, scaled read-write is unsupported ([5d5b97a](https://github.com/aehrc/ontoserver-deploy/commit/5d5b97a8b6b7bbb4957d120e69f4d32dacd90b6b))
+
 ## [0.5.0](https://github.com/aehrc/ontoserver-deploy/compare/ontoserver-v0.4.1...ontoserver-v0.5.0) (2026-08-13)
 
 
