@@ -374,7 +374,7 @@ generated GitHub Release notes carry that information.
 
 | Chart | Latest release | Notes |
 |---|---|---|
-| `ontoserver` | **0.4.1** | |
+| `ontoserver` | **0.5.0** | Adds `deployment.podManagementPolicy` and the OTel metrics/logs exporter values; restores the empty `serverPort` default |
 | `ontoserver-extras` | **0.1.2** | |
 | `ontoserver-indexer` | **0.2.1** | |
 

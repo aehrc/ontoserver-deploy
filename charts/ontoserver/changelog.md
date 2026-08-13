@@ -16,7 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-* **ontoserver:** expose podManagementPolicy and OTel exporters, restore empty serverPort default ([7cdff43](https://github.com/aehrc/ontoserver-deploy/commit/7cdff43e931ff0469ce26eb12193a5ce30fce6bf))
 * **ontoserver:** restore empty serverPort default ([d76637a](https://github.com/aehrc/ontoserver-deploy/commit/d76637af84f55a396b62df90157d31c5745f189d))
 
 
