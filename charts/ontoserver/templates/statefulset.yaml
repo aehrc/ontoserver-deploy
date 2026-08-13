@@ -198,12 +198,9 @@ spec:
               value: "{{ .Release.Name }}-ontoserver-clustering-service"
             - name: ontoserver.deployment.scaled
               value: "true"
+            {{- /* Not a chart knob. Scaled deployments are read-only, so this is always "true". */}}
             - name: ontoserver.internal.deployment.scaledReadOnly
-              {{- if required "ontoserver.deployment.isReadOnly is required" .Values.ontoserver.deployment.isReadOnly }}
               value: "true"
-              {{- else }}
-              value: "false"
-              {{- end }}
             {{- if .Values.ontoserver.deployment.clusterName }}
             - name: ontoserver.cluster.name
               value: {{ .Values.ontoserver.deployment.clusterName | quote }}

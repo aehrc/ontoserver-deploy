@@ -120,8 +120,8 @@
      index-backed operations ($expand, $validate-code) even though the row is in the shared
      database. $closure is the one stateful operation that remains available, which is why it
      is pinned to pod-0 via <release>-ontoserver-pod0-service. */ -}}
-{{- if and (eq .Values.ontoserver.deployment.type "scaled") (not .Values.ontoserver.deployment.isReadOnly) (not .Values.ontoserver.deployment.allowScaledReadWrite) }}
-  {{- fail "Scaled deployments must set ontoserver.deployment.isReadOnly: true. Read-write is not supported when scaled: each replica has its own Lucene index, so content written through the round-robin Service is only indexed on the replica that served the write and $expand/$validate-code fail on the others. Load content with a single-instance read-write deployment, then serve it scaled and read-only. Set ontoserver.deployment.allowScaledReadWrite=true to opt in to the experimental topology anyway." }}
+{{- if and (eq .Values.ontoserver.deployment.type "scaled") (not .Values.ontoserver.deployment.isReadOnly) }}
+  {{- fail "Scaled deployments must set ontoserver.deployment.isReadOnly: true. Ontoserver forces read-only on a scaled deployment, and each replica has its own Lucene index, so content written through the round-robin Service is only indexed on the replica that served the write and $expand/$validate-code fail on the others. Load content with a single-instance read-write deployment, then serve it scaled and read-only." }}
 {{- end }}
 
 {{- if and (eq .Values.ontoserver.deployment.kind "StatefulSet") .Values.ontoserver.deployment.persistence.files.existingVolume.enabled }}
