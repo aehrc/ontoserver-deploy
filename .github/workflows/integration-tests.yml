@@ -25,6 +25,13 @@ jobs:
   integration-tests:
     name: Integration Tests (${{ matrix.mode.name }})
     runs-on: ubuntu-latest
+    # Without this the job inherits GitHub's 6-hour default. Observed 2026-08-13: a runner whose
+    # k3d cluster stopped answering kubectl left a job wedged in a log-collection step that ignored
+    # cancel, force-cancel AND concurrency eviction — all of which need a responsive runner — while
+    # a queued run sat behind it and a chart stayed half-released. A timeout is the only bound that
+    # does not depend on the runner cooperating. Sized for the worst legitimate case: scaled installs
+    # for up to 20m (installTimeout) and then runs `helm test` for up to 10m.
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -125,8 +132,12 @@ jobs:
         with:
           cluster-name: ontoserver-test
           k3d-version: v5.8.3
+          # Single node (server only, which k3s leaves schedulable). A second node bought no
+          # coverage — the chart declares no podAntiAffinity or topologySpreadConstraints, so
+          # nothing depends on placement, and even scaled's two replicas may co-locate. It did
+          # cost a second copy of every pulled image on the runner's limited disk.
           args: >-
-            --agents 1
+            --agents 0
             --no-lb
             --image rancher/k3s:v1.32.10-k3s1
 
@@ -262,17 +273,31 @@ jobs:
             --wait \
             --timeout ${{ matrix.mode.installTimeout }}
 
+      # `cancelled()` as well as `failure()`: a cancelled run still gets a grace window in which
+      # always()/cancelled() steps execute, and twice on 2026-08-13 a stalled install was cancelled
+      # by hand — which is not a failure, so this step did not run and the evidence was lost.
+      # Every kubectl carries --request-timeout so a wedged API server cannot hang the step that
+      # exists to explain the wedge, and the step itself is bounded.
       - name: Diagnose failed install
-        if: failure()
+        if: failure() || cancelled()
+        timeout-minutes: 3
         run: |
+          echo "=== Node conditions (DiskPressure / MemoryPressure) ==="
+          kubectl --request-timeout=30s describe node | sed -n '/Conditions:/,/Addresses:/p' || true
+          echo "=== Runner disk ==="
+          df -h / || true
+          docker system df || true
           echo "=== Pod status ==="
-          kubectl get pods -o wide
+          kubectl --request-timeout=30s get pods -o wide || true
           echo "=== Pod description ==="
-          kubectl describe pods
+          kubectl --request-timeout=30s describe pods || true
           echo "=== Pod logs ==="
-          kubectl logs -l app=${{ matrix.mode.release }}-ontoserver --all-containers=true --tail=100 || true
+          kubectl --request-timeout=30s logs -l app=${{ matrix.mode.release }}-ontoserver --all-containers=true --tail=100 || true
           echo "=== Events ==="
-          kubectl get events --sort-by='.lastTimestamp'
+          kubectl --request-timeout=30s get events --sort-by='.lastTimestamp' || true
+          echo "=== Image pull / eviction events ==="
+          kubectl --request-timeout=30s get events -o wide \
+            | grep -Ei 'pull|evict|diskpressure|imagegc|429|throttl' || true
 
       - name: Run integration tests
         if: matrix.mode.runHelmTest
@@ -406,52 +431,58 @@ jobs:
             http://localhost:18081/fhir/metadata \
           | grep '"resourceType":"CapabilityStatement"'
 
+      # always() with no timeout is what wedged for 8 minutes on 2026-08-13 and became
+      # uncancellable. Every collection step is bounded, and every kubectl gets a request timeout.
       - name: Collect test logs
         if: always()
+        timeout-minutes: 3
         run: |
           echo "=== Events ==="
-          kubectl get events --sort-by='.lastTimestamp'
+          kubectl --request-timeout=30s get events --sort-by='.lastTimestamp'
           echo "=== Ontoserver pod logs (all containers) ==="
-          kubectl logs -l app=${{ matrix.mode.release }}-ontoserver --all-containers=true --tail=50 || true
+          kubectl --request-timeout=30s logs -l app=${{ matrix.mode.release }}-ontoserver --all-containers=true --tail=50 || true
           echo "=== test-metadata job ==="
-          kubectl describe job ${{ matrix.mode.release }}-ontoserver-test-metadata || true
+          kubectl --request-timeout=30s describe job ${{ matrix.mode.release }}-ontoserver-test-metadata || true
           echo "=== test-metadata logs ==="
-          kubectl logs -l job-name=${{ matrix.mode.release }}-ontoserver-test-metadata --tail=200 || true
+          kubectl --request-timeout=30s logs -l job-name=${{ matrix.mode.release }}-ontoserver-test-metadata --tail=200 || true
 
       # Every test hook, not just the mode-specific one: `helm test` fails on ANY hook, so
       # collecting only expectedHook leaves the actual failure invisible in the log.
       - name: Collect helm test hook logs
         if: always() && matrix.mode.runHelmTest
+        timeout-minutes: 3
         run: |
-          for job in $(kubectl get jobs -o name | sed 's|job.batch/||' | grep -- '-test-'); do
+          for job in $(kubectl --request-timeout=30s get jobs -o name | sed 's|job.batch/||' | grep -- '-test-'); do
             echo "=== job/$job ==="
-            kubectl get job "$job" -o jsonpath='{.status}' || true
+            kubectl --request-timeout=30s get job "$job" -o jsonpath='{.status}' || true
             echo ""
             echo "--- logs ---"
-            kubectl logs -l job-name="$job" --tail=200 || true
+            kubectl --request-timeout=30s logs -l job-name="$job" --tail=200 || true
           done
 
       - name: Collect Traefik logs
         if: always() && matrix.mode.verifyTraefikRoute
+        timeout-minutes: 3
         run: |
           echo "=== Traefik logs ==="
-          kubectl logs -n kube-system -l app.kubernetes.io/name=traefik --tail=50 || true
+          kubectl --request-timeout=30s logs -n kube-system -l app.kubernetes.io/name=traefik --tail=50 || true
 
       - name: Collect Gateway API diagnostics
         if: always() && matrix.mode.verifyGatewayRoute
+        timeout-minutes: 3
         run: |
           echo "=== GatewayClass / Gateway / HTTPRoute ==="
-          kubectl get gatewayclass,gateway,httproute -o wide || true
+          kubectl --request-timeout=30s get gatewayclass,gateway,httproute -o wide || true
           echo "=== Gateway status ==="
-          kubectl get gateway ${{ matrix.mode.release }}-gw -o yaml || true
+          kubectl --request-timeout=30s get gateway ${{ matrix.mode.release }}-gw -o yaml || true
           echo "=== HTTPRoute status ==="
-          kubectl get httproute -o yaml || true
+          kubectl --request-timeout=30s get httproute -o yaml || true
           echo "=== Envoy Gateway policies ==="
-          kubectl get clienttrafficpolicy,backendtrafficpolicy,securitypolicy -o yaml || true
+          kubectl --request-timeout=30s get clienttrafficpolicy,backendtrafficpolicy,securitypolicy -o yaml || true
           echo "=== Envoy Gateway control plane logs ==="
-          kubectl logs -n envoy-gateway-system deployment/envoy-gateway --tail=100 || true
+          kubectl --request-timeout=30s logs -n envoy-gateway-system deployment/envoy-gateway --tail=100 || true
           echo "=== Envoy proxy fleet ==="
-          kubectl get pods,svc -n envoy-gateway-system -o wide || true
-          kubectl logs -n envoy-gateway-system \
+          kubectl --request-timeout=30s get pods,svc -n envoy-gateway-system -o wide || true
+          kubectl --request-timeout=30s logs -n envoy-gateway-system \
             -l gateway.envoyproxy.io/owning-gateway-name=${{ matrix.mode.release }}-gw \
             --tail=100 || true

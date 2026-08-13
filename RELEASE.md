@@ -219,6 +219,38 @@ git commit -m "Release <chart> X.Y.Z [skip ci]"
 git push origin gh-pages
 ```
 
+### A release PR conflicts after another one merged
+
+Every release PR edits `.release-please-manifest.json`, so merging one leaves the others
+`CONFLICTING`. **Release Please does not fix this for you** — it rewrites a release branch only when
+the *generated release content* changes, and a straggler's content has not changed, so both the
+post-merge run and an explicit `workflow_dispatch` leave the stale branch alone (observed
+2026-08-13).
+
+Rebase it by hand. The resolution is always the union: each chart's own new version, plus whatever
+the merged release just published.
+
+```bash
+BR=release-please--branches--master--components--<chart>
+git fetch origin && git checkout -B "$BR" "origin/$BR"
+git rebase origin/master                 # conflicts in .release-please-manifest.json
+# resolve: keep every chart at its highest version, then
+git add .release-please-manifest.json && git rebase --continue
+git push --force-with-lease origin "$BR"
+```
+
+Afterwards check the invariant before merging — every `version:` must equal its manifest entry:
+
+```bash
+cat .release-please-manifest.json
+grep '^version:' charts/*/Chart.yaml
+```
+
+A useful side effect: the branch is now pushed by *you* rather than `GITHUB_TOKEN`, so its checks
+run without needing manual approval, and Integration Tests covers the PR for once.
+
+Avoid the whole situation by keeping a commit to one chart, so only one release PR is ever open.
+
 ### Marking a release as pre-release
 
 Not automated — deliberately. Set it by hand if a chart needs it:
@@ -304,9 +336,13 @@ generated GitHub Release notes carry that information.
 
 | Chart | Latest release | Notes |
 |---|---|---|
-| `ontoserver` | **0.4.0** | breaking: bundled nginx-ingress subchart removed |
-| `ontoserver-extras` | **0.1.1** | |
-| `ontoserver-indexer` | **0.2.0** | |
+| `ontoserver` | **0.4.1** | |
+| `ontoserver-extras` | **0.1.2** | |
+| `ontoserver-indexer` | **0.2.1** | |
+
+The 0.4.1 / 0.1.2 / 0.2.1 round fixed a `.helmignore` that excluded `README.md` from the packaged
+charts, so Artifact Hub had no README to render. 0.4.0 was the breaking release that removed the
+bundled nginx-ingress subchart.
 
 Releases 0.1.0–0.3.0 are flagged pre-release on GitHub; 0.4.0 / 0.1.1 / 0.2.0 are normal releases.
 
