@@ -374,7 +374,7 @@ generated GitHub Release notes carry that information.
 
 | Chart | Latest release | Notes |
 |---|---|---|
-| `ontoserver` | **0.5.1** | Removes `deployment.allowScaledReadWrite` — scaled read-write is not supported. 0.5.0 added `deployment.podManagementPolicy` and the OTel metrics/logs exporter values, and restored the empty `serverPort` default |
+| `ontoserver` | **0.5.2** | Scaled read-write is not supported: 0.5.1 removed `deployment.allowScaledReadWrite`, 0.5.2 stops the config passthroughs re-enabling writes. 0.5.0 added `deployment.podManagementPolicy` and the OTel metrics/logs exporter values, and restored the empty `serverPort` default |
 | `ontoserver-extras` | **0.1.2** | |
 | `ontoserver-indexer` | **0.2.1** | |
 
