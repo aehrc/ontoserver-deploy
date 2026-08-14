@@ -4,6 +4,35 @@ entries:
   - annotations:
       artifacthub.io/category: integration-delivery
       artifacthub.io/changes: |
+        - kind: fixed
+          description: 'Scaled read-write is NOT supported. An ontoserver.config or ontoserver.secretConfig entry can no longer re-enable writes on a scaled deployment - such an entry took effect over the chart at runtime, and now fails to render instead'
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    appVersion: ctsa-6
+    created: "2026-08-14T00:52:54.224644569Z"
+    description: Ontoserver FHIR terminology server helm chart with various deployment
+      configurations
+    digest: 4af92af70c3020c3145a1039baf80310d5958f25af366259698f7e044e070c3e
+    home: https://ontoserver.csiro.au
+    icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/master/icons/ontoserver.png
+    keywords:
+    - fhir
+    - terminology
+    - ontoserver
+    - hl7
+    maintainers:
+    - email: ontoserver-support@csiro.au
+      name: CSIRO
+    name: ontoserver
+    sources:
+    - https://github.com/aehrc/ontoserver-deploy
+    type: application
+    urls:
+    - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-v0.5.2/ontoserver-0.5.2.tgz
+    version: 0.5.2
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/changes: |
         - kind: removed
           description: 'Scaled read-write is NOT supported and there is no opt-in. Removes ontoserver.deployment.allowScaledReadWrite and the two scaled read-write example values files that used it. A values file setting that flag with type scaled and isReadOnly false now fails to render'
         - kind: changed
@@ -408,4 +437,4 @@ entries:
     urls:
     - https://github.com/aehrc/ontoserver-deploy/releases/download/ontoserver-indexer-0.1.0/ontoserver-indexer-0.1.0.tgz
     version: 0.1.0
-generated: "2026-08-13T23:55:22.972290426Z"
+generated: "2026-08-14T00:52:54.221734683Z"
