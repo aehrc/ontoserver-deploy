@@ -124,6 +124,28 @@
   {{- fail "Scaled deployments must set ontoserver.deployment.isReadOnly: true. Ontoserver forces read-only on a scaled deployment, and each replica has its own Lucene index, so content written through the round-robin Service is only indexed on the replica that served the write and $expand/$validate-code fail on the others. Load content with a single-instance read-write deployment, then serve it scaled and read-only." }}
 {{- end }}
 
+{{- /* The chart sets ontoserver.internal.deployment.scaledReadOnly itself on scaled deployments.
+     The config passthroughs render after that entry in the container's env list, and a later
+     duplicate wins, so a passthrough copy would silently override the chart and re-enable the
+     unsupported scaled read-write topology while still passing the isReadOnly guard above.
+     Reject it instead of rendering a manifest that contradicts itself.
+
+     Matching is normalised because Spring resolves a property from the environment in several
+     forms: the dotted name, an older all-lowercase spelling of it, and the uppercase underscored
+     form. Lowercasing and folding _ and - to . collapses all of them to one comparison.
+
+     Not checked, because it cannot be: existingSecretConfig and externalSecret contents are
+     opaque at render time. They arrive via envFrom, which Kubernetes applies *before* the
+     container's own env, so the chart's entry still wins there. */ -}}
+{{- $reserved := "ontoserver.internal.deployment.scaledreadonly" }}
+{{- range $section, $entries := dict "ontoserver.config" (.Values.ontoserver.config | default dict) "ontoserver.secretConfig" (.Values.ontoserver.secretConfig | default dict) }}
+  {{- range $key, $value := $entries }}
+    {{- if eq ($key | lower | replace "_" "." | replace "-" ".") $reserved }}
+      {{- fail (printf "%s must not set %s. Scaled read-write is not supported: Ontoserver forces read-only on a scaled deployment and the chart sets this itself, so a passthrough copy would only produce a manifest whose env list contradicts itself. Remove the entry. To serve content read-write, use a single-instance deployment." $section $key) }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
 {{- if and (eq .Values.ontoserver.deployment.kind "StatefulSet") .Values.ontoserver.deployment.persistence.files.existingVolume.enabled }}
   {{- fail "StatefulSet deployments do not support ontoserver.deployment.persistence.files.existingVolume. Each replica needs its own volume; use dynamic provisioning via storageClass or a Deployment for single-instance prebound volumes." }}
 {{- end }}
