@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2](https://github.com/aehrc/ontoserver-deploy/compare/ontoserver-v0.5.1...ontoserver-v0.5.2) (2026-08-14)
+
+
+### Fixed
+
+* **ontoserver:** stop config passthroughs re-enabling writes on scaled deployments ([fd908cd](https://github.com/aehrc/ontoserver-deploy/commit/fd908cd29c72841decfbaaa13d3b230c7763bed8))
+
 ## [0.5.1](https://github.com/aehrc/ontoserver-deploy/compare/ontoserver-v0.5.0...ontoserver-v0.5.1) (2026-08-13)
 
 

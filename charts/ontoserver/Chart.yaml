@@ -3,7 +3,7 @@ name: ontoserver
 description: Ontoserver FHIR terminology server helm chart with various
   deployment configurations
 type: application
-version: 0.5.1
+version: 0.5.2
 appVersion: "ctsa-6"
 home: https://ontoserver.csiro.au
 icon: https://raw.githubusercontent.com/aehrc/ontoserver-deploy/master/icons/ontoserver.png
@@ -24,7 +24,5 @@ annotations:
   # Please, not an in-development one. Release Please bumps `version:` but does NOT touch this list,
   # so update it in the release PR before merging or it will silently describe the previous release.
   artifacthub.io/changes: |
-    - kind: removed
-      description: 'Scaled read-write is NOT supported and there is no opt-in. Removes ontoserver.deployment.allowScaledReadWrite and the two scaled read-write example values files that used it. A values file setting that flag with type scaled and isReadOnly false now fails to render'
-    - kind: changed
-      description: 'Documentation now states up front that scaled deployments are read-only and that scaled read-write is unsupported, instead of presenting it as an opt-in topology'
+    - kind: fixed
+      description: 'Scaled read-write is NOT supported. An ontoserver.config or ontoserver.secretConfig entry can no longer re-enable writes on a scaled deployment - such an entry took effect over the chart at runtime, and now fails to render instead'
