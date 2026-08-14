@@ -83,7 +83,8 @@ The chart supports four deployment combinations controlled by `ontoserver.deploy
 > on any scaled deployment**: setting `ontoserver.deployment.scaled` makes the server reject writes
 > regardless of what else is configured, so a scaled read-write server is not a topology that exists.
 > The chart therefore refuses to render `type: scaled` with `isReadOnly: false` rather than deploy
-> something that cannot work.
+> something that cannot work, and rejects any `ontoserver.config` or `ontoserver.secretConfig` entry
+> that attempts to re-enable writes on a scaled deployment.
 >
 > Load content with a **single-instance read-write** deployment, then publish it to a syndication
 > server and serve it from a **scaled read-only** cluster. See

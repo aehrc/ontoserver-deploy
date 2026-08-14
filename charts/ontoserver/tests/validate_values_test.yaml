@@ -204,6 +204,59 @@ tests:
       - failedTemplate:
           errorMessage: "Scaled deployments must set ontoserver.deployment.isReadOnly: true. Ontoserver forces read-only on a scaled deployment, and each replica has its own Lucene index, so content written through the round-robin Service is only indexed on the replica that served the write and $expand/$validate-code fail on the others. Load content with a single-instance read-write deployment, then serve it scaled and read-only."
 
+  # The chart sets scaledReadOnly itself, and the config passthroughs render after it, so a
+  # duplicate would win at runtime and re-enable scaled read-write while still passing the
+  # isReadOnly guard. Each accepted spelling must be rejected.
+  - it: rejects a scaledReadOnly override in ontoserver.config
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.config:
+        ontoserver.internal.deployment.scaledReadOnly: "false"
+    asserts:
+      - failedTemplate:
+          errorPattern: "ontoserver\\.config must not set .*Scaled read-write is not supported"
+
+  - it: rejects the older lowercase scaledReadonly spelling
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.config:
+        ontoserver.internal.deployment.scaledReadonly: "false"
+    asserts:
+      - failedTemplate:
+          errorPattern: "must not set .*Scaled read-write is not supported"
+
+  - it: rejects the uppercase underscored environment form
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.config:
+        ONTOSERVER_INTERNAL_DEPLOYMENT_SCALEDREADONLY: "false"
+    asserts:
+      - failedTemplate:
+          errorPattern: "must not set ONTOSERVER_INTERNAL_DEPLOYMENT_SCALEDREADONLY"
+
+  - it: rejects a scaledReadOnly override in ontoserver.secretConfig
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.secretConfig:
+        ontoserver.internal.deployment.scaledReadOnly: "false"
+    asserts:
+      - failedTemplate:
+          errorPattern: "ontoserver\\.secretConfig must not set"
+
+  # The guard must not catch unrelated passthrough entries.
+  - it: allows other ontoserver.config entries on a scaled deployment
+    values:
+      - fixtures/scaled-values.yaml
+    set:
+      ontoserver.config:
+        ontoserver.fhir.closureTable.max: "500"
+    asserts:
+      - notFailedTemplate: {}
+
   # A single-instance deployment is the supported way to load content, so read-write there
   # must stay legal — the guard has to key on `type`, not on isReadOnly alone.
   - it: allows a single read-write deployment
