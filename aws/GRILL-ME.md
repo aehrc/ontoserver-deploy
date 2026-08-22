@@ -11,21 +11,25 @@ Answers inline after each question — fill in and save.
 Will the EKS cluster and its backing services (RDS, ECR, CloudFront) all live in one AWS account, or do you want a multi-account setup where ACK creates resources cross-account via IAM role assumption?
 
 **Answer:**
+single account
 
 ### 1.2 Region
 Which AWS region? (The sparked-infrastructure pattern uses `ap-southeast-2`.)
 
 **Answer:**
+ap-southeast-2
 
 ### 1.3 Environments
 How many environments do we need to spec? (e.g., `dev` only for now, or `dev` + `prod`? The KRO instances directory can hold per-env configs.)
 
 **Answer:**
+dev only - remember this is to make recipe for others. Let's start simple, and we need to tear it down clean.
 
 ### 1.4 Existing VPC or new?
 Should the bootstrap Terraform create a new VPC, or should it expect an existing VPC (like sparked-infrastructure's sparkey-eks does)?
 
 **Answer:**
+new VPC by default, with option to provide one
 
 ---
 
@@ -37,16 +41,19 @@ EKS Auto Mode creates a `default` NodePool. The Azure version has two node pools
 - (b) One custom NodePool/NodeClass for Ontoserver workloads (to control instance family, e.g., memory-optimised for the 4G+ heap)?
 
 **Answer:**
+pure default - these people want to bring the server up. This can be additional documentation
 
 ### 2.2 Kubernetes version pinning
 Should the bootstrap pin a specific K8s version (e.g., `1.32`) or track latest?
 
 **Answer:**
+I think pinning is better, as features change
 
 ### 2.3 Private or public endpoint?
 EKS API server endpoint: public, private, or both? (sparked-infrastructure uses `endpoint_public_access = true`.)
 
 **Answer:**
+endpoint_public_access = true - we need to expect that initially people will need to be able to inspect - again - documentation
 
 ---
 
@@ -58,7 +65,7 @@ The Azure version uses `B_Gen5_2` (basic tier, 2 vCPU). The sparked-infrastructu
 - (b) `db.t4g.medium` (2 vCPU, 4 GiB) — production-like
 - (c) Other
 
-**Answer:**
+**Answer:** - please check the ontoserver requirements. I would use (a) as we only want to prove how it works in principle - documented switch would be ideal
 
 ### 3.2 RDS via ACK or bootstrap Terraform?
 ACK's RDS controller is GA. Options:
@@ -68,7 +75,7 @@ ACK's RDS controller is GA. Options:
 
 Which approach? Note: if ACK manages RDS and you delete the K8s resource, the DB gets deleted too (unless deletion policy is set to `retain`).
 
-**Answer:**
+**Answer:** (a)
 
 ### 3.3 Database credentials
 How should the DB password be managed?
@@ -76,7 +83,7 @@ How should the DB password be managed?
 - (b) AWS Secrets Manager (with External Secrets Operator pulling it into K8s)
 - (c) Something else
 
-**Answer:**
+**Answer:** (a)
 
 ---
 
@@ -87,12 +94,13 @@ The Azure version uses a 512 GB Premium managed disk. EKS Auto Mode includes EBS
 - (a) gp3 PVC (what size? 512 GB like Azure, or smaller for initial dev?)
 - (b) io2 for higher IOPS if indexing is time-sensitive
 
-**Answer:**
+**Answer:** (a) with documentation for (b) switch?
 
 ### 4.2 EBS encryption
 EKS Auto Mode encrypts by default. Use default AWS-managed key, or a customer-managed KMS key?
 
 **Answer:**
+default
 
 ---
 
@@ -105,7 +113,7 @@ Azure version uses an optional ACR. Same pattern for ECR?
 - (c) Pull directly from quay.io (no registry needed in AWS)
 
 **Answer:**
-
+(a)
 ---
 
 ## 6. Networking & Ingress
@@ -117,7 +125,7 @@ EKS Auto Mode includes the AWS Load Balancer Controller. The existing EKS Helm e
 - (c) Both supported (Envoy for app routing, ALB for external ingress)
 
 **Answer:**
-
+(a)
 ### 6.2 TLS termination
 - (a) ALB terminates TLS using ACM certificate (simplest for AWS)
 - (b) cert-manager issues certs to Kubernetes Secrets (like Azure AGIC pattern)
@@ -126,7 +134,7 @@ EKS Auto Mode includes the AWS Load Balancer Controller. The existing EKS Helm e
 Note from the existing README: "cert-manager is not compatible with `ingress.className: alb`". If ALB, TLS must use ACM certificate ARN annotations.
 
 **Answer:**
-
+(a)
 ### 6.3 DNS
 Should the deployment include Route 53 record management?
 - (a) Yes, ACK route53-controller creates DNS records
@@ -134,7 +142,7 @@ Should the deployment include Route 53 record management?
 - (c) ExternalDNS operator (watches Ingress annotations, creates Route 53 records)
 
 **Answer:**
-
+(a)
 ### 6.4 WAF
 The Azure version has an optional WAF on the App Gateway. For AWS:
 - (a) AWS WAF on ALB/CloudFront via ACK wafv2-controller
@@ -142,7 +150,7 @@ The Azure version has an optional WAF on the App Gateway. For AWS:
 - (c) Other
 
 **Answer:**
-
+(a)
 ---
 
 ## 7. CDN / Caching
@@ -155,7 +163,7 @@ The ACK cloudfront-controller exists but is in Preview (not GA). Options:
 - (d) Use Varnish in-cluster caching (the ontoserver-extras chart already supports this) instead of CloudFront
 
 **Answer:**
-
+(a)
 ---
 
 ## 8. Observability
@@ -168,13 +176,13 @@ EKS Auto Mode includes Container Insights. The sparked-infrastructure also deplo
 - (d) OpenTelemetry (chart supports OTel instrumentation)
 
 **Answer:**
-
+(a)
 ### 8.2 Logging
 - (a) CloudWatch Logs (Auto Mode default)
 - (b) Something else (Loki, etc.)
 
 **Answer:**
-
+(a)
 ---
 
 ## 9. Tagging & Cleanup
@@ -189,6 +197,7 @@ What tag keys should all resources carry? Suggested minimum:
 What keys/values do you want? Any org-mandated tags?
 
 **Answer:**
+use minimum, explain how to extend
 
 ### 9.2 5-layer tagging
 EKS Auto Mode resources created by built-in controllers (EC2, EBS, ALB) require a [5-layer tagging pattern](https://aws-samples.github.io/sample-aws-eks-auto-mode/docs/architecture/tagging):
@@ -201,6 +210,7 @@ EKS Auto Mode resources created by built-in controllers (EC2, EBS, ALB) require 
 This requires `enable_auto_mode_custom_tags = true` on the EKS module (adds IAM permissions for custom tag keys). Acceptable?
 
 **Answer:**
+yes
 
 ### 9.3 KRO as resource grouping
 You mentioned KRO ResourceGroups as an analogue to Azure Resource Groups for logical grouping + cascading cleanup. The KRO `ResourceGraphDefinition` composes resources, and deleting the instance triggers deletion of all composed resources.
@@ -211,7 +221,7 @@ Should we design:
 - (c) Hybrid — one master that references sub-compositions
 
 **Answer:**
-
+(a) - explain alternatives
 ---
 
 ## 10. Secrets & Identity
@@ -223,12 +233,12 @@ EKS Auto Mode supports EKS Pod Identity (no IRSA setup needed). The chart alread
 - (c) Either — support both
 
 **Answer:**
-
+(a)
 ### 10.2 External Secrets Operator
 The ontoserver chart already supports External Secrets. Should the platform layer install ESO and configure a ClusterSecretStore pointing to AWS Secrets Manager?
 
 **Answer:**
-
+yes, I am changing my mind on above, if incompatible
 ---
 
 ## 11. CI/CD & GitOps
@@ -237,6 +247,7 @@ The ontoserver chart already supports External Secrets. Should the platform laye
 The sparked-infrastructure uses ArgoCD (there's a `sparked-argo` repo). The examples directory has ArgoCD manifests. Use ArgoCD for deploying the ACK/KRO resources and Ontoserver?
 
 **Answer:**
+We need to imagine a completely independent setup. So I would propose flux with code commit. Flux because it is easier, and code commit because it is batteries included.
 
 ### 11.2 Terraform state backend
 - (a) Reuse the existing `examplebucket-fhir-aws` S3 bucket (from sparked-infrastructure)
@@ -244,6 +255,7 @@ The sparked-infrastructure uses ArgoCD (there's a `sparked-argo` repo). The exam
 - (c) To be determined when AWS account access is provided
 
 **Answer:**
+No, see above 
 
 ---
 
@@ -259,6 +271,8 @@ However, if we package ACK controller installations or KRO ResourceGraphDefiniti
 - (b) Helm chart (ct-testable, version-tracked, parameterised)
 - (c) Mix — ACK controllers via their official Helm charts, KRO compositions as raw manifests
 
+Please double-check EKS has ACK built in. 
+
 **Answer:**
 
 ### 12.2 Integration test AWS account
@@ -268,6 +282,7 @@ Will the integration tests run against:
 - (c) TBD
 
 **Answer:**
+(a)
 
 ### 12.3 Acceptance test scope
 For the integration test, what constitutes "working"?
@@ -277,6 +292,7 @@ For the integration test, what constitutes "working"?
 - (d) Other
 
 **Answer:**
+(c) - we want this to work for users
 
 ---
 
@@ -287,9 +303,9 @@ For the first deliverable, which services are must-have vs nice-to-have?
 
 | Service | Must-have? |
 |---------|-----------|
-| EKS Auto Mode cluster | |
-| VPC/networking | |
-| RDS PostgreSQL | |
+| EKS Auto Mode cluster |X |
+| VPC/networking |X |
+| RDS PostgreSQL |X |
 | EBS persistence (Lucene indexes) | |
 | ALB ingress with TLS | |
 | ECR | |
@@ -299,11 +315,13 @@ For the first deliverable, which services are must-have vs nice-to-have?
 | External Secrets | |
 
 **Answer:**
+I think the first three and then iterate
 
 ### 13.2 Timeline pressure
 Is there a deadline or event driving this, or is it spec-at-leisure?
 
 **Answer:**
+No deadline. Thorough work preferred
 
 ---
 
@@ -315,6 +333,7 @@ kro is described as "not yet intended for production use" (their README). The Re
 - (b) Want a fallback plan (e.g., Helm + ArgoCD without KRO for prod, KRO for dev)
 
 **Answer:**
+(a) note that KRO is a feature that can be turned in EKS auto, so you do not have to maintain anything there either.
 
 ### 14.2 Ontoserver read-write vs read-only
 The Azure version doesn't specify. The EKS examples show both patterns. Should the default deployment be:
@@ -323,12 +342,13 @@ The Azure version doesn't specify. The EKS examples show both patterns. Should t
 - (c) Both documented as KRO instances
 
 **Answer:**
+(c) - both likely usecases
 
 ### 14.3 Relationship to sparked-infrastructure
 Should this `aws/` directory be self-contained (duplicating VPC/EKS bootstrap), or should it reference/import from sparked-infrastructure? The Azure directory is self-contained.
 
 **Answer:**
-
+self-contained. This is for external customers to stand up their own instance.
 ---
 
 *End of grill-me. Save your answers and let me know when ready.*
