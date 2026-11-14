@@ -1,0 +1,25 @@
+ontoserver:
+  gateway:
+    enabled: true
+  tls:
+    enabled: true
+envoygateway:
+  backendTrafficPolicy:
+    enabled: true
+    rateLimit:
+      requests: 150
+      unit: Second
+    rateLimitUserAgents:
+      - SemrushBot
+    ipRateLimits:
+      - cidr: 0.0.0.0/0
+        requests: 20
+        unit: Second
+      - cidr: 10.0.0.0/8
+        type: Exact
+        requests: 500
+        unit: Minute
+    pathRateLimits:
+      - regex: '.*/(\$|%24)[^/]+/_history/?(\?.*)?'
+        requests: 1
+        unit: Minute

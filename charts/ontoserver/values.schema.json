@@ -929,6 +929,57 @@
               "items": {
                 "type": "string"
               }
+            },
+            "ipRateLimits": {
+              "type": "array",
+              "description": "Per-client-IP rate limits",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["cidr", "requests", "unit"],
+                "properties": {
+                  "cidr": {
+                    "type": "string",
+                    "description": "Client CIDR, e.g. 0.0.0.0/0"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": ["Distinct", "Exact"],
+                    "description": "Distinct: one bucket per IP in the range; Exact: one bucket for the whole range"
+                  },
+                  "requests": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": ["Second", "Minute", "Hour"]
+                  }
+                }
+              }
+            },
+            "pathRateLimits": {
+              "type": "array",
+              "description": "Per-path rate limits, one bucket shared by all clients",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["regex", "requests", "unit"],
+                "properties": {
+                  "regex": {
+                    "type": "string",
+                    "description": "Regular expression matched against the request path"
+                  },
+                  "requests": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": ["Second", "Minute", "Hour"]
+                  }
+                }
+              }
             }
           }
         },

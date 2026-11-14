@@ -442,6 +442,21 @@ envoygateway:
       unit: Second
     ## @param envoygateway.backendTrafficPolicy.rateLimitUserAgents   List of User-Agent substrings to rate-limit aggressively (1 req/hour). Matched as regular expressions against the User-Agent header.
     rateLimitUserAgents: []
+    ## @param envoygateway.backendTrafficPolicy.ipRateLimits   Per-client-IP rate limits. Each entry has cidr, type (Distinct gives every IP in the range its own bucket; Exact shares one bucket across the range; default Distinct), requests and unit. Rendered after the User-Agent rules and before the global limit.
+    ## Example:
+    ## ipRateLimits:
+    ##   - cidr: 0.0.0.0/0
+    ##     type: Distinct
+    ##     requests: 20
+    ##     unit: Second
+    ipRateLimits: []
+    ## @param envoygateway.backendTrafficPolicy.pathRateLimits  Per-path rate limits, one bucket shared by all clients. Each entry has regex (matched against the request path), requests and unit. Rendered after the IP rules and before the global limit.
+    ## Example:
+    ## pathRateLimits:
+    ##   - regex: '.*/(\$|%24)[^/]+/_history/?(\?.*)?'
+    ##     requests: 1
+    ##     unit: Minute
+    pathRateLimits: []
   securityPolicy:
     ## @param envoygateway.securityPolicy.enabled          Enable Envoy SecurityPolicy (requires ontoserver.gateway.enabled)
     enabled: false
