@@ -41,8 +41,22 @@
   {{- fail "If not using sidecar PostgreSQL container ontoserver.deployment.db.enabled=false you must specify ontoserver.config.spring.datasource.url" }}
 {{- end }}
 
-{{- if and (index .Values.ontoserver.config "spring.datasource.url") (and (empty (index .Values.ontoserver.config "spring.datasource.username")) (empty (index .Values.ontoserver.secretConfig "spring.datasource.username"))) }}
-  {{- fail "If using external database and ontoserver.config.spring.datasource.url is specified you also need to specify ontoserver.config.spring.datasource.username" }}
+{{- /* The username may also arrive through a Secret the chart cannot read at render time.
+     existingSecretConfig and externalSecret.dataFrom are opaque, so trust them. An
+     externalSecret.data list is visible, so require an entry for the username in it. */ -}}
+{{- $usernameFromSecret := not (empty .Values.ontoserver.existingSecretConfig) }}
+{{- if .Values.ontoserver.externalSecret.enabled }}
+  {{- if .Values.ontoserver.externalSecret.dataFrom }}
+    {{- $usernameFromSecret = true }}
+  {{- end }}
+  {{- range .Values.ontoserver.externalSecret.data }}
+    {{- if eq .secretKey "spring.datasource.username" }}
+      {{- $usernameFromSecret = true }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- if and (index .Values.ontoserver.config "spring.datasource.url") (empty (index .Values.ontoserver.config "spring.datasource.username")) (empty (index .Values.ontoserver.secretConfig "spring.datasource.username")) (not $usernameFromSecret) }}
+  {{- fail "If using external database and ontoserver.config.spring.datasource.url is specified you also need to specify ontoserver.config.spring.datasource.username (or supply it through secretConfig, existingSecretConfig or externalSecret)" }}
 {{- end }}
 
 {{- if and .Values.ontoserver.metrics.serviceMonitor.enabled (not .Values.ontoserver.managementService.enabled) }}

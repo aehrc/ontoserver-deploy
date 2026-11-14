@@ -96,7 +96,7 @@ tests:
       - fixtures/external-db-no-username.yaml
     asserts:
       - failedTemplate:
-          errorMessage: "If using external database and ontoserver.config.spring.datasource.url is specified you also need to specify ontoserver.config.spring.datasource.username"
+          errorMessage: "If using external database and ontoserver.config.spring.datasource.url is specified you also need to specify ontoserver.config.spring.datasource.username (or supply it through secretConfig, existingSecretConfig or externalSecret)"
 
   - it: fails when serviceMonitor enabled without managementService
     set:
@@ -400,3 +400,55 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "is 38 characters; this chart allows at most 33"
+
+  - it: passes when the datasource username comes from an externalSecret data entry
+    values:
+      - fixtures/external-db-no-username.yaml
+    set:
+      ontoserver.externalSecret.enabled: true
+      ontoserver.externalSecret.secretStoreRef.name: vault-backend
+      ontoserver.externalSecret.data:
+        - secretKey: spring.datasource.username
+          remoteRef:
+            key: kv/data/ontoserver
+            property: db-username
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when externalSecret data lists other keys but not the datasource username
+    values:
+      - fixtures/external-db-no-username.yaml
+    set:
+      ontoserver.externalSecret.enabled: true
+      ontoserver.externalSecret.secretStoreRef.name: vault-backend
+      ontoserver.externalSecret.data:
+        - secretKey: spring.datasource.password
+          remoteRef:
+            key: kv/data/ontoserver
+            property: db-password
+    asserts:
+      - failedTemplate:
+          errorPattern: "you also need to specify ontoserver.config.spring.datasource.username"
+
+  - it: passes when the externalSecret uses dataFrom, whose keys are not visible at render time
+    values:
+      - fixtures/external-db-no-username.yaml
+    set:
+      ontoserver.externalSecret.enabled: true
+      ontoserver.externalSecret.secretStoreRef.name: vault-backend
+      ontoserver.externalSecret.dataFrom:
+        - extract:
+            key: kv/data/ontoserver
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: passes when the datasource username may come from existingSecretConfig
+    values:
+      - fixtures/external-db-no-username.yaml
+    set:
+      ontoserver.existingSecretConfig: ontoserver-db-credentials
+    asserts:
+      - hasDocuments:
+          count: 0

@@ -198,6 +198,67 @@ tests:
                 requests: 50
                 unit: Second
 
+  - it: renders IP and path rate limits between the User-Agent rules and the global limit
+    templates:
+      - templates/envoy-gateway-policies.yaml
+    values:
+      - fixtures/rate-limit-ip-path-values.yaml
+    asserts:
+      - isKind:
+          of: BackendTrafficPolicy
+          documentIndex: 0
+      - equal:
+          path: spec.rateLimit.local.rules
+          documentIndex: 0
+          value:
+            - clientSelectors:
+                - headers:
+                    - name: User-Agent
+                      value: SemrushBot
+                      type: RegularExpression
+              limit:
+                requests: 1
+                unit: Hour
+            - clientSelectors:
+                - sourceCIDR:
+                    value: 0.0.0.0/0
+                    type: Distinct
+              limit:
+                requests: 20
+                unit: Second
+            - clientSelectors:
+                - sourceCIDR:
+                    value: 10.0.0.0/8
+                    type: Exact
+              limit:
+                requests: 500
+                unit: Minute
+            - clientSelectors:
+                - path:
+                    type: RegularExpression
+                    value: '.*/(\$|%24)[^/]+/_history/?(\?.*)?'
+              limit:
+                requests: 1
+                unit: Minute
+            - limit:
+                requests: 150
+                unit: Second
+
+  - it: rejects an IP rate limit type outside Distinct and Exact
+    templates:
+      - templates/envoy-gateway-policies.yaml
+    values:
+      - fixtures/rate-limit-ip-path-values.yaml
+    set:
+      envoygateway.backendTrafficPolicy.ipRateLimits:
+        - cidr: 0.0.0.0/0
+          type: Prefix
+          requests: 20
+          unit: Second
+    asserts:
+      - failedTemplate:
+          errorPattern: "ipRateLimits.0.type must be one of the following"
+
   - it: renders no PV by default
     templates:
       - templates/pv.yaml

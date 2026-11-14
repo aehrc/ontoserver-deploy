@@ -52,6 +52,24 @@ spec:
             requests: 1
             unit: Hour
         {{- end }}
+        {{- range .Values.envoygateway.backendTrafficPolicy.ipRateLimits }}
+        - clientSelectors:
+            - sourceCIDR:
+                value: {{ .cidr }}
+                type: {{ .type | default "Distinct" }}
+          limit:
+            requests: {{ .requests }}
+            unit: {{ .unit }}
+        {{- end }}
+        {{- range .Values.envoygateway.backendTrafficPolicy.pathRateLimits }}
+        - clientSelectors:
+            - path:
+                type: RegularExpression
+                value: {{ .regex | quote }}
+          limit:
+            requests: {{ .requests }}
+            unit: {{ .unit }}
+        {{- end }}
         - limit:
             requests: {{ .Values.envoygateway.backendTrafficPolicy.rateLimit.requests }}
             unit: {{ .Values.envoygateway.backendTrafficPolicy.rateLimit.unit }}
