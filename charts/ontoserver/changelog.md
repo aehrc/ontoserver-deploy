@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/aehrc/ontoserver-deploy/compare/ontoserver-v0.5.2...ontoserver-v0.6.0) (2026-11-14)
+
+
+### Added
+
+* **ontoserver:** per-IP and per-path rate limits on the BackendTrafficPolicy ([9213aed](https://github.com/aehrc/ontoserver-deploy/commit/9213aed95f57047184c6b407d7632b738d811c29))
+
+
+### Fixed
+
+* **ontoserver:** accept a datasource username supplied through a Secret ([fd63c62](https://github.com/aehrc/ontoserver-deploy/commit/fd63c627390a0eb02ed24e9c2c28ab5cd83b9692))
+
+
+### Documentation
+
+* **ontoserver:** regenerate README parameter table for the rate-limit values ([0808f2b](https://github.com/aehrc/ontoserver-deploy/commit/0808f2b3180b32e8d4bed75d5fabba14c840d250))
+
 ## [0.5.2](https://github.com/aehrc/ontoserver-deploy/compare/ontoserver-v0.5.1...ontoserver-v0.5.2) (2026-08-14)
 
 
